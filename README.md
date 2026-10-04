@@ -1,21 +1,21 @@
 # OSPSD-Team-5
+
 This is Team 5's repository for CS 3943 OSPSD.
 
 ## Calendar service — Milestone 1, Level 1
 
-This repository currently contains the FastAPI scaffold and Event response model.
-The second Level 1 teammate will implement the local endpoint and HTTP tests.
-The API below is the agreed target contract, not implemented behavior yet.
-Google Calendar integration is planned for Level 2.
+The service retrieves one locally defined calendar event through FastAPI.
+The GET endpoint and two offline HTTP tests are implemented. Google Calendar
+integration remains for Level 2; the public contract below is the handoff boundary.
 
 ### Installation
 
-Use Python 3.14 (verified locally with 3.14.2). Runtime, test, and development
-dependencies, including transitive dependencies, are pinned in requirements.txt.
-CI uses Python 3.14 on Linux; its results must be checked after pushing.
-A fresh temporary environment on macOS passed installation, dependency checks,
-Ruff, mypy, and scaffold/model checks. HTTPX TestClient currently emits a
-Starlette deprecation warning; it did not prevent the scaffold checks.
+Run commands from the repository root. Use Python 3.14. Installation and checks
+were verified on Windows with Python 3.14.8; the foundation was also checked on
+macOS with Python 3.14.2. Requirements are pinned in requirements.txt. On Windows,
+pip also installs pytest's platform-specific colorama dependency.
+
+macOS/Linux:
 
 ```sh
 python3.14 -m venv .venv
@@ -23,28 +23,59 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
+Windows PowerShell:
+
+```powershell
+py -3.14 -m venv .venv
+./.venv/Scripts/python.exe -m pip install -r requirements.txt
+```
+
+Windows Git Bash:
+
+```bash
+py -3.14 -m venv .venv
+source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+```
+
+Git Bash paths use forward slashes. The PowerShell commands below invoke the
+virtual environment directly, so activation and execution-policy changes are
+unnecessary.
+
 ### Run
 
-From the repository root:
+macOS/Linux or activated Git Bash:
 
 ```sh
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
-Swagger UI: http://localhost:8000/docs
+PowerShell:
 
-### Target API (implementation pending)
+```powershell
+./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
+```
+
+Keep the server running while making requests in another terminal. Stop it with
+Ctrl+C. Swagger UI: http://localhost:8000/docs
+
+### API contract
 
 `GET /events/{event_id}` retrieves one calendar event without changing state.
-It takes one required string path parameter, `event_id`, with no query or body
-parameters. Success returns `200 OK` with exactly four fields: string `id` and
-`title`, and ISO 8601 datetime strings `start_time` and `end_time`.
-Level 1 uses local data and has no authentication; Level 2 will use the
-authenticated user's primary Google Calendar.
+It takes one required string path parameter, `event_id`, with no required query
+or body parameters. Success returns `200 OK` with exactly four fields: string
+`id` and `title`, and ISO 8601 datetime strings `start_time` and `end_time`.
+Level 1 uses local data and has no authentication.
+
+Git Bash/macOS/Linux:
 
 ```sh
-curl http://localhost:8000/events/test-event
+curl -i http://localhost:8000/events/test-event
+curl -i http://localhost:8000/events/missing-event
 ```
+
+PowerShell: use `curl.exe -i` with the same URLs to invoke curl directly.
+The known ID returns 200 and:
 
 ```json
 {
@@ -55,68 +86,100 @@ curl http://localhost:8000/events/test-event
 }
 ```
 
-The planned local event is `test-event`. Unknown IDs will return `404` with
-`{"detail": "Event not found"}`.
-Until the route is implemented, the curl example returns FastAPI's default
-404 response instead of the target contract.
+Only `test-event` is locally defined. Other IDs return `404 Not Found` with
+`{"detail": "Event not found"}`. Restarting the service retains the fixed data;
+there is no persistence or write operation.
+
+### Code map and request flow
+
+`app/main.py` owns the FastAPI app, local event mapping, and GET handler.
+FastAPI parses the path parameter, the handler looks up the ID, and the existing
+`Event` model in `app/models.py` defines the serialized success response. A missing
+ID raises HTTPException, which FastAPI renders as the documented 404 JSON.
+There are no SDK calls or credentials in this path.
+
+A dictionary keeps the one-ID lookup simple and makes the local implementation
+easy to replace in Level 2. No provider interface or dependency injection is
+needed for this level.
 
 ### Checks and testing
 
-With the virtual environment active, run the same checks as CI:
+macOS/Linux or activated Git Bash:
 
 ```sh
-ruff check .
-ruff format --check .
-mypy
-pytest
+python -m pip check
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy
+python -m pytest -v
 git diff --check
 ```
 
-Ruff checks lint and formatting; mypy checks application types in strict mode.
-Configuration is in pyproject.toml. GitHub Actions runs lint, formatting, types,
-and tests on pushes and pull requests. Pytest must collect and pass real tests;
-CI intentionally fails while none exist. Add HTTP tests under tests/; include
-that directory in mypy configuration when it exists.
+PowerShell:
 
-For intentional formatting changes, run `ruff format .` and review the diff.
+```powershell
+./.venv/Scripts/python.exe -m pip check
+./.venv/Scripts/python.exe -m ruff check .
+./.venv/Scripts/python.exe -m ruff format --check .
+./.venv/Scripts/python.exe -m mypy
+./.venv/Scripts/python.exe -m pytest -v
+git diff --check
+```
 
-Tests are pending; pytest currently collects no tests (exit code 5).
-Use FastAPI TestClient to check public HTTP behavior without Google credentials
-or network access:
+Ruff checks lint and formatting; mypy checks both app and tests in strict mode.
+Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs lint,
+formatting, types, and tests on pushes and pull requests using Python 3.14 on
+Linux. For intentional formatting changes, run `python -m ruff format .` and
+review the diff.
 
-- Known ID: expect 200 and the exact JSON above, catching missing/extra fields
-  and incorrect values.
-- Unknown ID: expect 404 and the documented error, catching an incorrect success.
+Testing strategy: [tests/test_events.py](tests/test_events.py) exercises the HTTP
+boundary through TestClient without starting a server, using network access, or
+requiring Google credentials. Each test uses a scoped client with cleanup.
 
-Write expected values independently of the lookup data. Keep tests independent
-and read-only. Demonstrate one test catching an incorrect title, record the
-failing assertion in the PR, restore the code, and rerun tests. Once implemented,
-verify the curl example from another teammate's checkout. These checks do not
-establish real-provider behavior; document that verification separately in Level 2.
+- Known ID: check 200 and exact JSON, detecting missing/extra fields or wrong values.
+- Unknown ID: check 404 and the documented error, detecting an incorrect success.
+
+Expected values are written independently of the application's lookup data.
+Both tests and all code checks passed locally on Python 3.14.8. TestClient emits
+a Starlette deprecation warning with the pinned HTTPX dependency; tests still pass.
+
+Defect-detection evidence: temporarily changing the in-memory title to
+`Incorrect Event` made `test_get_known_event` fail at its JSON assertion:
+
+```text
+{'title': 'Incorrect Event'} != {'title': 'Example Event'}
+```
+
+The original title was restored without modifying source files, and both tests
+passed again. Include this evidence in the implementation PR.
+
+These tests establish the local HTTP contract. They do not verify Google
+Calendar, authentication, or all-day events. Teammate setup and curl verification
+from another checkout, implementation review, and CI for the implementation PR
+remain pending.
 
 ### Level 2 handoff
 
-After Level 1 is implemented, replace the fixed lookup in `app/main.py` with a Google Calendar event lookup
-using the authenticated user's `primary` calendar. Preserve the route and
-`Event` response model in `app/models.py`; do not expose `calendar_id` or raw
-Google fields. Map `summary` to `title`, `start.dateTime` to `start_time`, and
-`end.dateTime` to `end_time`. The planned fixture represents a timed event;
-agree on all-day event behavior before expanding that contract.
+The Level 2 owners should replace the local lookup in `app/main.py` with a Google
+Calendar lookup using the authenticated user's `primary` calendar. Preserve the
+route, `Event` response model, and Level 1 tests. Do not expose `calendar_id` or
+raw Google fields. The planned field mapping is `summary` to `title`,
+`start.dateTime` to `start_time`, and `end.dateTime` to `end_time`; verify provider
+assumptions against its documentation and a real test account.
 
-Google authentication, local configuration, and real-provider verification
-will be documented in Level 2. Keep secrets and generated tokens out of Git.
-Decide missing-title behavior as well as all-day event behavior before claiming
-support. The current model does not enforce timezone awareness or start/end
-ordering; those guarantees are not part of the current contract.
+The local fixture represents a timed event. Agree on missing-title and all-day
+behavior before claiming support. The current model does not enforce timezone
+awareness or start/end ordering; those guarantees are not part of this contract.
+
+Google authentication, configuration, and real-provider verification remain
+Level 2 work. Keep secrets and generated tokens out of Git. Keep fast tests
+independent of live credentials when replacing the local implementation, and
+document how at least two teammates can verify the real integration.
 
 ## Contributor documentation
 
 - [AGENTS.md](AGENTS.md): code map, contributor instructions, and review/release rules.
-- [Work plan](docs/WORK_PLAN.md): Level 1 split and milestone responsibilities.
-
-These docs are drafts for team review. Dependencies are pinned and CI is
-configured; GitHub execution, teammate review, endpoint/tests, and Level 2
-provider integration remain pending.
+- [Work plan](docs/WORK_PLAN.md): owners, progress, and milestone responsibilities.
 
 ## Team Members
 

@@ -1,8 +1,8 @@
 # HW1 work plan
 
-Proposed split for team agreement. The foundations were drafted with Codex;
-the endpoint and tests are left for Kristie to implement. Record actual work
-and reviews in PRs. Aim for similar effort and adjust if one side takes longer.
+The Level 1 foundations and endpoint/tests were developed with Codex assistance.
+Student owners remain responsible for understanding and verifying their work.
+Record actual work and reviews in PRs; adjust ownership if effort changes.
 
 ## Level 1
 
@@ -11,10 +11,17 @@ and reviews in PRs. Aim for similar effort and adjust if one side takes longer.
 | Juno Lee | App scaffold, Event model, API contract, setup docs, pinned dependencies, and CI | Kristie Lee |
 | Kristie Lee | Fixed event lookup, GET route, HTTP tests, test evidence, and endpoint demonstration | Juno Lee |
 
-Agree on the README contract first. Juno's foundation is ready for Kristie when
-setup works and the model matches the documented fields. Kristie's part is done
-when known and unknown IDs behave as documented and offline HTTP tests pass.
-Both review each other's work and reproduce setup, running, and testing.
+Juno's foundation was merged in [PR #3](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/3).
+Kristie's endpoint and two offline HTTP tests are implemented, preserving the
+README contract. Python 3.14.8 installation, dependency checks, Ruff, strict mypy,
+and both tests passed locally. The success test detected a deliberately incorrect
+title; restoring it made both tests pass again. See the README for evidence.
+
+Kristie's scope ends with the Level 1 implementation PR. Remaining team steps:
+Juno reviews that PR; the team verifies its CI and reproduces setup and curl
+requests from another checkout. Merge and later releases are handled by the team. A TestClient
+check has verified Swagger availability; a separate live-server demonstration
+remains pending.
 
 ## Level 2
 
@@ -31,9 +38,10 @@ to run the service and fast tests.
 - October 21, 2026: Level 5, final release, review fixes, and demonstration.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
-GitHub Actions. Current gaps: endpoint, tests, GitHub CI execution, teammate
-review/setup reproduction, and Google integration. CI will fail until tests
-are added. Follow the release rules in [AGENTS.md](../AGENTS.md).
+GitHub Actions. Current gaps: implementation PR CI, teammate review/setup
+reproduction, live-server demonstration, and Google integration. The foundation
+PR's CI failed at pytest because it had no tests; the two new tests pass locally.
+Follow the release rules in [AGENTS.md](../AGENTS.md).
 
 ## Evidence to keep as work progresses
 
