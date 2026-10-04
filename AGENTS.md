@@ -2,9 +2,9 @@
 
 ## Code and setup
 
-- `app/main.py`: FastAPI scaffold; event lookup and route are pending.
+- `app/main.py`: FastAPI app, local event mapping, and GET event route.
 - `app/models.py`: public Event response model.
-- `tests/`: HTTP tests to be added by the implementation owner.
+- `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
@@ -28,9 +28,10 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 and the pinned requirements. Run the README check commands:
 Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
 runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
-app; add tests to its configuration when they are implemented. Pytest exits 5
-until tests exist, so CI will fail rather than claim success. Do not bypass checks
-or report missing tests as passing. GitHub CI results still need verification.
+app and tests in strict mode. Both HTTP tests pass locally on Python 3.14.8.
+Keep expected values independent of lookup data and fast tests offline.
+Do not bypass checks or report missing tests as passing. Implementation PR CI
+results still need verification.
 
 ## Releases
 
