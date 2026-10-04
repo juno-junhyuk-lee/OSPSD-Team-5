@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 
-from app.models import Event
+from app.models import CreateEventRequest, Event
 
 app = FastAPI(title="Calendar Service")
 
@@ -22,4 +23,20 @@ def get_event(event_id: str) -> Event:
     event = LOCAL_EVENTS.get(event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+@app.post("/events", response_model=Event, status_code=201)
+def create_event(request: CreateEventRequest) -> Event:
+    """Create a timed event in local memory and return its generated ID."""
+    event_id = uuid4().hex
+    while event_id in LOCAL_EVENTS:
+        event_id = uuid4().hex
+    event = Event(
+        id=event_id,
+        title=request.title,
+        start_time=request.start_time,
+        end_time=request.end_time,
+    )
+    LOCAL_EVENTS[event_id] = event
     return event
