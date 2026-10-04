@@ -8,8 +8,12 @@
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
-Use the README setup and commands. Keep Level 1 to one read-only operation
-with local data. Preserve its public contract for Level 2 and translate Google
+Use the README setup and commands. Each member owns one distinct, useful public
+operation through Levels 1–5, including its tests and documentation. Keep Level 1
+operations small and backed by local data. Jim Lo owns `POST /events`; its planned
+creation contract is in the README and is not implemented yet. Preserve existing
+GET behavior when adding POST. Creation tests must restore local state.
+Preserve each operation's public contract for Level 2 and translate Google
 fields before returning them. Do not commit credentials or add unnecessary layers.
 Fast tests must run without internet or Google credentials.
 

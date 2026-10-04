@@ -4,7 +4,22 @@ The Level 1 foundations and endpoint/tests were developed with Codex assistance.
 Student owners remain responsible for understanding and verifying their work.
 Record actual work and reviews in PRs; adjust ownership if effort changes.
 
-## Level 1
+## Operation ownership
+
+Following clarification with the instructor, each member must own one distinct
+public operation through Levels 1–5, including its tests and documentation.
+Shared setup and integration work support those operations but do not replace
+individual operation ownership.
+
+| Owner | Operation | Current status | Reviewer |
+| --- | --- | --- | --- |
+| Jim Lo | `POST /events` | Level 1 contract documented; implementation and tests pending | To be agreed with the team |
+
+The team still needs to record the other members' operation assignments.
+The tables below retain the earlier GET implementation history; they do not
+establish the team's final operation ownership.
+
+## Existing Level 1 GET work
 
 | Owner | Work | Reviewer |
 | --- | --- | --- |
@@ -23,13 +38,35 @@ requests from another checkout. Merge and later releases are handled by the team
 check has verified Swagger availability; a separate live-server demonstration
 remains pending.
 
-## Level 2
+## Jim Lo's POST Level 1 work
 
-Assign the other three members to authentication/configuration, Google event
-retrieval, and response translation/real verification. Preserve the Level 1
-contract and use the authenticated user's primary calendar. At least two members
-must verify the real integration; by the first checkpoint everyone must be able
-to run the service and fast tests.
+The planned contract is in the README's event creation section. Work is split
+into three reviewable changes:
+
+1. Document the POST contract and ownership, and update contributor instructions.
+2. Implement local event creation and input validation with offline HTTP tests.
+3. Add a usage walkthrough, verification evidence, and Level 2 handoff notes.
+
+The first change contains documentation only. POST is not implemented, and
+Levels 1–5 are not complete. Jim must understand and verify AI-assisted work;
+another teammate must review substantive changes before merging. Codex assists
+with this contract documentation; Jim reviews each change before authorizing
+its commit.
+
+Level 1 completion requires `201` creation, generated IDs, retrieval through
+the existing GET route, documented `422` validation failures without state
+changes, isolated tests, passing checks, and matching documentation. Local
+memory is sufficient; Google authentication and actual provider writes belong
+to Jim's Level 2 work.
+
+## Provider integration requirements
+
+The earlier plan to assign three members exclusively to Level 2 support tasks
+has been superseded by operation ownership. The existing GET handoff uses the
+authenticated user's primary calendar; POST provider details will be defined
+when its Level 2 work begins. At least two members must verify the real
+integration; by the first checkpoint everyone must be able to run the service
+and fast tests.
 
 ## Milestones (before class)
 

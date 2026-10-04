@@ -7,6 +7,8 @@ This is Team 5's repository for CS 3943 OSPSD.
 The service retrieves one locally defined calendar event through FastAPI.
 The GET endpoint and two offline HTTP tests are implemented. Google Calendar
 integration remains for Level 2; the public contract below is the handoff boundary.
+Jim Lo owns event creation through Levels 1–5. Its planned Level 1 contract
+is documented below; the POST endpoint is not implemented yet.
 
 ### Installation
 
@@ -89,6 +91,71 @@ The known ID returns 200 and:
 Only `test-event` is locally defined. Other IDs return `404 Not Found` with
 `{"detail": "Event not found"}`. Restarting the service retains the fixed data;
 there is no persistence or write operation.
+
+### Planned event creation contract
+
+`POST /events` creates one timed event in the service's local memory. Jim Lo
+owns this operation, including its implementation, tests, and documentation
+through Levels 1–5. This section defines the Level 1 target behavior; the
+current service does not yet expose this endpoint.
+
+The request uses `Content-Type: application/json` and requires three body fields:
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `title` | string | Strip leading and trailing whitespace; the result must not be empty. |
+| `start_time` | ISO 8601 datetime string | Must include a UTC offset or `Z`. |
+| `end_time` | ISO 8601 datetime string | Must include a UTC offset or `Z` and represent an instant after `start_time`. |
+
+There are no required path or query parameters. The caller does not supply
+the event ID; the service generates it. For example:
+
+```json
+{
+  "title": "Team Meeting",
+  "start_time": "2026-10-05T10:00:00-04:00",
+  "end_time": "2026-10-05T11:00:00-04:00"
+}
+```
+
+Success returns `201 Created` with exactly the existing `Event` response fields:
+`id`, `title`, `start_time`, and `end_time`. For example:
+
+```json
+{
+  "id": "<server-generated-id>",
+  "title": "Team Meeting",
+  "start_time": "2026-10-05T10:00:00-04:00",
+  "end_time": "2026-10-05T11:00:00-04:00"
+}
+```
+
+The response contains the normalized title and datetime strings representing
+the supplied instants. Equivalent datetime serialization, such as `Z` versus
+`+00:00`, is permitted. The generated ID identifies the new event and must not
+overwrite an existing event. The event can then be retrieved through
+`GET /events/{event_id}` in the same running process.
+
+Missing required fields, invalid field values, timezone-free timestamps, and
+an end time equal to or earlier than the start time return `422 Unprocessable
+Entity` using FastAPI's validation error response with a `detail` array.
+Rejected requests do not add an event or change existing events. Validation
+applies to creation inputs; it does not add guarantees to the existing GET
+operation or shared response model.
+
+Each valid POST creates a new event, even when its body matches a previous
+request. Repeated requests receive different IDs; Level 1 does not provide
+idempotency. Created events are process-local and are lost on restart. The
+Level 1 workflow assumes one server process, with no cross-worker sharing,
+provider authentication, Google Calendar writes, or durable storage. All-day
+events are outside this timed-event contract.
+
+The implementation will be accepted when HTTP tests demonstrate successful
+creation, retrieval through GET, distinct IDs for repeated creation, and
+rejection without state changes for the invalid inputs above. Existing GET
+tests must continue to pass, and creation tests must restore local state so
+they remain independent. Another teammate must review the contract,
+implementation, tests, and documentation; the reviewer is not assigned yet.
 
 ### Code map and request flow
 
