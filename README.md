@@ -176,6 +176,41 @@ Level 2 work. Keep secrets and generated tokens out of Git. Keep fast tests
 independent of live credentials when replacing the local implementation, and
 document how at least two teammates can verify the real integration.
 
+### Shared Google Calendar authentication
+
+The team uses one shared test account and its primary calendar. Enable the
+Calendar API and create a Desktop OAuth client in the shared Cloud project.
+For an External app in Testing, register the shared account as a test user and
+configure `https://www.googleapis.com/auth/calendar.events` in Data Access.
+The authentication script requests this scope for all event operations.
+
+Privately obtain the client JSON and save it as `credentials.json` in the
+repository root. Install the updated pinned requirements, then run:
+
+```sh
+# Windows Git Bash or PowerShell; no activation required
+./.venv/Scripts/python.exe scripts/google_calendar_auth.py
+```
+
+On macOS/Linux, use `.venv/bin/python` instead. Sign in to the shared test account
+in the browser and approve event access within five minutes. The script stores
+`token.json` locally, refreshes usable expired tokens, and requests authorization
+again if a token is revoked or lacks the agreed scope. Each teammate generates
+their own local token. Never commit either JSON file or print its contents.
+
+The verification request lists up to ten events from `primary` without changing
+state. Copy a returned API event ID to verify that specific event:
+
+```sh
+./.venv/Scripts/python.exe scripts/google_calendar_auth.py --event-id EVENT_ID
+```
+
+A successful API request with no returned events still verifies authentication;
+create a timed test event before verifying retrieval. A second execution should
+reuse the saved authorization. A second teammate must reproduce the real request.
+This setup script does not replace the FastAPI endpoint's local lookup yet.
+The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
+
 ## Contributor documentation
 
 - [AGENTS.md](AGENTS.md): code map, contributor instructions, and review/release rules.
