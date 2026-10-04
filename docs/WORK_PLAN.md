@@ -13,7 +13,7 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Jim Lo | `POST /events` | Level 1 contract documented; implementation and tests pending | To be agreed with the team |
+| Jim Lo | `POST /events` | Level 1 implementation and offline tests added; walkthrough and teammate review pending | To be agreed with the team |
 
 The team still needs to record the other members' operation assignments.
 The tables below retain the earlier GET implementation history; they do not
@@ -47,11 +47,9 @@ into three reviewable changes:
 2. Implement local event creation and input validation with offline HTTP tests.
 3. Add a usage walkthrough, verification evidence, and Level 2 handoff notes.
 
-The first change contains documentation only. POST is not implemented, and
-Levels 1–5 are not complete. Jim must understand and verify AI-assisted work;
-another teammate must review substantive changes before merging. Codex assists
-with this contract documentation; Jim reviews each change before authorizing
-its commit.
+The first change contains documentation only. The second adds POST and its
+offline tests; Level 1 review and later levels remain pending.
+Another teammate must review substantive changes before merging.
 
 Level 1 completion requires `201` creation, generated IDs, retrieval through
 the existing GET route, documented `422` validation failures without state

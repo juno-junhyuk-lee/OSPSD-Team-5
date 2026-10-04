@@ -4,11 +4,10 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 ## Calendar service — Milestone 1, Level 1
 
-The service retrieves one locally defined calendar event through FastAPI.
-The GET endpoint and two offline HTTP tests are implemented. Google Calendar
-integration remains for Level 2; the public contract below is the handoff boundary.
-Jim Lo owns event creation through Levels 1–5. Its planned Level 1 contract
-is documented below; the POST endpoint is not implemented yet.
+The service retrieves and creates local calendar events through FastAPI.
+GET and POST are implemented with offline HTTP tests. Google Calendar
+integration remains for Level 2; the contracts below are the handoff boundaries.
+Jim Lo owns event creation through Levels 1–5. Its Level 1 contract is below.
 
 ### Installation
 
@@ -88,16 +87,16 @@ The known ID returns 200 and:
 }
 ```
 
-Only `test-event` is locally defined. Other IDs return `404 Not Found` with
-`{"detail": "Event not found"}`. Restarting the service retains the fixed data;
-there is no persistence or write operation.
+`test-event` is predefined. POST-created events are also available through GET
+in the same process. Unknown IDs return `404 Not Found` with
+`{"detail": "Event not found"}`. Restarting retains only the predefined event;
+created events are not persisted.
 
-### Planned event creation contract
+### Event creation contract
 
 `POST /events` creates one timed event in the service's local memory. Jim Lo
 owns this operation, including its implementation, tests, and documentation
-through Levels 1–5. This section defines the Level 1 target behavior; the
-current service does not yet expose this endpoint.
+through Levels 1–5. This endpoint implements the Level 1 behavior below.
 
 The request uses `Content-Type: application/json` and requires three body fields:
 
@@ -150,7 +149,7 @@ Level 1 workflow assumes one server process, with no cross-worker sharing,
 provider authentication, Google Calendar writes, or durable storage. All-day
 events are outside this timed-event contract.
 
-The implementation will be accepted when HTTP tests demonstrate successful
+Acceptance requires HTTP tests demonstrating successful
 creation, retrieval through GET, distinct IDs for repeated creation, and
 rejection without state changes for the invalid inputs above. Existing GET
 tests must continue to pass, and creation tests must restore local state so
@@ -159,11 +158,15 @@ implementation, tests, and documentation; the reviewer is not assigned yet.
 
 ### Code map and request flow
 
-`app/main.py` owns the FastAPI app, local event mapping, and GET handler.
+`app/main.py` owns the FastAPI app, local event mapping, and GET/POST handlers.
 FastAPI parses the path parameter, the handler looks up the ID, and the existing
 `Event` model in `app/models.py` defines the serialized success response. A missing
 ID raises HTTPException, which FastAPI renders as the documented 404 JSON.
 There are no SDK calls or credentials in this path.
+
+For POST, `CreateEventRequest` in `app/models.py` validates and normalizes the
+input before the handler runs. The handler generates an unused ID, stores the
+new `Event` in local memory, and returns it with status 201.
 
 A dictionary keeps the one-ID lookup simple and makes the local implementation
 easy to replace in Level 2. No provider interface or dependency injection is

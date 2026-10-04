@@ -2,16 +2,18 @@
 
 ## Code and setup
 
-- `app/main.py`: FastAPI app, local event mapping, and GET event route.
-- `app/models.py`: public Event response model.
+- `app/main.py`: FastAPI app, local event mapping, and GET/POST event routes.
+- `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
+- `tests/test_create_events.py`: offline creation and validation contract tests.
+- `tests/conftest.py`: shared HTTP client fixture and local state cleanup.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
 Use the README setup and commands. Each member owns one distinct, useful public
 operation through Levels 1–5, including its tests and documentation. Keep Level 1
-operations small and backed by local data. Jim Lo owns `POST /events`; its planned
-creation contract is in the README and is not implemented yet. Preserve existing
+operations small and backed by local data. Jim Lo owns `POST /events`; its
+implemented Level 1 creation contract is in the README. Preserve existing
 GET behavior when adding POST. Creation tests must restore local state.
 Preserve each operation's public contract for Level 2 and translate Google
 fields before returning them. Do not commit credentials or add unnecessary layers.
