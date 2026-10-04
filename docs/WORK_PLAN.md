@@ -30,9 +30,10 @@ to run the service and fast tests.
 - October 14, 2026: Levels 3 and 4, review prerelease, and sister-team review.
 - October 21, 2026: Level 5, final release, review fixes, and demonstration.
 
-Current gaps: endpoint, tests, dependency pinning, CI, teammate review, and Google
-integration. Follow the release rules in [AGENTS.md](../AGENTS.md).
-The Python support range and fresh-install setup also need verification.
+Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
+GitHub Actions. Current gaps: endpoint, tests, GitHub CI execution, teammate
+review/setup reproduction, and Google integration. CI will fail until tests
+are added. Follow the release rules in [AGENTS.md](../AGENTS.md).
 
 ## Evidence to keep as work progresses
 

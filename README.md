@@ -10,12 +10,15 @@ Google Calendar integration is planned for Level 2.
 
 ### Installation
 
-Target: Python 3.10 or newer. The scaffold has been checked locally on Python
-3.14.2; other versions and a fresh dependency install still need verification.
-Dependencies currently use version ranges and are not yet pinned or locked.
+Use Python 3.14 (verified locally with 3.14.2). Runtime, test, and development
+dependencies, including transitive dependencies, are pinned in requirements.txt.
+CI uses Python 3.14 on Linux; its results must be checked after pushing.
+A fresh temporary environment on macOS passed installation, dependency checks,
+Ruff, mypy, and scaffold/model checks. HTTPX TestClient currently emits a
+Starlette deprecation warning; it did not prevent the scaffold checks.
 
 ```sh
-python3 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
@@ -57,11 +60,25 @@ The planned local event is `test-event`. Unknown IDs will return `404` with
 Until the route is implemented, the curl example returns FastAPI's default
 404 response instead of the target contract.
 
-### Test
+### Checks and testing
+
+With the virtual environment active, run the same checks as CI:
 
 ```sh
+ruff check .
+ruff format --check .
+mypy
 pytest
+git diff --check
 ```
+
+Ruff checks lint and formatting; mypy checks application types in strict mode.
+Configuration is in pyproject.toml. GitHub Actions runs lint, formatting, types,
+and tests on pushes and pull requests. Pytest must collect and pass real tests;
+CI intentionally fails while none exist. Add HTTP tests under tests/; include
+that directory in mypy configuration when it exists.
+
+For intentional formatting changes, run `ruff format .` and review the diff.
 
 Tests are pending; pytest currently collects no tests (exit code 5).
 Use FastAPI TestClient to check public HTTP behavior without Google credentials
@@ -97,8 +114,9 @@ ordering; those guarantees are not part of the current contract.
 - [AGENTS.md](AGENTS.md): code map, contributor instructions, and review/release rules.
 - [Work plan](docs/WORK_PLAN.md): Level 1 split and milestone responsibilities.
 
-These docs are drafts for team review. Dependency pinning, CI, teammate review,
-and Level 2 provider integration remain pending.
+These docs are drafts for team review. Dependencies are pinned and CI is
+configured; GitHub execution, teammate review, endpoint/tests, and Level 2
+provider integration remain pending.
 
 ## Team Members
 

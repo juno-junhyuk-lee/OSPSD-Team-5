@@ -25,9 +25,12 @@ resolves comments and merges after approval and passing checks. Disclose AI
 assistance; each student must understand and verify their submitted work.
 Discuss contract changes together and update tests and docs with the code.
 
-Run `pytest` and `git diff --check` locally. Tests, linting, and type checking
-must also run in CI; configuring those tools and documenting their local
-commands remain pending. Do not report missing tests or checks as passing.
+Use Python 3.14 and the pinned requirements. Run the README check commands:
+Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
+runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
+app; add tests to its configuration when they are implemented. Pytest exits 5
+until tests exist, so CI will fail rather than claim success. Do not bypass checks
+or report missing tests as passing. GitHub CI results still need verification.
 
 ## Releases
 
