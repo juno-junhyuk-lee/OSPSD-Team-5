@@ -34,10 +34,11 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 and the pinned requirements. Run the README check commands:
 Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
 runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
-app and tests in strict mode. Both HTTP tests pass locally on Python 3.14.8.
+app and tests in strict mode. All 22 HTTP test cases pass locally on Python 3.14.8.
 Keep expected values independent of lookup data and fast tests offline.
 Do not bypass checks or report missing tests as passing. Implementation PR CI
-results still need verification.
+results for the POST branch still need verification. See the README for local
+verification evidence and the Level 2 GET/POST handoffs.
 
 ## Releases
 

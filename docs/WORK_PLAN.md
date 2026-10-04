@@ -1,7 +1,6 @@
 # HW1 work plan
 
 The Level 1 foundations and endpoint/tests were developed with Codex assistance.
-Student owners remain responsible for understanding and verifying their work.
 Record actual work and reviews in PRs; adjust ownership if effort changes.
 
 ## Operation ownership
@@ -13,7 +12,7 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Jim Lo | `POST /events` | Level 1 implementation and offline tests added; walkthrough and teammate review pending | To be agreed with the team |
+| Jim Lo | `POST /events` | Level 1 code, tests, walkthrough, and local verification complete; teammate review and branch CI pending | To be agreed with the team |
 
 The team still needs to record the other members' operation assignments.
 The tables below retain the earlier GET implementation history; they do not
@@ -32,24 +31,33 @@ README contract. Python 3.14.8 installation, dependency checks, Ruff, strict myp
 and both tests passed locally. The success test detected a deliberately incorrect
 title; restoring it made both tests pass again. See the README for evidence.
 
-Kristie's scope ends with the Level 1 implementation PR. Remaining team steps:
-Juno reviews that PR; the team verifies its CI and reproduces setup and curl
-requests from another checkout. Merge and later releases are handled by the team. A TestClient
-check has verified Swagger availability; a separate live-server demonstration
-remains pending.
+Kristie's GET implementation was merged in [PR #4](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/4)
+after Juno's approval, with passing PR CI. Local curl verification was completed
+during the POST work. Setup and workflow verification from another teammate's
+checkout remain pending; releases are handled by the team.
 
 ## Jim Lo's POST Level 1 work
 
-The planned contract is in the README's event creation section. Work is split
+The contract is in the README's event creation section. Work is split
 into three reviewable changes:
 
 1. Document the POST contract and ownership, and update contributor instructions.
 2. Implement local event creation and input validation with offline HTTP tests.
 3. Add a usage walkthrough, verification evidence, and Level 2 handoff notes.
 
-The first change contains documentation only. The second adds POST and its
-offline tests; Level 1 review and later levels remain pending.
+The first change defines the contract. The second implements POST with offline
+tests. The third documents usage, local verification, and the Level 2 handoff.
 Another teammate must review substantive changes before merging.
+
+Local verification on October 4, 2026 (macOS, Python 3.14.8): 22 tests, Ruff,
+strict mypy, dependency compatibility, and diff checks passed. Live curl checks
+confirmed creation, retrieval, validation failure, and unchanged predefined
+data. A controlled missing-write defect was detected by the POST-to-GET test;
+restoring normal storage made it pass. Details are in the README. Codex assisted
+with the POST implementation, tests, documentation, and local verification.
+
+Remaining steps: assign a reviewer, verify setup from another checkout, and
+check GitHub CI after publishing the branch. Google integration is Level 2 work.
 
 Level 1 completion requires `201` creation, generated IDs, retrieval through
 the existing GET route, documented `422` validation failures without state
@@ -73,9 +81,9 @@ and fast tests.
 - October 21, 2026: Level 5, final release, review fixes, and demonstration.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
-GitHub Actions. Current gaps: implementation PR CI, teammate review/setup
-reproduction, live-server demonstration, and Google integration. The foundation
-PR's CI failed at pytest because it had no tests; the two new tests pass locally.
+GitHub Actions. Current gaps: POST branch CI and review, teammate setup
+reproduction, and Google integration. The foundation PR's CI initially failed
+at pytest because it had no tests; GET PR CI and the 22 local tests now pass.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 
 ## Evidence to keep as work progresses
