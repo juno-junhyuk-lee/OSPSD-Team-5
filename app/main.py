@@ -3,9 +3,15 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 
-from app.models import CreateEventRequest, Event
+from app.models import Calendar, CreateEventRequest, Event
 
 app = FastAPI(title="Calendar Service")
+
+LOCAL_CALENDARS: dict[str, Calendar] = {
+    "primary": Calendar(
+        id="primary", title="Team 5 Calendar", time_zone="America/New_York"
+    )
+}
 
 LOCAL_EVENTS: dict[str, Event] = {
     "test-event": Event(
@@ -15,6 +21,15 @@ LOCAL_EVENTS: dict[str, Event] = {
         end_time=datetime(2026, 10, 5, 19, 0, tzinfo=timezone.utc),
     )
 }
+
+
+@app.get("/calendars/{calendar_id}", response_model=Calendar)
+def get_calendar(calendar_id: str) -> Calendar:
+    """Retrieve calendar metadata without changing state."""
+    calendar = LOCAL_CALENDARS.get(calendar_id)
+    if calendar is None:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+    return calendar
 
 
 @app.get("/events/{event_id}", response_model=Event)
