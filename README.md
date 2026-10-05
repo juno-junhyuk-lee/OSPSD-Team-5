@@ -394,7 +394,8 @@ The flow follows the [Google Python quickstart](https://developers.google.com/wo
 
 ### Level 2 POST handoff
 
-This is the implementation plan; POST still uses Level 1 local storage.
+The creation module and offline tests are implemented; the HTTP route still
+uses Level 1 local storage. Connecting the route is the next change.
 Jim will connect the existing route to the shared account's `primary` calendar
 using `events.insert`. The existing `calendar.events` scope permits creation;
 see Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).
@@ -444,8 +445,25 @@ reported as a setup problem, without silently falling back to local creation.
 
 #### Integration and verification plan
 
-Keep the Google call and response translation in a small module. Retain the
-synchronous route so the blocking SDK call runs through FastAPI's thread pool.
+`app/google_calendar.py` loads `token.json`, checks the event scope, refreshes
+usable expired authorization, and saves refreshed tokens locally. It does not
+start browser authorization. `create_google_event` inserts into `primary` and
+validates Google's returned ID, title, and timed-event fields before returning
+an `Event`. Extra Google fields are excluded from the public result.
+Setup failures raise `GoogleCalendarSetupError`; provider failures and unusable
+responses propagate for the upcoming HTTP integration to handle. Creation uses
+`execute(num_retries=0)`, including when the response may have been lost.
+
+[Module tests](tests/test_google_calendar.py) replace token loading and SDK
+responses with scoped mocks. They check outgoing fields, returned provider IDs,
+time instants across offsets, repeated creation, unusable responses, and errors
+without retries. Authorization tests use temporary files and controlled refresh
+results to check missing/malformed tokens, scope, reuse, refresh, and revocation.
+All token values in these tests are fictional. No credentials or live requests
+are needed; these checks do not establish real-provider correctness.
+
+Retain the synchronous route so the blocking SDK call runs through FastAPI's
+thread pool.
 The final provider interface and dependency injection belong to later levels.
 
 The event GET route currently reads local data. During this transition, mirror

@@ -9,3 +9,4 @@ select = ["E4", "E7", "E9", "F", "I"]
 python_version = "3.14"
 files = ["app", "tests"]
 strict = true
+untyped_calls_exclude = ["google.oauth2.credentials", "google.auth.exceptions"]

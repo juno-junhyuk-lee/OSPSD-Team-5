@@ -82,8 +82,10 @@ Work is split into four reviewable changes:
 3. Connect POST to Google and preserve HTTP contract tests and existing routes.
 4. Record real HTTP create/read verification, cleanup, and teammate instructions.
 
-Only the first change is prepared. No POST provider call or real creation has
-been verified yet. Codex assisted with the Level 2 planning documentation.
+The first change is committed. The second adds `app/google_calendar.py` and
+offline creation/authorization tests; HTTP wiring and real verification remain
+pending. The module checks returned data, uses provider IDs, and avoids creation
+retries. Codex assisted with planning, module implementation, and offline tests.
 
 Keep the API inputs, 201 response, validation rules, and returned event shape.
 Use Google's event ID. A temporary local mirror preserves same-process retrieval

@@ -11,6 +11,9 @@
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
 - `tests/conftest.py`: shared HTTP client fixture and local state cleanup.
+- `app/google_calendar.py`: local token loading/refresh and Google event creation;
+  HTTP wiring is pending.
+- `tests/test_google_calendar.py`: offline SDK translation and authorization tests.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
@@ -26,6 +29,9 @@ Level 2 POST plan for shared authorization, provider field mapping, and the
 temporary local mirror while event GET remains local. Authorize in the setup
 script, not during an HTTP request. Never fall back to local creation after a
 provider or setup failure, and do not automatically retry uncertain writes.
+Keep strict checks for application code. Mypy permits calls to untyped methods
+in the Google credentials and auth exceptions modules; the API client imports
+have scoped `import-untyped` exclusions because the installed SDK lacks types.
 
 ## Working together
 
