@@ -13,7 +13,7 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 1 local metadata lookup and HTTP tests implemented; review and PR CI pending | To be agreed with the team |
-| Jim Lo | `POST /events` | Level 1 approved and merged in PR #5 with passing CI; Level 2 design documented, implementation and real verification pending | Level 1: Ka Pui and Juno; Level 2: to be agreed |
+| Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 HTTP integration and offline tests implemented, real verification and review pending | Level 1: Ka Pui and Juno; Level 2: to be agreed |
 
 The team still needs to record the other members' operation assignments.
 The tables below retain the earlier GET implementation history; they do not
@@ -82,10 +82,17 @@ Work is split into four reviewable changes:
 3. Connect POST to Google and preserve HTTP contract tests and existing routes.
 4. Record real HTTP create/read verification, cleanup, and teammate instructions.
 
-The first change is committed. The second adds `app/google_calendar.py` and
-offline creation/authorization tests; HTTP wiring and real verification remain
-pending. The module checks returned data, uses provider IDs, and avoids creation
-retries. Codex assisted with planning, module implementation, and offline tests.
+The first two changes are committed. The third connects HTTP POST to Google
+and preserves offline HTTP tests through scoped SDK responses. The route returns
+503 for setup failure and 502 when creation cannot be confirmed, without local
+fallback or creation retries. A controlled lost-response test covers an accepted
+write, and a waiting SDK call allows an unrelated GET to complete in TestClient.
+Real verification remains pending. Codex assisted with planning, implementation,
+and offline tests.
+
+Local checks for this change passed on Python 3.14.8: 47 tests, Ruff lint/format,
+strict mypy, dependency compatibility, and diff checks. The existing TestClient
+deprecation warning remains. No live Google POST has been verified yet.
 
 Keep the API inputs, 201 response, validation rules, and returned event shape.
 Use Google's event ID. A temporary local mirror preserves same-process retrieval
@@ -115,8 +122,8 @@ and fast tests.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
 GitHub Actions. POST Level 1 review and CI are complete. Current POST gaps:
-Google creation, offline integration tests, real verification by two members,
-and Level 2 PR review/CI. The foundation PR's CI initially failed at pytest
+real verification by two members and Level 2 PR review/CI. The foundation PR's
+CI initially failed at pytest
 because it had no tests; GET and POST Level 1 PR CI now pass.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 

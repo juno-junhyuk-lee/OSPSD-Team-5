@@ -10,9 +10,9 @@
 - `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
-- `tests/conftest.py`: shared HTTP client fixture and local state cleanup.
-- `app/google_calendar.py`: local token loading/refresh and Google event creation;
-  HTTP wiring is pending.
+- `tests/conftest.py`: shared HTTP client, scoped Google SDK mock, and local cleanup.
+- `app/google_calendar.py`: local token loading/refresh and Google event creation,
+  called by POST. GET still reads local mirrors.
 - `tests/test_google_calendar.py`: offline SDK translation and authorization tests.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
@@ -52,8 +52,9 @@ app and tests in strict mode. The Level 1 suite now has 24 HTTP test cases,
 including calendar details; all passed locally on Python 3.14.8 during PR #7 review.
 Keep expected values independent of lookup data and fast tests offline.
 Do not bypass checks or report missing tests as passing. POST Level 1 was approved
-and merged in PR #5 with passing CI. POST Level 2 implementation, real verification
-by at least two teammates, and its PR checks remain pending. See the README for
+and merged in PR #5 with passing CI. POST Level 2 HTTP integration is implemented;
+real verification by at least two teammates and its PR checks remain pending.
+See the README for
 local verification evidence and the Level 2 GET/POST handoffs.
 
 ## Releases

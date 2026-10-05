@@ -2,12 +2,12 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## Calendar service — Milestone 1, Level 1
+## Calendar service — Milestone 1
 
-The service retrieves calendar details and retrieves and creates local events
-through FastAPI. These operations are implemented with offline HTTP tests. Google Calendar
-integration remains for Level 2; the contracts below are the handoff boundaries.
-Jim Lo owns event creation through Levels 1–5. Its Level 1 contract is below.
+The service retrieves local calendar details and events through FastAPI.
+POST now calls Google Calendar and mirrors a successful result for local GET.
+Offline checks cover this integration; real POST verification remains pending.
+Jim Lo owns event creation through Levels 1–5. Its public contract is below.
 
 ### Installation
 
@@ -127,9 +127,11 @@ This operation does not list calendars or events and does not alter event routes
 
 ### Event creation contract
 
-`POST /events` creates one timed event in the service's local memory. Jim Lo
+`POST /events` creates one timed event in Google Calendar's `primary` calendar. Jim Lo
 owns this operation, including its implementation, tests, and documentation
-through Levels 1–5. This endpoint implements the Level 1 behavior below.
+through Levels 1–5. Level 2 preserves the Level 1 input and success contract;
+it requires local authorization from the Shared Google Calendar authentication
+instructions below. Real-provider verification is still pending.
 
 The request uses `Content-Type: application/json` and requires three body fields:
 
@@ -140,7 +142,7 @@ The request uses `Content-Type: application/json` and requires three body fields
 | `end_time` | ISO 8601 datetime string | Must include a UTC offset or `Z` and represent an instant after `start_time`. |
 
 There are no required path or query parameters. The caller does not supply
-the event ID; the service generates it. For example:
+the event ID; Google generates it. For example:
 
 ```json
 {
@@ -176,11 +178,19 @@ applies to creation inputs; it does not add guarantees to the existing GET
 operation or shared response model.
 
 Each valid POST creates a new event, even when its body matches a previous
-request. Repeated requests receive different IDs; Level 1 does not provide
-idempotency. Created events are process-local and are lost on restart. The
-Level 1 workflow assumes one server process, with no cross-worker sharing,
-provider authentication, Google Calendar writes, or durable storage. All-day
-events are outside this timed-event contract.
+request. Repeated requests receive different IDs; this operation does not provide
+idempotency. The Google event persists independently of the server. Successful
+results are temporarily mirrored in memory for the current local GET route;
+this mirror is lost on restart and is not shared across workers. Real GET
+integration remains separate work. All-day events are outside this contract.
+
+Setup failure returns 503 with a `detail` string directing the developer to the
+authorization script. Provider HTTP/transport failure or an unusable response
+returns 502 with a `detail` string stating that creation could not be confirmed
+and to check the calendar before retrying. Neither failure adds a local mirror
+or falls back to local creation. A 502 does not guarantee that Google created
+no event; do not blindly repeat a write with an uncertain result. Raw provider
+errors and credential contents are not included in these HTTP responses.
 
 Acceptance requires HTTP tests demonstrating successful
 creation, retrieval through GET, distinct IDs for repeated creation, and
@@ -192,7 +202,8 @@ Juno and merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull
 
 ### Create and retrieve an event
 
-Start the server using the Run instructions above. In another terminal,
+Install current requirements and complete Shared Google Calendar authentication
+below, then start the server using the Run instructions above. In another terminal,
 create an event (macOS/Linux or Git Bash):
 
 ```sh
@@ -226,8 +237,8 @@ Invoke-RestMethod -Uri "http://localhost:8000/events/$($event.id)"
 
 To check validation, use Swagger UI's `POST /events` operation and submit a
 body with `end_time` equal to `start_time`. Expect `422` with a `detail` array.
-The rejected request must not create an event. Restarting the server removes
-created events; GET then returns `404` for their IDs.
+The rejected request must not create an event. Restarting removes local mirrors;
+the current GET then returns `404` for their IDs, while Google events remain.
 
 ### Code map and request flow
 
@@ -240,8 +251,10 @@ ID raises HTTPException, which FastAPI renders as the documented 404 JSON.
 There are no SDK calls or credentials in this path.
 
 For POST, `CreateEventRequest` in `app/models.py` validates and normalizes the
-input before the handler runs. The handler generates an unused ID, stores the
-new `Event` in local memory, and returns it with status 201.
+input before the handler runs. The handler calls `create_google_event`, which
+loads authorization, creates the Google event, and translates the response.
+Only a successful translated result is stored in the local mirror and returned
+with status 201. Setup/provider failures return the errors documented above.
 
 A dictionary keeps the one-ID lookup simple and makes the local implementation
 easy to replace in Level 2. No provider interface or dependency injection is
@@ -281,6 +294,8 @@ Testing strategy: the GET and POST suites exercise the HTTP boundary through
 TestClient without a server, network access, or Google credentials.
 [tests/conftest.py](tests/conftest.py) restores local events after each test,
 including failures. Expected values are independent of the application's data.
+HTTP tests also use a scoped SDK mock from this fixture, exercising the actual
+creation/translation module without accessing credentials or making requests.
 
 - [Calendar GET tests](tests/test_calendars.py): primary returns 200 with exact
   metadata JSON; unknown IDs return the documented calendar 404.
@@ -294,6 +309,14 @@ including failures. Expected values are independent of the application's data.
   return 422 with a `detail` array and leave local events unchanged.
 - Time boundaries: ordering is checked across different UTC offsets, including
   a valid end time whose displayed local hour is earlier than the start hour.
+- Provider integration: Google IDs and outgoing fields are checked, invalid
+  input makes no provider write, and setup/provider failures leave local state
+  unchanged. A simulated accepted write with a lost response returns 502 without
+  retrying; the caller is told to investigate the calendar.
+- Responsiveness: a controlled SDK call signals that it started and waits for
+  release while an unrelated GET completes. Cleanup releases the call even on
+  failure; no arbitrary sleep establishes the ordering. This is an in-process
+  TestClient check, not a live single-worker server demonstration.
 
 On October 4, 2026, the POST implementation was verified on macOS with Python
 3.14.8: all 22 tests, Ruff lint/format checks, strict mypy, dependency compatibility
@@ -394,9 +417,8 @@ The flow follows the [Google Python quickstart](https://developers.google.com/wo
 
 ### Level 2 POST handoff
 
-The creation module and offline tests are implemented; the HTTP route still
-uses Level 1 local storage. Connecting the route is the next change.
-Jim will connect the existing route to the shared account's `primary` calendar
+The creation module, HTTP connection, and offline tests are implemented;
+real-provider verification is the next step. Jim connected POST to `primary`
 using `events.insert`. The existing `calendar.events` scope permits creation;
 see Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).
 
@@ -416,7 +438,7 @@ events. Hide other provider fields, credentials, and configuration from the
 public response. Timed events remain the supported input; all-day events,
 attendees, and recurring-event options are outside this contract.
 
-#### Local setup for the planned integration
+#### Local setup for the integration
 
 Reuse the shared setup merged in [PR #6](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/6).
 Do not create another Cloud project or OAuth client. From the repository root:
@@ -438,7 +460,7 @@ Do not create another Cloud project or OAuth client. From the repository root:
 4. Keep the generated `token.json` on your own machine. Both JSON files are
    ignored by Git; do not include their contents in logs, PRs, or test fixtures.
 
-The planned HTTP integration will load local authorization and refresh an
+The HTTP integration loads local authorization and refreshes an
 expired usable token when needed. Browser authorization stays in the setup
 script, outside HTTP requests. Missing or unusable authorization must be
 reported as a setup problem, without silently falling back to local creation.
@@ -451,7 +473,7 @@ start browser authorization. `create_google_event` inserts into `primary` and
 validates Google's returned ID, title, and timed-event fields before returning
 an `Event`. Extra Google fields are excluded from the public result.
 Setup failures raise `GoogleCalendarSetupError`; provider failures and unusable
-responses propagate for the upcoming HTTP integration to handle. Creation uses
+responses are handled by the route as documented 503/502 responses. Creation uses
 `execute(num_retries=0)`, including when the response may have been lost.
 
 [Module tests](tests/test_google_calendar.py) replace token loading and SDK
@@ -462,8 +484,7 @@ results to check missing/malformed tokens, scope, reuse, refresh, and revocation
 All token values in these tests are fictional. No credentials or live requests
 are needed; these checks do not establish real-provider correctness.
 
-Retain the synchronous route so the blocking SDK call runs through FastAPI's
-thread pool.
+The synchronous route runs the blocking SDK call through FastAPI's thread pool.
 The final provider interface and dependency injection belong to later levels.
 
 The event GET route currently reads local data. During this transition, mirror
@@ -473,13 +494,12 @@ is not evidence of provider persistence and disappears on restart; the Google
 event remains. Once Kristie's GET uses Google on the same calendar, coordinate
 removal of the mirror and verify the real POST-to-GET workflow together.
 
-Keep Level 1 contract assertions and existing GET tests. Fast tests will control
+Level 1 contract assertions and existing GET tests are preserved. Fast tests control
 SDK responses without credentials or network access and verify field mapping,
 provider IDs, repeated creation, and invalid requests causing no provider write.
 Rejected writes must not produce a local success mirror. Do not automatically
 retry creation; a timeout can leave an event created even if no response arrived.
-Document basic failure behavior with the implementation; comprehensive failure
-translation remains Level 5 work.
+Comprehensive failure translation remains Level 5 work.
 
 Real verification will start the service and POST a uniquely named timed test
 event through HTTP. Check 201 and the four response fields, then independently
