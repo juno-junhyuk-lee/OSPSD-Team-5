@@ -13,7 +13,7 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 1 local metadata lookup and HTTP tests implemented; review and PR CI pending | To be agreed with the team |
-| Jim Lo | `POST /events` | Level 1 code, tests, walkthrough, and local verification complete; teammate review and branch CI pending | To be agreed with the team |
+| Jim Lo | `POST /events` | Level 1 approved and merged in PR #5 with passing CI; Level 2 design documented, implementation and real verification pending | Level 1: Ka Pui and Juno; Level 2: to be agreed |
 
 The team still needs to record the other members' operation assignments.
 The tables below retain the earlier GET implementation history; they do not
@@ -57,8 +57,10 @@ data. A controlled missing-write defect was detected by the POST-to-GET test;
 restoring normal storage made it pass. Details are in the README. Codex assisted
 with the POST implementation, tests, documentation, and local verification.
 
-Remaining steps: assign a reviewer, verify setup from another checkout, and
-check GitHub CI after publishing the branch. Google integration is Level 2 work.
+Level 1 was merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/5)
+after Ka Pui and Juno approved it. Juno reproduced the 22 tests, Ruff checks,
+and strict mypy locally. [PR CI](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/37237676633)
+passed. Real Google creation remains Jim's Level 2 work.
 
 Level 1 completion requires `201` creation, generated IDs, retrieval through
 the existing GET route, documented `422` validation failures without state
@@ -66,12 +68,40 @@ changes, isolated tests, passing checks, and matching documentation. Local
 memory is sufficient; Google authentication and actual provider writes belong
 to Jim's Level 2 work.
 
+## Jim Lo's POST Level 2 work
+
+Start from the current merged main, including POST Level 1, shared authentication
+(PR #6), and calendar details (PR #7). Use the shared test account's primary
+calendar and the existing OAuth client and `calendar.events` scope. The README's
+Level 2 POST handoff records field mapping, setup, transition behavior, and tests.
+
+Work is split into four reviewable changes:
+
+1. Document the integration design and local setup, and update Level 1 status.
+2. Add Google creation and response translation with offline tests.
+3. Connect POST to Google and preserve HTTP contract tests and existing routes.
+4. Record real HTTP create/read verification, cleanup, and teammate instructions.
+
+Only the first change is prepared. No POST provider call or real creation has
+been verified yet. Codex assisted with the Level 2 planning documentation.
+
+Keep the API inputs, 201 response, validation rules, and returned event shape.
+Use Google's event ID. A temporary local mirror preserves same-process retrieval
+until Kristie's GET reads Google; verify persistence independently against Google.
+Do not silently use local creation when authorization fails or automatically
+retry a write with an uncertain outcome.
+
+Completion requires passing offline checks, a real HTTP POST followed by an
+independent Google read, cleanup of verification events, teammate review, and
+at least two members running POST against Google with their own local tokens.
+The shared authentication script alone does not complete this operation.
+
 ## Provider integration requirements
 
 The earlier plan to assign three members exclusively to Level 2 support tasks
 has been superseded by operation ownership. The existing GET handoff uses the
-authenticated user's primary calendar; POST provider details will be defined
-when its Level 2 work begins. At least two members must verify the real
+authenticated user's primary calendar; POST uses the same calendar and ID space
+as described in the README. At least two members must verify the real
 integration; by the first checkpoint everyone must be able to run the service
 and fast tests.
 
@@ -82,9 +112,10 @@ and fast tests.
 - October 21, 2026: Level 5, final release, review fixes, and demonstration.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
-GitHub Actions. Current gaps: POST branch CI and review, teammate setup
-reproduction, and Google integration. The foundation PR's CI initially failed
-at pytest because it had no tests; GET PR CI and the 22 local tests now pass.
+GitHub Actions. POST Level 1 review and CI are complete. Current POST gaps:
+Google creation, offline integration tests, real verification by two members,
+and Level 2 PR review/CI. The foundation PR's CI initially failed at pytest
+because it had no tests; GET and POST Level 1 PR CI now pass.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 
 ## Evidence to keep as work progresses

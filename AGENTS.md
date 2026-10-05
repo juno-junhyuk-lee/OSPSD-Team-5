@@ -21,7 +21,11 @@ implemented Level 1 creation contract is in the README. Preserve existing
 GET behavior when adding POST. Creation tests must restore local state.
 Preserve each operation's public contract for Level 2 and translate Google
 fields before returning them. Do not commit credentials or add unnecessary layers.
-Fast tests must run without internet or Google credentials.
+Fast tests must run without internet or Google credentials. Follow the README's
+Level 2 POST plan for shared authorization, provider field mapping, and the
+temporary local mirror while event GET remains local. Authorize in the setup
+script, not during an HTTP request. Never fall back to local creation after a
+provider or setup failure, and do not automatically retry uncertain writes.
 
 ## Working together
 
@@ -38,11 +42,13 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 and the pinned requirements. Run the README check commands:
 Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
 runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
-app and tests in strict mode. All 22 HTTP test cases pass locally on Python 3.14.8.
+app and tests in strict mode. The Level 1 suite now has 24 HTTP test cases,
+including calendar details; all passed locally on Python 3.14.8 during PR #7 review.
 Keep expected values independent of lookup data and fast tests offline.
-Do not bypass checks or report missing tests as passing. Implementation PR CI
-results for the POST branch still need verification. See the README for local
-verification evidence and the Level 2 GET/POST handoffs.
+Do not bypass checks or report missing tests as passing. POST Level 1 was approved
+and merged in PR #5 with passing CI. POST Level 2 implementation, real verification
+by at least two teammates, and its PR checks remain pending. See the README for
+local verification evidence and the Level 2 GET/POST handoffs.
 
 ## Releases
 

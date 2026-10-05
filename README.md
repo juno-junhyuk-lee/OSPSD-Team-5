@@ -187,7 +187,8 @@ creation, retrieval through GET, distinct IDs for repeated creation, and
 rejection without state changes for the invalid inputs above. Existing GET
 tests must continue to pass, and creation tests must restore local state so
 they remain independent. Another teammate must review the contract,
-implementation, tests, and documentation; the reviewer is not assigned yet.
+implementation, tests, and documentation. Level 1 was approved by Ka Pui and
+Juno and merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/5).
 
 ### Create and retrieve an event
 
@@ -320,9 +321,10 @@ returned 404 instead of 200. Restoring the mapping made the test pass. The
 experiment changed only in-memory behavior; source files were not modified.
 
 These checks establish local behavior, not Google integration, authentication,
-all-day support, multi-worker sharing, or durability. Teammate verification from
-another checkout, POST review, and CI for this branch remain pending. The
-PowerShell walkthrough has not been executed locally.
+all-day support, multi-worker sharing, or durability. Juno reproduced the POST
+checks locally, and PR #5 was approved and merged with passing CI. The
+PowerShell walkthrough has not been executed locally. Real POST provider
+verification remains Level 2 work.
 
 ### Level 2 event GET handoff
 
@@ -392,23 +394,94 @@ The flow follows the [Google Python quickstart](https://developers.google.com/wo
 
 ### Level 2 POST handoff
 
-Jim will replace the local creation write with an authenticated Google Calendar
-write while preserving the POST request, 201 response, and validation rules.
-Invalid local input must be rejected before calling the provider.
+This is the implementation plan; POST still uses Level 1 local storage.
+Jim will connect the existing route to the shared account's `primary` calendar
+using `events.insert`. The existing `calendar.events` scope permits creation;
+see Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).
 
-Use Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert)
-to verify the operation and write permissions. Translate `title` to `summary`,
-`start_time` to `start.dateTime`, and `end_time` to `end.dateTime`. Translate the
-created provider event back to the four-field `Event` response. Its returned ID
-must work with the team's GET implementation on the same calendar; callers
-must not depend on Level 1's UUID format. Agree on the target test calendar
-and configuration with the team before integrating the operations.
+Preserve the three request fields, title normalization, time validation, 201
+response, and four-field `Event` model. Invalid input must return 422 before
+any provider write. Callers do not supply the ID or calendar configuration.
 
-Keep fast tests offline by controlling the provider result. Separately document
-credentials, configuration, a real create/read verification, and cleanup of test
-events. Record behavior for rejected writes and uncertain outcomes rather than
-assuming a timeout means no event was created. No Google writes or provider
-failure handling have been verified by the Level 1 implementation.
+| Public field | Google field | Translation |
+| --- | --- | --- |
+| `title` | `summary` | Send the normalized title; translate the result back. |
+| `start_time` | `start.dateTime` | Send RFC 3339 with an offset; preserve the instant on return. |
+| `end_time` | `end.dateTime` | Send RFC 3339 with an offset; preserve the instant on return. |
+| `id` | `id` | Return Google's event ID; do not require the Level 1 UUID format. |
+
+Let Google assign the event ID. Repeated valid requests still create distinct
+events. Hide other provider fields, credentials, and configuration from the
+public response. Timed events remain the supported input; all-day events,
+attendees, and recurring-event options are outside this contract.
+
+#### Local setup for the planned integration
+
+Reuse the shared setup merged in [PR #6](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/6).
+Do not create another Cloud project or OAuth client. From the repository root:
+
+1. Install the current pinned requirements using the Installation instructions.
+2. Obtain the shared client JSON privately and save it as `credentials.json`.
+3. Run the existing authentication script and sign in to the shared test account:
+
+   ```sh
+   # macOS/Linux
+   .venv/bin/python scripts/google_calendar_auth.py
+   ```
+
+   ```powershell
+   # Windows
+   ./.venv/Scripts/python.exe scripts/google_calendar_auth.py
+   ```
+
+4. Keep the generated `token.json` on your own machine. Both JSON files are
+   ignored by Git; do not include their contents in logs, PRs, or test fixtures.
+
+The planned HTTP integration will load local authorization and refresh an
+expired usable token when needed. Browser authorization stays in the setup
+script, outside HTTP requests. Missing or unusable authorization must be
+reported as a setup problem, without silently falling back to local creation.
+
+#### Integration and verification plan
+
+Keep the Google call and response translation in a small module. Retain the
+synchronous route so the blocking SDK call runs through FastAPI's thread pool.
+The final provider interface and dependency injection belong to later levels.
+
+The event GET route currently reads local data. During this transition, mirror
+only a successfully created and translated Google event into the local mapping,
+using its Google ID, to preserve same-process POST-to-GET behavior. This mirror
+is not evidence of provider persistence and disappears on restart; the Google
+event remains. Once Kristie's GET uses Google on the same calendar, coordinate
+removal of the mirror and verify the real POST-to-GET workflow together.
+
+Keep Level 1 contract assertions and existing GET tests. Fast tests will control
+SDK responses without credentials or network access and verify field mapping,
+provider IDs, repeated creation, and invalid requests causing no provider write.
+Rejected writes must not produce a local success mirror. Do not automatically
+retry creation; a timeout can leave an event created even if no response arrived.
+Document basic failure behavior with the implementation; comprehensive failure
+translation remains Level 5 work.
+
+Real verification will start the service and POST a uniquely named timed test
+event through HTTP. Check 201 and the four response fields, then independently
+read the returned ID from Google using the existing script:
+
+```sh
+.venv/bin/python scripts/google_calendar_auth.py --event-id <returned-id>
+```
+
+Replace `<returned-id>` before running. On Windows, use the Python executable
+shown above. Compare the title and time instants against the submitted request;
+if the script does not display the times, inspect them in Google Calendar or a
+provider read. Record the revision, commands, expected/observed results, and any
+gaps. Remove only the test events created for this verification from the shared
+calendar and confirm cleanup; stopping the server does not remove Google events.
+
+Before merging, a teammate must review the provider call, authentication,
+translation, and ID assumptions. At least two team members must run POST against
+Google, each with their own local token. Authentication-only verification does
+not establish POST Level 2 completion. Real POST verification is pending.
 
 
 ## Contributor documentation
