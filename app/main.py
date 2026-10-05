@@ -3,15 +3,10 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 
+from app.google_calendar import get_primary_calendar
 from app.models import Calendar, CreateEventRequest, Event
 
 app = FastAPI(title="Calendar Service")
-
-LOCAL_CALENDARS: dict[str, Calendar] = {
-    "primary": Calendar(
-        id="primary", title="Team 5 Calendar", time_zone="America/New_York"
-    )
-}
 
 LOCAL_EVENTS: dict[str, Event] = {
     "test-event": Event(
@@ -25,11 +20,19 @@ LOCAL_EVENTS: dict[str, Event] = {
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
 def get_calendar(calendar_id: str) -> Calendar:
-    """Retrieve calendar metadata without changing state."""
-    calendar = LOCAL_CALENDARS.get(calendar_id)
-    if calendar is None:
+    """Retrieve the authenticated user's primary calendar metadata."""
+    if calendar_id != "primary":
         raise HTTPException(status_code=404, detail="Calendar not found")
-    return calendar
+    try:
+        return get_primary_calendar()
+    except (OSError, ValueError) as error:
+        raise HTTPException(
+            status_code=503, detail="Google authorization unavailable"
+        ) from error
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=502, detail="Calendar provider unavailable"
+        ) from error
 
 
 @app.get("/events/{event_id}", response_model=Event)

@@ -12,7 +12,7 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Juno Lee | `GET /calendars/{calendar_id}` | Level 1 local metadata lookup and HTTP tests implemented; review and PR CI pending | To be agreed with the team |
+| Juno Lee | `GET /calendars/{calendar_id}` | Level 2 Google lookup and offline tests implemented; Juno verified real HTTP retrieval; second-teammate verification, review, and PR CI pending | To be agreed with the team |
 | Jim Lo | `POST /events` | Level 1 code, tests, walkthrough, and local verification complete; teammate review and branch CI pending | To be agreed with the team |
 
 The team still needs to record the other members' operation assignments.
@@ -82,9 +82,9 @@ and fast tests.
 - October 21, 2026: Level 5, final release, review fixes, and demonstration.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
-GitHub Actions. Current gaps: POST branch CI and review, teammate setup
-reproduction, and Google integration. The foundation PR's CI initially failed
-at pytest because it had no tests; GET PR CI and the 22 local tests now pass.
+GitHub Actions. Current calendar-details gaps: second-teammate real verification,
+review, and branch CI. Event provider integrations remain separate work. The foundation PR's CI initially failed
+at pytest because it had no tests; GET PR CI passed; the current Level 2 branch has 25 passing offline tests.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 
 ## Evidence to keep as work progresses

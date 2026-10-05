@@ -2,11 +2,11 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## Calendar service — Milestone 1, Level 1
+## Calendar service — Milestone 1
 
-The service retrieves calendar details and retrieves and creates local events
-through FastAPI. These operations are implemented with offline HTTP tests. Google Calendar
-integration remains for Level 2; the contracts below are the handoff boundaries.
+Calendar details use Google Calendar; event retrieval and creation still use
+local data. All operations have offline HTTP tests. The contracts below remain
+the boundaries for the remaining Level 2 integrations.
 Jim Lo owns event creation through Levels 1–5. Its Level 1 contract is below.
 
 ### Installation
@@ -97,8 +97,9 @@ created events are not persisted.
 `GET /calendars/{calendar_id}` retrieves calendar metadata without changing state.
 It helps callers identify their calendar and its timezone. `calendar_id` is a
 required string path parameter; no query or body parameters are required.
-Juno Lee owns this operation through Levels 1–5. Level 1 uses fixed local data
-and requires no authentication.
+Juno Lee owns this operation through Levels 1–5. Level 2 reads Google metadata
+using local OAuth authorization. The JSON below is an example; title and timezone
+come from the authenticated account.
 
 Git Bash/macOS/Linux:
 
@@ -119,10 +120,10 @@ Success returns `200 OK` with exactly three string fields:
 }
 ```
 
-Only `primary` is locally defined. Its ID is a service lookup alias and remains
+Only `primary` is supported. Its ID is a service lookup alias and remains
 `primary` in the response; callers must not interpret it as a Google account ID.
 The timezone is an IANA timezone name. Other IDs return `404 Not Found` with
-`{"detail": "Calendar not found"}`. Restarting retains the fixed calendar data.
+`{"detail": "Calendar not found"}` before any Google request.
 This operation does not list calendars or events and does not alter event routes.
 
 ### Event creation contract
@@ -230,13 +231,13 @@ created events; GET then returns `404` for their IDs.
 
 ### Code map and request flow
 
-`app/main.py` owns the FastAPI app, local calendar/event mappings, and GET/POST
-handlers. Calendar retrieval uses the `Calendar` model in `app/models.py` to
-return metadata; unknown IDs produce the documented calendar 404.
-FastAPI parses the path parameter, the handler looks up the ID, and the existing
-`Event` model in `app/models.py` defines the serialized success response. A missing
-ID raises HTTPException, which FastAPI renders as the documented 404 JSON.
-There are no SDK calls or credentials in this path.
+`app/main.py` owns the FastAPI app and routes. Calendar GET calls
+`app/google_calendar.py`, which loads local OAuth authorization, retrieves Google
+metadata, and returns the `Calendar` model. Unsupported IDs return 404 locally.
+
+Event GET looks up local event data and returns the `Event` model. Missing event
+IDs raise HTTPException, which FastAPI renders as the documented 404 JSON.
+There are no Google calls or credentials in the event GET/POST paths yet.
 
 For POST, `CreateEventRequest` in `app/models.py` validates and normalizes the
 input before the handler runs. The handler generates an unused ID, stores the
@@ -282,7 +283,9 @@ TestClient without a server, network access, or Google credentials.
 including failures. Expected values are independent of the application's data.
 
 - [Calendar GET tests](tests/test_calendars.py): primary returns 200 with exact
-  metadata JSON; unknown IDs return the documented calendar 404.
+  metadata JSON using a controlled lookup; unknown IDs return the calendar 404.
+- [Google metadata test](tests/test_google_calendar.py): a controlled SDK response
+  verifies field translation and excludes raw provider ID and etag.
 - [Event GET tests](tests/test_events.py): known ID returns 200 with exact JSON;
   unknown ID returns the documented 404.
 - [POST tests](tests/test_create_events.py): creation returns 201 with the four
@@ -319,7 +322,7 @@ For POST, temporarily discarding writes to the local event mapping made
 returned 404 instead of 200. Restoring the mapping made the test pass. The
 experiment changed only in-memory behavior; source files were not modified.
 
-These checks establish local behavior, not Google integration, authentication,
+The preceding Level 1 event checks establish local behavior, not Google integration or authentication,
 all-day support, multi-worker sharing, or durability. Teammate verification from
 another checkout, POST review, and CI for this branch remain pending. The
 PowerShell walkthrough has not been executed locally.
@@ -338,21 +341,45 @@ all-day behavior before claiming support for GET. The shared response model
 does not enforce timezone awareness or start/end ordering; POST validates
 those rules separately in its creation request model.
 
-Google authentication, configuration, and real-provider verification remain
-Level 2 work. Keep secrets and generated tokens out of Git. Keep fast tests
+Connecting event GET to the shared authentication and verifying its real-provider
+behavior remain Level 2 work. Keep secrets and generated tokens out of Git. Keep fast tests
 independent of live credentials when replacing the local implementation, and
 document how at least two teammates can verify the real integration.
 
-### Level 2 calendar details handoff
+### Level 2 calendar details verification
 
-Retrieve the authenticated user's primary calendar from Google,
-map `summary` to `title` and `timeZone` to `time_zone`, and retain the service
-alias `primary` as the response ID. Confirm metadata permissions separately:
-the event CRUD scope is not automatically sufficient for calendar metadata.
-Google's returned title and timezone replace the fixture values; decide any
-missing-title behavior before integration. Other calendar IDs remain unsupported
-until the team intentionally expands the contract. No Google lookup is added
-in Level 1.
+`app/google_calendar.py` reads repository-root `token.json` and calls Google's
+[calendars.get](https://developers.google.com/workspace/calendar/api/v3/reference/calendars/get).
+It translates `summary` to `title` and `timeZone` to `time_zone`, retaining the
+service alias `primary`. Token-file loading errors (OSError/ValueError) produce
+503 with `{"detail": "Google authorization unavailable"}`. Handled Google
+HTTP/authentication errors and incomplete metadata produce 502 with
+`{"detail": "Calendar provider unavailable"}`. These basic messages do not expose
+Google response bodies. Transport failures, detailed error categories, failure
+tests, and structured logging remain future work; some failures may return 500.
+No browser sign-in occurs inside HTTP requests. The synchronous route runs
+blocking Google I/O outside the async event loop; the client closes after use.
+
+Add (if not already) `https://www.googleapis.com/auth/calendar.calendars.readonly` to Google Auth
+Platform Data Access, then rerun `python scripts/google_calendar_auth.py` and
+approve the additional scope. The script requests both metadata read access and
+the team's event CRUD scope. Existing event-only tokens require reauthorization.
+
+Run the service and curl `/calendars/primary`. Expect 200 with the actual shared
+calendar title and timezone, the ID `primary`, and no raw Google fields. Compare
+with the shared calendar settings. Unknown IDs retain the documented 404.
+This read-only check creates nothing and needs no event cleanup.
+
+The Level 1 HTTP assertions are preserved using a controlled lookup during tests;
+an additional offline test verifies translation and hiding Google's account ID.
+Event operations still use local data. No application retry loop was added;
+the Google libraries may refresh expired access tokens automatically.
+
+Juno verified reauthorization and a live FastAPI request: `/calendars/primary`
+returned 200 with the shared account calendar title and America/New_York timezone.
+All 25 offline tests, Ruff, formatting, and strict mypy pass locally on Python
+3.14.2. A second teammate must reproduce the real HTTP request; review and this
+branch's GitHub CI verification are still pending.
 
 ### Shared Google Calendar authentication
 
@@ -360,7 +387,8 @@ The team uses one shared test account and its primary calendar. Enable the
 Calendar API and create a Desktop OAuth client in the shared Cloud project.
 For an External app in Testing, register the shared account as a test user and
 configure `https://www.googleapis.com/auth/calendar.events` in Data Access.
-The authentication script requests this scope for all event operations.
+The authentication script also requests `calendar.calendars.readonly` for
+calendar metadata; add that scope in Data Access as well.
 
 Privately obtain the client JSON and save it as `credentials.json` in the
 repository root. Install the updated pinned requirements, then run:
@@ -386,7 +414,8 @@ state. Copy a returned API event ID to verify that specific event:
 A successful API request with no returned events still verifies authentication;
 create a timed test event before verifying retrieval. A second execution should
 reuse the saved authorization. A second teammate must reproduce the real request.
-This setup script does not replace the FastAPI endpoint's local lookup yet.
+The setup script verifies event access separately; event HTTP endpoints still
+use local data, while calendar-details HTTP retrieval now calls Google.
 The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
 
 

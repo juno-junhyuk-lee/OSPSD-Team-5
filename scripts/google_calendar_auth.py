@@ -11,7 +11,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.calendars.readonly",
+]
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -27,7 +30,7 @@ def main() -> int:
     if token_path.exists():
         credentials = Credentials.from_authorized_user_file(str(token_path))
         if not credentials.has_scopes(SCOPES):
-            print("Stored token lacks calendar.events; requesting authorization again.")
+            print("Stored token lacks required scopes; requesting authorization again.")
             credentials = None
     if credentials is None or not credentials.valid:
         if credentials and credentials.expired and credentials.refresh_token:
