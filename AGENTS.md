@@ -16,6 +16,8 @@
 - `tests/test_google_calendar.py`: offline SDK translation and authorization tests.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
+- [POST Level 2 verification](docs/POST_LEVEL2_VERIFICATION.md): real-run evidence,
+  reproduction, and cleanup instructions.
 
 Use the README setup and commands. Each member owns one distinct, useful public
 operation through Levels 1–5, including its tests and documentation. Keep Level 1
@@ -53,7 +55,8 @@ including calendar details; all passed locally on Python 3.14.8 during PR #7 rev
 Keep expected values independent of lookup data and fast tests offline.
 Do not bypass checks or report missing tests as passing. POST Level 1 was approved
 and merged in PR #5 with passing CI. POST Level 2 HTTP integration is implemented;
-real verification by at least two teammates and its PR checks remain pending.
+one real run passed in Jim's environment with cleanup. A second member's real
+POST run and its PR checks remain pending.
 See the README for
 local verification evidence and the Level 2 GET/POST handoffs.
 

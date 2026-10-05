@@ -6,7 +6,8 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 The service retrieves local calendar details and events through FastAPI.
 POST now calls Google Calendar and mirrors a successful result for local GET.
-Offline checks cover this integration; real POST verification remains pending.
+Offline checks and one real POST run cover this integration; a second teammate's
+real verification and Level 2 PR review/CI remain pending.
 Jim Lo owns event creation through Levels 1–5. Its public contract is below.
 
 ### Installation
@@ -131,7 +132,7 @@ This operation does not list calendars or events and does not alter event routes
 owns this operation, including its implementation, tests, and documentation
 through Levels 1–5. Level 2 preserves the Level 1 input and success contract;
 it requires local authorization from the Shared Google Calendar authentication
-instructions below. Real-provider verification is still pending.
+instructions below. One real-provider run is recorded in the verification guide.
 
 The request uses `Content-Type: application/json` and requires three body fields:
 
@@ -418,7 +419,8 @@ The flow follows the [Google Python quickstart](https://developers.google.com/wo
 ### Level 2 POST handoff
 
 The creation module, HTTP connection, and offline tests are implemented;
-real-provider verification is the next step. Jim connected POST to `primary`
+one real-provider run has passed. A second teammate's run and PR review/CI remain
+pending. Jim connected POST to `primary`
 using `events.insert`. The existing `calendar.events` scope permits creation;
 see Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).
 
@@ -519,7 +521,13 @@ calendar and confirm cleanup; stopping the server does not remove Google events.
 Before merging, a teammate must review the provider call, authentication,
 translation, and ID assumptions. At least two team members must run POST against
 Google, each with their own local token. Authentication-only verification does
-not establish POST Level 2 completion. Real POST verification is pending.
+not establish POST Level 2 completion. Jim's environment has completed real POST,
+independent Google reads, persistence checks, and test-event cleanup. Another
+teammate's real POST verification remains pending.
+
+Follow [POST Level 2 verification](docs/POST_LEVEL2_VERIFICATION.md) for the
+separately runnable workflow, independent Google time checks, persistence,
+cleanup, and current evidence. Each teammate records their own real run.
 
 
 ## Contributor documentation
