@@ -354,6 +354,42 @@ missing-title behavior before integration. Other calendar IDs remain unsupported
 until the team intentionally expands the contract. No Google lookup is added
 in Level 1.
 
+### Shared Google Calendar authentication
+
+The team uses one shared test account and its primary calendar. Enable the
+Calendar API and create a Desktop OAuth client in the shared Cloud project.
+For an External app in Testing, register the shared account as a test user and
+configure `https://www.googleapis.com/auth/calendar.events` in Data Access.
+The authentication script requests this scope for all event operations.
+
+Privately obtain the client JSON and save it as `credentials.json` in the
+repository root. Install the updated pinned requirements, then run:
+
+```sh
+# Windows Git Bash or PowerShell; no activation required
+./.venv/Scripts/python.exe scripts/google_calendar_auth.py
+```
+
+On macOS/Linux, use `.venv/bin/python` instead. Sign in to the shared test account
+in the browser and approve event access within five minutes. The script stores
+`token.json` locally, refreshes usable expired tokens, and requests authorization
+again if a token is revoked or lacks the agreed scope. Each teammate generates
+their own local token. Never commit either JSON file or print its contents.
+
+The verification request lists up to ten events from `primary` without changing
+state. Copy a returned API event ID to verify that specific event:
+
+```sh
+./.venv/Scripts/python.exe scripts/google_calendar_auth.py --event-id EVENT_ID
+```
+
+A successful API request with no returned events still verifies authentication;
+create a timed test event before verifying retrieval. A second execution should
+reuse the saved authorization. A second teammate must reproduce the real request.
+This setup script does not replace the FastAPI endpoint's local lookup yet.
+The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
+
+
 ### Level 2 POST handoff
 
 Jim will replace the local creation write with an authenticated Google Calendar
@@ -373,6 +409,7 @@ credentials, configuration, a real create/read verification, and cleanup of test
 events. Record behavior for rejected writes and uncertain outcomes rather than
 assuming a timeout means no event was created. No Google writes or provider
 failure handling have been verified by the Level 1 implementation.
+
 
 ## Contributor documentation
 
