@@ -12,6 +12,7 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
+| Juno Lee | `GET /calendars/{calendar_id}` | Level 1 local metadata lookup and HTTP tests implemented; review and PR CI pending | To be agreed with the team |
 | Jim Lo | `POST /events` | Level 1 code, tests, walkthrough, and local verification complete; teammate review and branch CI pending | To be agreed with the team |
 
 The team still needs to record the other members' operation assignments.

@@ -2,6 +2,10 @@
 
 ## Code and setup
 
+- `GET /calendars/{calendar_id}`: Local calendar metadata operation.
+- `tests/test_calendars.py`: offline calendar success and missing-ID tests.
+  The Calendar response model lives in `app/models.py`; its lookup is in `app/main.py`.
+
 - `app/main.py`: FastAPI app, local event mapping, and GET/POST event routes.
 - `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.

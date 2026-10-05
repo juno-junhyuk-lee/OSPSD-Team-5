@@ -10,6 +10,12 @@ from pydantic import (
 )
 
 
+class Calendar(BaseModel):
+    id: str
+    title: str
+    time_zone: str
+
+
 class Event(BaseModel):
     id: str
     title: str

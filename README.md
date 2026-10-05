@@ -4,8 +4,8 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 ## Calendar service — Milestone 1, Level 1
 
-The service retrieves and creates local calendar events through FastAPI.
-GET and POST are implemented with offline HTTP tests. Google Calendar
+The service retrieves calendar details and retrieves and creates local events
+through FastAPI. These operations are implemented with offline HTTP tests. Google Calendar
 integration remains for Level 2; the contracts below are the handoff boundaries.
 Jim Lo owns event creation through Levels 1–5. Its Level 1 contract is below.
 
@@ -91,6 +91,39 @@ The known ID returns 200 and:
 in the same process. Unknown IDs return `404 Not Found` with
 `{"detail": "Event not found"}`. Restarting retains only the predefined event;
 created events are not persisted.
+
+### Calendar details contract
+
+`GET /calendars/{calendar_id}` retrieves calendar metadata without changing state.
+It helps callers identify their calendar and its timezone. `calendar_id` is a
+required string path parameter; no query or body parameters are required.
+Juno Lee owns this operation through Levels 1–5. Level 1 uses fixed local data
+and requires no authentication.
+
+Git Bash/macOS/Linux:
+
+```sh
+curl -i http://localhost:8000/calendars/primary
+curl -i http://localhost:8000/calendars/missing-calendar
+```
+
+PowerShell: use `curl.exe -i` with the same URLs to invoke curl directly.
+
+Success returns `200 OK` with exactly three string fields:
+
+```json
+{
+  "id": "primary",
+  "title": "Team 5 Calendar",
+  "time_zone": "America/New_York"
+}
+```
+
+Only `primary` is locally defined. Its ID is a service lookup alias and remains
+`primary` in the response; callers must not interpret it as a Google account ID.
+The timezone is an IANA timezone name. Other IDs return `404 Not Found` with
+`{"detail": "Calendar not found"}`. Restarting retains the fixed calendar data.
+This operation does not list calendars or events and does not alter event routes.
 
 ### Event creation contract
 
@@ -197,7 +230,9 @@ created events; GET then returns `404` for their IDs.
 
 ### Code map and request flow
 
-`app/main.py` owns the FastAPI app, local event mapping, and GET/POST handlers.
+`app/main.py` owns the FastAPI app, local calendar/event mappings, and GET/POST
+handlers. Calendar retrieval uses the `Calendar` model in `app/models.py` to
+return metadata; unknown IDs produce the documented calendar 404.
 FastAPI parses the path parameter, the handler looks up the ID, and the existing
 `Event` model in `app/models.py` defines the serialized success response. A missing
 ID raises HTTPException, which FastAPI renders as the documented 404 JSON.
@@ -246,7 +281,9 @@ TestClient without a server, network access, or Google credentials.
 [tests/conftest.py](tests/conftest.py) restores local events after each test,
 including failures. Expected values are independent of the application's data.
 
-- [GET tests](tests/test_events.py): known ID returns 200 with exact JSON;
+- [Calendar GET tests](tests/test_calendars.py): primary returns 200 with exact
+  metadata JSON; unknown IDs return the documented calendar 404.
+- [Event GET tests](tests/test_events.py): known ID returns 200 with exact JSON;
   unknown ID returns the documented 404.
 - [POST tests](tests/test_create_events.py): creation returns 201 with the four
   response fields, a generated ID, a trimmed title, and the correct instants.
@@ -287,7 +324,7 @@ all-day support, multi-worker sharing, or durability. Teammate verification from
 another checkout, POST review, and CI for this branch remain pending. The
 PowerShell walkthrough has not been executed locally.
 
-### Level 2 GET handoff
+### Level 2 event GET handoff
 
 The Level 2 owners should replace the local lookup in `app/main.py` with a Google
 Calendar lookup using the authenticated user's `primary` calendar. Preserve the
@@ -306,6 +343,16 @@ Level 2 work. Keep secrets and generated tokens out of Git. Keep fast tests
 independent of live credentials when replacing the local implementation, and
 document how at least two teammates can verify the real integration.
 
+### Level 2 calendar details handoff
+
+Retrieve the authenticated user's primary calendar from Google,
+map `summary` to `title` and `timeZone` to `time_zone`, and retain the service
+alias `primary` as the response ID. Confirm metadata permissions separately:
+the event CRUD scope is not automatically sufficient for calendar metadata.
+Google's returned title and timezone replace the fixture values; decide any
+missing-title behavior before integration. Other calendar IDs remain unsupported
+until the team intentionally expands the contract. No Google lookup is added
+in Level 1.
 
 ### Shared Google Calendar authentication
 
