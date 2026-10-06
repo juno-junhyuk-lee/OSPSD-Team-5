@@ -126,3 +126,40 @@ def test_authentication_required_returns_service_unavailable(
 
     assert response.status_code == 503
     assert response.json() == {"detail": "Calendar authentication required"}
+
+
+@pytest.mark.parametrize(
+    "outcome", ["success", "not-found", "http-error", "timeout", "malformed", "all-day"]
+)
+def test_google_client_is_closed_after_request(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    service = Mock()
+    execute = service.events.return_value.get.return_value.execute
+    execute.return_value = timed_event()
+    expected_status = 200
+    if outcome in {"not-found", "http-error"}:
+        status = 404 if outcome == "not-found" else 500
+        execute.side_effect = HttpError(
+            Mock(status=status, reason="Failure"), b'{"error": {"message": "Failure"}}'
+        )
+        expected_status = 404 if status == 404 else 502
+    elif outcome == "timeout":
+        execute.side_effect = TimeoutError("timeout")
+        expected_status = 502
+    elif outcome == "malformed":
+        execute.return_value = None
+        expected_status = 502
+    elif outcome == "all-day":
+        execute.return_value = {
+            "id": "all-day",
+            "start": {"date": "2026-10-05"},
+            "end": {"date": "2026-10-06"},
+        }
+        expected_status = 422
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    response = client.get("/events/google-event")
+
+    assert response.status_code == expected_status
+    service.close.assert_called_once_with()

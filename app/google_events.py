@@ -1,6 +1,7 @@
 """Translate Google events to the public timed-event model."""
 
 from collections.abc import Mapping
+from contextlib import closing
 
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from pydantic import ValidationError
@@ -46,12 +47,10 @@ def translate_event(data: Mapping[str, object]) -> Event:
 
 def retrieve_event(event_id: str) -> Event:
     try:
-        data = (
-            calendar_client()
-            .events()
-            .get(calendarId="primary", eventId=event_id)
-            .execute()
-        )
+        with closing(calendar_client()) as service:
+            data = (
+                service.events().get(calendarId="primary", eventId=event_id).execute()
+            )
     except HttpError as error:
         if error.resp.status == 404:
             raise EventNotFoundError from error
