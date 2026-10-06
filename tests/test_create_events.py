@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from datetime import datetime
 from threading import Event as ThreadEvent
 from unittest.mock import MagicMock
@@ -8,8 +9,7 @@ from fastapi.testclient import TestClient
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import Response  # type: ignore[import-untyped]
 
-from app import google_calendar
-from app.main import LOCAL_EVENTS
+from app import google_create_events
 
 
 @pytest.fixture
@@ -74,15 +74,16 @@ def test_missing_field_preserves_state(
     event_payload: dict[str, object],
     field: str,
     google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
     del event_payload[field]
-    before = LOCAL_EVENTS.copy()
+    before = deepcopy(provider_events)
 
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 422
     assert isinstance(response.json()["detail"], list)
-    assert LOCAL_EVENTS == before
+    assert provider_events == before
     google_service.events.return_value.insert.assert_not_called()
 
 
@@ -111,15 +112,16 @@ def test_invalid_field_preserves_state(
     field: str,
     value: object,
     google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
     event_payload[field] = value
-    before = LOCAL_EVENTS.copy()
+    before = deepcopy(provider_events)
 
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 422
     assert isinstance(response.json()["detail"], list)
-    assert LOCAL_EVENTS == before
+    assert provider_events == before
     google_service.events.return_value.insert.assert_not_called()
 
 
@@ -133,18 +135,19 @@ def test_time_order_compares_instants(
     assert response.status_code == 201
 
 
-def test_missing_authorization_returns_503_without_local_creation(
+def test_missing_authorization_returns_503_without_provider_write(
     client: TestClient,
     event_payload: dict[str, object],
     google_service: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
-    before = LOCAL_EVENTS.copy()
+    before = deepcopy(provider_events)
 
     def unavailable() -> None:
-        raise google_calendar.GoogleCalendarSetupError("Private setup details")
+        raise google_create_events.GoogleCalendarSetupError("Private setup details")
 
-    monkeypatch.setattr(google_calendar, "load_credentials", unavailable)
+    monkeypatch.setattr(google_create_events, "load_credentials", unavailable)
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 503
@@ -154,7 +157,7 @@ def test_missing_authorization_returns_503_without_local_creation(
             "Run scripts/google_calendar_auth.py."
         )
     }
-    assert LOCAL_EVENTS == before
+    assert provider_events == before
     google_service.events.return_value.insert.assert_not_called()
 
 
@@ -165,13 +168,14 @@ def test_missing_authorization_returns_503_without_local_creation(
         TimeoutError("Private transport details"),
     ],
 )
-def test_provider_failure_returns_502_without_local_creation(
+def test_provider_failure_returns_502_without_retry(
     client: TestClient,
     event_payload: dict[str, object],
     google_service: MagicMock,
     error: Exception,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
-    before = LOCAL_EVENTS.copy()
+    before = deepcopy(provider_events)
     execute = google_service.events.return_value.insert.return_value.execute
     execute.side_effect = error
 
@@ -184,14 +188,17 @@ def test_provider_failure_returns_502_without_local_creation(
             "Check the calendar before retrying."
         )
     }
-    assert LOCAL_EVENTS == before
+    assert provider_events == before
     execute.assert_called_once_with(num_retries=0)
 
 
-def test_unusable_google_result_is_not_mirrored(
-    client: TestClient, event_payload: dict[str, object], google_service: MagicMock
+def test_unusable_google_result_returns_502(
+    client: TestClient,
+    event_payload: dict[str, object],
+    google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
-    before = LOCAL_EVENTS.copy()
+    before = deepcopy(provider_events)
     execute = google_service.events.return_value.insert.return_value.execute
     execute.side_effect = None
     execute.return_value = {"id": "google-event-123", "summary": "Team Meeting"}
@@ -199,18 +206,26 @@ def test_unusable_google_result_is_not_mirrored(
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 502
-    assert LOCAL_EVENTS == before
+    assert provider_events == before
     execute.assert_called_once_with(num_retries=0)
 
 
 def test_accepted_write_with_lost_response_is_not_retried(
-    client: TestClient, event_payload: dict[str, object], google_service: MagicMock
+    client: TestClient,
+    event_payload: dict[str, object],
+    google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
-    before = LOCAL_EVENTS.copy()
     accepted: list[str] = []
 
     def lose_response(*, num_retries: int = 0) -> None:
         accepted.append("google-accepted-event")
+        provider_events["google-accepted-event"] = {
+            "id": "google-accepted-event",
+            "summary": "Team Meeting",
+            "start": {"dateTime": "2026-10-05T10:00:00-04:00"},
+            "end": {"dateTime": "2026-10-05T11:00:00-04:00"},
+        }
         raise TimeoutError("Write accepted, response lost")
 
     execute = google_service.events.return_value.insert.return_value.execute
@@ -221,7 +236,7 @@ def test_accepted_write_with_lost_response_is_not_retried(
     assert response.status_code == 502
     assert "Check the calendar before retrying" in response.json()["detail"]
     assert accepted == ["google-accepted-event"]
-    assert LOCAL_EVENTS == before
+    assert client.get("/events/google-accepted-event").status_code == 200
     execute.assert_called_once_with(num_retries=0)
 
 

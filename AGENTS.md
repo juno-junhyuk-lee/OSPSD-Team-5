@@ -2,38 +2,46 @@
 
 ## Code and setup
 
-- `GET /calendars/{calendar_id}`: Local calendar metadata operation.
+- `GET /calendars/{calendar_id}`: Google-backed primary calendar metadata operation.
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
-  The Calendar response model lives in `app/models.py`; its lookup is in `app/main.py`.
+  The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 
-- `app/main.py`: FastAPI app, local event mapping, and GET/POST event routes.
+- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, and POST.
+- `app/google_auth.py`: noninteractive token loading and refresh for API requests.
+- `app/google_calendar.py`: Google calendar metadata retrieval and translation.
+- `app/google_create_events.py`: POST authorization, creation, and response translation.
+- `tests/test_google_calendar.py`: offline calendar metadata translation tests.
+- `tests/test_google_create_events.py`: offline POST provider and token tests.
+- `app/google_events.py`: Google event retrieval, translation, and service errors.
+- `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
+- `tests/test_google_auth.py`: isolated token lifecycle tests.
 - `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
-- `tests/conftest.py`: shared HTTP client, scoped Google SDK mock, and local cleanup.
-- `app/google_calendar.py`: local token loading/refresh and Google event creation,
-  called by POST. GET still reads local mirrors.
-- `tests/test_google_calendar.py`: offline SDK translation and authorization tests.
+- `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
-- [POST Level 2 verification](docs/POST_LEVEL2_VERIFICATION.md): real-run evidence,
-  reproduction, and cleanup instructions.
 
 Use the README setup and commands. Each member owns one distinct, useful public
 operation through Levels 1–5, including its tests and documentation. Keep Level 1
 operations small and backed by local data. Jim Lo owns `POST /events`; its
 implemented Level 1 creation contract is in the README. Preserve existing
-GET behavior when adding POST. Creation tests must restore local state.
+GET behavior when adding POST. Creation tests must isolate fake provider state.
 Preserve each operation's public contract for Level 2 and translate Google
 fields before returning them. Do not commit credentials or add unnecessary layers.
-Fast tests must run without internet or Google credentials. Follow the README's
-Level 2 POST plan for shared authorization, provider field mapping, and the
-temporary local mirror while event GET remains local. Authorize in the setup
-script, not during an HTTP request. Never fall back to local creation after a
-provider or setup failure, and do not automatically retry uncertain writes.
-Keep strict checks for application code. Mypy permits calls to untyped methods
-in the Google credentials and auth exceptions modules; the API client imports
-have scoped `import-untyped` exclusions because the installed SDK lacks types.
+Fast tests must run without internet or Google credentials.
+
+Kristie owns event GET. It uses the shared account's primary Google Calendar;
+run scripts/google_calendar_auth.py before serving requests. Never start browser
+authorization in a route. Preserve the four-field Event response and existing 404.
+Jim's POST writes to the same primary calendar and returns Google's event ID.
+GET reads the provider directly; no local event mirror is used. Never fall back
+to local creation or automatically retry uncertain writes. The provider fake
+stores insert results for GET only in fast tests; do not claim it verifies a
+real create/read workflow. Keep both OAuth scopes in the shared setup script.
+See [POST verification](docs/POST_LEVEL2_VERIFICATION.md) for real-run evidence.
+Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
+are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 
 ## Working together
 
@@ -50,15 +58,11 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 and the pinned requirements. Run the README check commands:
 Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
 runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
-app and tests in strict mode. The Level 1 suite now has 24 HTTP test cases,
-including calendar details; all passed locally on Python 3.14.8 during PR #7 review.
+app and tests in strict mode. Calendar metadata and event retrieval have offline
+tests using controlled provider responses.
 Keep expected values independent of lookup data and fast tests offline.
-Do not bypass checks or report missing tests as passing. POST Level 1 was approved
-and merged in PR #5 with passing CI. POST Level 2 HTTP integration is implemented;
-one real run passed in Jim's environment with cleanup. A second member's real
-POST run and its PR checks remain pending.
-See the README for
-local verification evidence and the Level 2 GET/POST handoffs.
+Do not bypass checks or report missing tests as passing. See the README for
+real-provider verification evidence and remaining teammate verification.
 
 ## Releases
 

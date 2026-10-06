@@ -1,19 +1,35 @@
 from collections.abc import Iterator
+from copy import deepcopy
 from itertools import count
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 
-from app import google_calendar
-from app.main import LOCAL_EVENTS, app
+from app import google_create_events
+from app.main import app
 
 
 @pytest.fixture
-def google_service() -> Iterator[MagicMock]:
+def provider_events() -> dict[str, dict[str, object]]:
+    return {
+        "test-event": {
+            "id": "test-event",
+            "summary": "Example Event",
+            "start": {"dateTime": "2026-10-05T18:00:00Z"},
+            "end": {"dateTime": "2026-10-05T19:00:00Z"},
+        }
+    }
+
+
+@pytest.fixture
+def google_service(
+    provider_events: dict[str, dict[str, object]],
+) -> Iterator[MagicMock]:
     with (
-        patch.object(google_calendar, "load_credentials"),
-        patch.object(google_calendar, "build") as build,
+        patch.object(google_create_events, "load_credentials"),
+        patch.object(google_create_events, "build") as build,
     ):
         sdk = build.return_value.__enter__.return_value
         insert = sdk.events.return_value.insert
@@ -21,24 +37,44 @@ def google_service() -> Iterator[MagicMock]:
 
         def execute(*, num_retries: int = 0) -> dict[str, object]:
             body = insert.call_args.kwargs["body"]
-            return {
+            event = {
                 "id": f"google-event-{next(ids)}",
                 "summary": body["summary"],
                 "start": body["start"],
                 "end": body["end"],
                 "htmlLink": "https://calendar.google.com/example",
             }
+            provider_events[str(event["id"])] = deepcopy(event)
+            return deepcopy(event)
 
         insert.return_value.execute.side_effect = execute
         yield sdk
 
 
 @pytest.fixture
-def client(google_service: MagicMock) -> Iterator[TestClient]:
-    original_events = LOCAL_EVENTS.copy()
-    try:
-        with TestClient(app) as test_client:
-            yield test_client
-    finally:
-        LOCAL_EVENTS.clear()
-        LOCAL_EVENTS.update(original_events)
+def client(
+    google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[TestClient]:
+    def provider_get(*, calendarId: str, eventId: str) -> Mock:
+        assert calendarId == "primary"
+
+        def execute() -> dict[str, object]:
+            if eventId not in provider_events:
+                raise HttpError(
+                    Mock(status=404, reason="Not Found"),
+                    b'{"error": {"message": "Not found"}}',
+                )
+            return deepcopy(provider_events[eventId])
+
+        return Mock(execute=execute)
+
+    def retrieval_client() -> Mock:
+        service = Mock()
+        service.events.return_value.get.side_effect = provider_get
+        return service
+
+    monkeypatch.setattr("app.google_events.calendar_client", retrieval_client)
+    with TestClient(app) as test_client:
+        yield test_client
