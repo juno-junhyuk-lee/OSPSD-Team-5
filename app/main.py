@@ -4,6 +4,13 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 
 from app.google_calendar import get_primary_calendar
+from app.google_auth import CalendarAuthenticationError
+from app.google_events import (
+    CalendarProviderError,
+    EventNotFoundError,
+    UnsupportedEventError,
+    retrieve_event,
+)
 from app.models import Calendar, CreateEventRequest, Event
 
 app = FastAPI(title="Calendar Service")
@@ -37,11 +44,23 @@ def get_calendar(calendar_id: str) -> Calendar:
 
 @app.get("/events/{event_id}", response_model=Event)
 def get_event(event_id: str) -> Event:
-    """Retrieve one local calendar event by its ID without changing state."""
-    event = LOCAL_EVENTS.get(event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
-    return event
+    """Retrieve one timed event from the authenticated primary Google Calendar."""
+    try:
+        return retrieve_event(event_id)
+    except EventNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Event not found") from error
+    except CalendarAuthenticationError as error:
+        raise HTTPException(
+            status_code=503, detail="Calendar authentication required"
+        ) from error
+    except UnsupportedEventError as error:
+        raise HTTPException(
+            status_code=422, detail="Only timed events are supported"
+        ) from error
+    except CalendarProviderError as error:
+        raise HTTPException(
+            status_code=502, detail="Calendar provider request failed"
+        ) from error
 
 
 @app.post("/events", response_model=Event, status_code=201)

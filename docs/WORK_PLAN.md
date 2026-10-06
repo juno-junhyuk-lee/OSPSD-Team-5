@@ -13,9 +13,10 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 Google lookup and offline tests implemented; Juno verified real HTTP retrieval; second-teammate verification, review, and PR CI pending | To be agreed with the team |
+| Kristie Lee | `GET /events/{event_id}` | Level 2 implementation and 46-test suite verified locally; second-member reproduction, policy review, PR CI pending | To be agreed with the team |
 | Jim Lo | `POST /events` | Level 1 code, tests, walkthrough, and local verification complete; teammate review and branch CI pending | To be agreed with the team |
 
-The team still needs to record the other members' operation assignments.
+The team still needs to record Niriti's and Ka Pui's final operation assignments.
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
 
@@ -65,6 +66,27 @@ the existing GET route, documented `422` validation failures without state
 changes, isolated tests, passing checks, and matching documentation. Local
 memory is sufficient; Google authentication and actual provider writes belong
 to Jim's Level 2 work.
+
+## Kristie Lee's GET Level 2 work
+
+The shared authentication setup was merged in PR #6. GET now uses Google's
+primary calendar and translates its response to the existing Event contract.
+Implementation, offline tests, and documentation are split into three commits.
+Missing events retain 404; authentication-required, all-day and provider failures
+have documented 503, 422 and 502 responses. Missing titles become empty strings;
+these edge-case policies require teammate review.
+
+Local evidence (Windows, Python 3.14.8): 46 tests, Ruff, strict mypy and diff
+checks passed. Fast tests also passed with external network connections blocked.
+A deliberately incorrect translated title was caught by a JSON assertion, then
+restored. Real Google requests through the FastAPI TestClient verified 200 for
+Team 5 GET Test and 404 for an absent ID. See the README for reproduction steps.
+
+Remaining: publish the PR, verify its CI, and have an additional teammate run
+the provider-backed FastAPI endpoint and record the commit/environment/results.
+Do not mark Level 2 fully verified before that second member's execution.
+The live POST-to-GET workflow is incomplete until Jim's POST uses Google;
+the offline fixture bridges local data only for historical Level 1 tests.
 
 ## Provider integration requirements
 

@@ -6,11 +6,15 @@
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 
-- `app/main.py`: FastAPI app, local event mapping, and GET/POST event routes.
+- `app/main.py`: FastAPI routes; Google-backed event GET and local POST/calendar GET.
+- `app/google_auth.py`: noninteractive token loading and refresh for API requests.
+- `app/google_events.py`: Google event retrieval, translation, and service errors.
+- `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
+- `tests/test_google_auth.py`: isolated token lifecycle tests.
 - `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
-- `tests/conftest.py`: shared HTTP client fixture and local state cleanup.
+- `tests/conftest.py`: controlled Google client, shared HTTP fixture, local state cleanup.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
@@ -22,6 +26,13 @@ GET behavior when adding POST. Creation tests must restore local state.
 Preserve each operation's public contract for Level 2 and translate Google
 fields before returning them. Do not commit credentials or add unnecessary layers.
 Fast tests must run without internet or Google credentials.
+
+Kristie owns event GET. It uses the shared account's primary Google Calendar;
+run scripts/google_calendar_auth.py before serving requests. Never start browser
+authorization in a route. Preserve the four-field Event response and existing 404.
+Local POST IDs are not retrievable from Google until POST Level 2 is integrated.
+The provider fake bridges local creation and retrieval only in fast tests; do not
+claim it verifies the real create/read workflow.
 
 ## Working together
 
@@ -38,12 +49,11 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 and the pinned requirements. Run the README check commands:
 Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
 runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
-app and tests in strict mode. The current suite has 25 offline cases; calendar metadata uses controlled
-lookups/SDK responses. Local checks pass on Python 3.14.2.
+app and tests in strict mode. Calendar metadata and event retrieval have offline
+tests using controlled provider responses.
 Keep expected values independent of lookup data and fast tests offline.
-Do not bypass checks or report missing tests as passing. Implementation PR CI
-results for the calendar-details Level 2 branch still need verification. See the README for local
-verification evidence and the Level 2 GET/POST handoffs.
+Do not bypass checks or report missing tests as passing. See the README for
+real-provider verification evidence and remaining teammate verification.
 
 ## Releases
 
