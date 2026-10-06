@@ -3,8 +3,8 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 
-from app.google_calendar import get_primary_calendar
 from app.google_auth import CalendarAuthenticationError
+from app.google_calendar import get_primary_calendar
 from app.google_events import (
     CalendarProviderError,
     EventNotFoundError,
