@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
@@ -8,6 +8,7 @@ from requests.exceptions import RequestException
 from app.google_auth import CalendarAuthenticationError
 from app.google_calendar import get_primary_calendar
 from app.google_create_events import GoogleCalendarSetupError, create_google_event
+from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.google_events import (
     CalendarProviderError,
     EventNotFoundError,
@@ -86,3 +87,29 @@ def create_event(request: CreateEventRequest) -> Event:
             ),
         ) from None
     return event
+
+
+@app.delete("/events/{event_id}", status_code=204)
+def delete_event(event_id: str) -> Response:
+    """Delete a Google event; repeating the request returns 404."""
+    try:
+        delete_google_event(event_id)
+    except GoogleEventNotFoundError:
+        raise HTTPException(status_code=404, detail="Event not found") from None
+    except GoogleCalendarSetupError:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Google Calendar authorization is unavailable. "
+                "Run scripts/google_calendar_auth.py."
+            ),
+        ) from None
+    except HttpError, TransportError, HttpLib2Error, RequestException, OSError:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Google Calendar deletion could not be confirmed. "
+                "Retrying is safe; it returns 404 if the event is already gone."
+            ),
+        ) from None
+    return Response(status_code=204)

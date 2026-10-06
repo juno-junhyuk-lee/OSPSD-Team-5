@@ -258,6 +258,25 @@ Google events; event GET should still return 200 for the created ID. Delete only
 Detailed reproduction steps, cleanup instructions, historical results, and
 teammate verification links are in [POST Level 2 verification](docs/POST_LEVEL2_VERIFICATION.md).
 
+### Event deletion contract
+
+`DELETE /events/{event_id}` deletes one event from the shared test account's
+`primary` Google Calendar. Ka Pui Cheung owns this operation through Levels 1–5.
+It takes one required string path parameter, `event_id` (a Google event ID, as
+returned by POST), and no query or body parameters.
+
+| Result | Status | Body | Retry? |
+| --- | --- | --- | --- |
+| Deleted | `204 No Content` | empty | Not needed |
+| Unknown or already-deleted ID (Google 404 or 410) | `404` | `{"detail": "Event not found"}` | No |
+| Local authorization missing or unusable | `503` | `{"detail": "..."}` naming the auth script | After fixing setup |
+| Google rejected the call, failed, or the response was lost | `502` | `{"detail": "..."}` | Yes |
+
+Deleting the same ID twice returns `204` then `404`. Retrying after a `502` is
+safe: if the first attempt succeeded, the retry returns `404`. Deletion uses
+`sendUpdates="none"`, so attendees are not emailed. Raw Google errors are never
+returned. See [DELETE Level 2 verification](docs/DELETE_LEVEL2_VERIFICATION.md).
+
 ### Code map and request flow
 
 `app/main.py` owns the FastAPI routes.
@@ -281,6 +300,11 @@ the client, and translates the Google response to `Event`. Invalid input is
 rejected before a write. Each creation request uses `num_retries=0`; an uncertain
 result must be investigated before retrying. Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
+
+DELETE calls `delete_google_event` in `app/google_delete_events.py`, which
+reuses POST's `load_credentials` and calls `events.delete` on `primary` once,
+without retries. Google 404/410 raise `GoogleEventNotFoundError`; the handler
+maps that and other failures to the documented responses.
 
 ### Checks and testing
 
