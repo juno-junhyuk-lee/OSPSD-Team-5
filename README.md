@@ -2,12 +2,17 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## Calendar service — Milestone 1, Level 1
+## Calendar service — Milestone 1
 
-The service retrieves calendar details and retrieves and creates local events
-through FastAPI. These operations are implemented with offline HTTP tests. Google Calendar
-integration remains for Level 2; the contracts below are the handoff boundaries.
-Jim Lo owns event creation through Levels 1–5. Its Level 1 contract is below.
+Kristie Lee owns `GET /events/{event_id}` through Levels 1–5. This operation
+now retrieves timed events from Google Calendar using locally authorized tokens.
+Calendar metadata retrieval and event creation still use their Level 1 local
+implementations. Jim Lo owns creation and Juno Lee owns calendar metadata.
+
+This branch is in a transitional state: local POST events are not written to
+Google and cannot be retrieved by the Google-backed GET. The shared create/read
+workflow requires POST Level 2 integration. Fast tests use a controlled provider
+response to retain the earlier Level 1 create/read checks.
 
 ### Installation
 
@@ -60,37 +65,50 @@ PowerShell:
 Keep the server running while making requests in another terminal. Stop it with
 Ctrl+C. Swagger UI: http://localhost:8000/docs
 
-### API contract
+### Event retrieval contract
 
-`GET /events/{event_id}` retrieves one calendar event without changing state.
-It takes one required string path parameter, `event_id`, with no required query
-or body parameters. Success returns `200 OK` with exactly four fields: string
-`id` and `title`, and ISO 8601 datetime strings `start_time` and `end_time`.
-Level 1 uses local data and has no authentication.
+`GET /events/{event_id}` reads one timed event from the authenticated test
+account's primary Google Calendar without changing state. `event_id` is a
+required string path parameter using Google's API event ID, not a Calendar UI
+link or the old local `test-event` ID. No query/body parameters are required.
+Run the shared authentication command below before starting the server.
 
-Git Bash/macOS/Linux:
+Success returns `200 OK` with exactly four fields: string `id` and `title`,
+and ISO 8601 datetime strings `start_time` and `end_time`. The provider mapping
+is `id` → `id`, `summary` → `title`, `start.dateTime` → `start_time`, and
+`end.dateTime` → `end_time`. Additional Google fields remain hidden.
+
+Example from the real shared test calendar (times may change if the event is edited):
 
 ```sh
-curl -i http://localhost:8000/events/test-event
-curl -i http://localhost:8000/events/missing-event
+curl -i http://localhost:8000/events/lf797iogm23bfjn97ogpfocl80
 ```
-
-PowerShell: use `curl.exe -i` with the same URLs to invoke curl directly.
-The known ID returns 200 and:
 
 ```json
 {
-  "id": "test-event",
-  "title": "Example Event",
-  "start_time": "2026-10-05T18:00:00Z",
-  "end_time": "2026-10-05T19:00:00Z"
+  "id": "lf797iogm23bfjn97ogpfocl80",
+  "title": "Team 5 GET Test",
+  "start_time": "2026-10-05T13:30:00-04:00",
+  "end_time": "2026-10-05T14:00:00-04:00"
 }
 ```
 
-`test-event` is predefined. POST-created events are also available through GET
-in the same process. Unknown IDs return `404 Not Found` with
-`{"detail": "Event not found"}`. Restarting retains only the predefined event;
-created events are not persisted.
+An absent provider title is represented as an empty string. All-day events use
+Google date fields and are rejected because this public model represents timed
+events. These policies are covered by tests and require teammate review.
+The shared Event model does not add timezone or start/end ordering validation;
+POST validates its own input separately.
+
+| Condition | HTTP status | JSON detail |
+| --- | --- | --- |
+| Google returns 404 | 404 | `Event not found` |
+| Missing/invalid token, insufficient token scope, or failed refresh | 503 | `Calendar authentication required` |
+| All-day event | 422 | `Only timed events are supported` |
+| Other Google HTTP errors, handled transport failures, or malformed provider data | 502 | `Calendar provider request failed` |
+
+The API does not expose provider error messages or launch browser login during
+requests. For 503, rerun the authentication script. Error handling does not cover
+every SDK exception; retry, cancellation, and uncertain write policies are later work.
 
 ### Calendar details contract
 
@@ -165,8 +183,8 @@ Success returns `201 Created` with exactly the existing `Event` response fields:
 The response contains the normalized title and datetime strings representing
 the supplied instants. Equivalent datetime serialization, such as `Z` versus
 `+00:00`, is permitted. The generated ID identifies the new event and must not
-overwrite an existing event. The event can then be retrieved through
-`GET /events/{event_id}` in the same running process.
+overwrite an existing event. These IDs refer to process-local data; they are not
+retrievable through the Google-backed GET until POST Level 2 is integrated.
 
 Missing required fields, invalid field values, timezone-free timestamps, and
 an end time equal to or earlier than the start time return `422 Unprocessable
@@ -182,69 +200,28 @@ Level 1 workflow assumes one server process, with no cross-worker sharing,
 provider authentication, Google Calendar writes, or durable storage. All-day
 events are outside this timed-event contract.
 
-Acceptance requires HTTP tests demonstrating successful
-creation, retrieval through GET, distinct IDs for repeated creation, and
-rejection without state changes for the invalid inputs above. Existing GET
-tests must continue to pass, and creation tests must restore local state so
-they remain independent. Another teammate must review the contract,
-implementation, tests, and documentation; the reviewer is not assigned yet.
-
-### Create and retrieve an event
-
-Start the server using the Run instructions above. In another terminal,
-create an event (macOS/Linux or Git Bash):
-
-```sh
-curl -i http://localhost:8000/events \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"  Team Meeting  ","start_time":"2026-10-05T10:00:00-04:00","end_time":"2026-10-05T11:00:00-04:00"}'
-```
-
-Expect `201`, a generated `id`, the title `Team Meeting` without surrounding
-spaces, and the supplied times. Copy the returned ID into the next request:
-
-```sh
-curl -i "http://localhost:8000/events/<returned-id>"
-```
-
-Replace `<returned-id>` before running the command. Expect `200` with the same
-event. A second POST with the same body returns a different ID.
-
-In PowerShell, use the same workflow through `Invoke-RestMethod`:
-
-```powershell
-$body = @{
-    title = "  Team Meeting  "
-    start_time = "2026-10-05T10:00:00-04:00"
-    end_time = "2026-10-05T11:00:00-04:00"
-} | ConvertTo-Json
-$event = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/events" -ContentType "application/json" -Body $body
-$event
-Invoke-RestMethod -Uri "http://localhost:8000/events/$($event.id)"
-```
-
-To check validation, use Swagger UI's `POST /events` operation and submit a
-body with `end_time` equal to `start_time`. Expect `422` with a `detail` array.
-The rejected request must not create an event. Restarting the server removes
-created events; GET then returns `404` for their IDs.
+Creation tests verify successful writes, validation and local state cleanup.
+The provider fake retains historical create/read coverage; a real create/read
+workflow remains pending POST integration. Review and verification details are
+in the [work plan](docs/WORK_PLAN.md) and [verification notes](docs/VERIFICATION.md).
 
 ### Code map and request flow
 
-`app/main.py` owns the FastAPI app, local calendar/event mappings, and GET/POST
-handlers. Calendar retrieval uses the `Calendar` model in `app/models.py` to
-return metadata; unknown IDs produce the documented calendar 404.
-FastAPI parses the path parameter, the handler looks up the ID, and the existing
-`Event` model in `app/models.py` defines the serialized success response. A missing
-ID raises HTTPException, which FastAPI renders as the documented 404 JSON.
-There are no SDK calls or credentials in this path.
+`app/main.py` owns the FastAPI routes and the local calendar/POST mappings.
+For event GET, FastAPI parses the ID and calls `retrieve_event` in
+`app/google_events.py`. That module makes Google's `events.get` request on
+`primary` and converts the result to `Event` in `app/models.py`.
+`app/google_auth.py` loads the repository-root token and refreshes it when needed.
+No browser login occurs on an HTTP request. SDK objects stay within the Google
+modules; routes receive the public model or service-specific exceptions.
 
-For POST, `CreateEventRequest` in `app/models.py` validates and normalizes the
-input before the handler runs. The handler generates an unused ID, stores the
-new `Event` in local memory, and returns it with status 201.
+The synchronous GET handler keeps blocking SDK work off the async event loop.
+Each request constructs its own authorized client. No cross-request client cache,
+provider-independent interface, or retry layer is introduced at this level.
 
-A dictionary keeps the one-ID lookup simple and makes the local implementation
-easy to replace in Level 2. No provider interface or dependency injection is
-needed for this level.
+Calendar GET still uses `LOCAL_CALENDARS`. POST still validates with
+`CreateEventRequest`, generates an unused ID, and stores an Event in `LOCAL_EVENTS`.
+Their Google integrations belong to their respective operation owners.
 
 ### Checks and testing
 
@@ -276,83 +253,18 @@ formatting, types, and tests on pushes and pull requests using Python 3.14 on
 Linux. For intentional formatting changes, run `python -m ruff format .` and
 review the diff.
 
-Testing strategy: the GET and POST suites exercise the HTTP boundary through
-TestClient without a server, network access, or Google credentials.
-[tests/conftest.py](tests/conftest.py) restores local events after each test,
-including failures. Expected values are independent of the application's data.
+The fast suite runs without Google credentials or external network access.
+It covers HTTP contracts, provider response translation, token handling and
+failure cases. The shared fixture restores local state and substitutes the
+Google client. Its local POST-to-GET checks do not establish a live Google write.
 
-- [Calendar GET tests](tests/test_calendars.py): primary returns 200 with exact
-  metadata JSON; unknown IDs return the documented calendar 404.
-- [Event GET tests](tests/test_events.py): known ID returns 200 with exact JSON;
-  unknown ID returns the documented 404.
-- [POST tests](tests/test_create_events.py): creation returns 201 with the four
-  response fields, a generated ID, a trimmed title, and the correct instants.
-  GET retrieves the same event; repeated creation produces distinct IDs.
-- Invalid creation: missing fields, blank or invalid titles, malformed or
-  timezone-free times, numeric timestamps, and equal/reversed time ranges
-  return 422 with a `detail` array and leave local events unchanged.
-- Time boundaries: ordering is checked across different UTC offsets, including
-  a valid end time whose displayed local hour is earlier than the start hour.
+All 46 tests, Ruff and strict mypy passed on Windows with Python 3.14.8. A real
+Google request through FastAPI TestClient verified event retrieval and missing-ID
+handling. A second member's endpoint reproduction, edge-case policy review and
+this PR's CI are pending. TestClient emits an existing Starlette deprecation warning.
 
-On October 4, 2026, the POST implementation was verified on macOS with Python
-3.14.8: all 22 tests, Ruff lint/format checks, strict mypy, dependency compatibility
-(`uv pip check`), and `git diff --check` passed. TestClient emits an existing
-Starlette deprecation warning with the pinned HTTPX dependency.
-
-A single-worker Uvicorn server on `127.0.0.1:8765` was also checked with curl:
-POST returned 201 with a trimmed title, GET returned the same event with 200,
-an equal-time request returned 422, and the predefined event remained unchanged.
-The server was stopped after verification.
-
-Defect-detection evidence: temporarily changing the in-memory title to
-`Incorrect Event` made `test_get_known_event` fail at its JSON assertion:
-
-```text
-{'title': 'Incorrect Event'} != {'title': 'Example Event'}
-```
-
-The original title was restored without modifying source files, and both tests
-passed again. Include this evidence in the implementation PR.
-
-For POST, temporarily discarding writes to the local event mapping made
-`test_create_and_retrieve_event` fail: POST returned 201, but the following GET
-returned 404 instead of 200. Restoring the mapping made the test pass. The
-experiment changed only in-memory behavior; source files were not modified.
-
-These checks establish local behavior, not Google integration, authentication,
-all-day support, multi-worker sharing, or durability. Teammate verification from
-another checkout, POST review, and CI for this branch remain pending. The
-PowerShell walkthrough has not been executed locally.
-
-### Level 2 event GET handoff
-
-The Level 2 owners should replace the local lookup in `app/main.py` with a Google
-Calendar lookup using the authenticated user's `primary` calendar. Preserve the
-route, `Event` response model, and Level 1 tests. Do not expose `calendar_id` or
-raw Google fields. The planned field mapping is `summary` to `title`,
-`start.dateTime` to `start_time`, and `end.dateTime` to `end_time`; verify provider
-assumptions against its documentation and a real test account.
-
-The local GET fixture represents a timed event. Agree on missing-title and
-all-day behavior before claiming support for GET. The shared response model
-does not enforce timezone awareness or start/end ordering; POST validates
-those rules separately in its creation request model.
-
-Google authentication, configuration, and real-provider verification remain
-Level 2 work. Keep secrets and generated tokens out of Git. Keep fast tests
-independent of live credentials when replacing the local implementation, and
-document how at least two teammates can verify the real integration.
-
-### Level 2 calendar details handoff
-
-Retrieve the authenticated user's primary calendar from Google,
-map `summary` to `title` and `timeZone` to `time_zone`, and retain the service
-alias `primary` as the response ID. Confirm metadata permissions separately:
-the event CRUD scope is not automatically sufficient for calendar metadata.
-Google's returned title and timezone replace the fixture values; decide any
-missing-title behavior before integration. Other calendar IDs remain unsupported
-until the team intentionally expands the contract. No Google lookup is added
-in Level 1.
+See [verification notes](docs/VERIFICATION.md) for test coverage, defect-detection
+evidence, real-provider reproduction steps and historical Level 1 verification.
 
 ### Shared Google Calendar authentication
 
@@ -386,30 +298,16 @@ state. Copy a returned API event ID to verify that specific event:
 A successful API request with no returned events still verifies authentication;
 create a timed test event before verifying retrieval. A second execution should
 reuse the saved authorization. A second teammate must reproduce the real request.
-This setup script does not replace the FastAPI endpoint's local lookup yet.
+The setup script authorizes the account; the FastAPI event GET now uses that token.
 The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
 
 
-### Level 2 POST handoff
+### Remaining provider integrations
 
-Jim will replace the local creation write with an authenticated Google Calendar
-write while preserving the POST request, 201 response, and validation rules.
-Invalid local input must be rejected before calling the provider.
-
-Use Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert)
-to verify the operation and write permissions. Translate `title` to `summary`,
-`start_time` to `start.dateTime`, and `end_time` to `end.dateTime`. Translate the
-created provider event back to the four-field `Event` response. Its returned ID
-must work with the team's GET implementation on the same calendar; callers
-must not depend on Level 1's UUID format. Agree on the target test calendar
-and configuration with the team before integrating the operations.
-
-Keep fast tests offline by controlling the provider result. Separately document
-credentials, configuration, a real create/read verification, and cleanup of test
-events. Record behavior for rejected writes and uncertain outcomes rather than
-assuming a timeout means no event was created. No Google writes or provider
-failure handling have been verified by the Level 1 implementation.
-
+Calendar metadata and POST remain local. Their owners will connect them to
+Google while preserving their contracts. The live create/read workflow becomes
+available after POST writes to the same primary calendar that GET reads.
+[Integration notes](docs/VERIFICATION.md) retain the operation-specific handoffs.
 
 ## Contributor documentation
 
