@@ -6,11 +6,11 @@
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its lookup is in `app/main.py`.
 
-- pp/main.py: FastAPI routes; Google-backed event GET and local POST/calendar GET.
-- pp/google_auth.py: noninteractive token loading and refresh for API requests.
-- pp/google_events.py: Google event retrieval, translation, and service errors.
-- 	ests/test_google_events.py: offline Google-backed HTTP contract and failure tests.
-- 	ests/test_google_auth.py: isolated token lifecycle tests.
+- `app/main.py`: FastAPI routes; Google-backed event GET and local POST/calendar GET.
+- `app/google_auth.py`: noninteractive token loading and refresh for API requests.
+- `app/google_events.py`: Google event retrieval, translation, and service errors.
+- `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
+- `tests/test_google_auth.py`: isolated token lifecycle tests.
 - `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
