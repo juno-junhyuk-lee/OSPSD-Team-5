@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 
-from app import google_create_events
+from app import google_create_events, google_delete_events
 from app.main import app
 
 
@@ -30,6 +30,8 @@ def google_service(
     with (
         patch.object(google_create_events, "load_credentials"),
         patch.object(google_create_events, "build") as build,
+        patch.object(google_delete_events, "load_credentials"),
+        patch.object(google_delete_events, "build", build),
     ):
         sdk = build.return_value.__enter__.return_value
         insert = sdk.events.return_value.insert
@@ -48,6 +50,16 @@ def google_service(
             return deepcopy(event)
 
         insert.return_value.execute.side_effect = execute
+        delete = sdk.events.return_value.delete
+
+        def delete_execute(*, num_retries: int = 0) -> str:
+            event_id = delete.call_args.kwargs["eventId"]
+            if event_id not in provider_events:
+                raise HttpError(Mock(status=404, reason="Not Found"), b"")
+            del provider_events[event_id]
+            return ""
+
+        delete.return_value.execute.side_effect = delete_execute
         yield sdk
 
 

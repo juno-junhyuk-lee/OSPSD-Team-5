@@ -14,6 +14,7 @@ individual operation ownership.
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8 | See PR #8 reviews |
+| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
 | Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
 
 The team still needs to record Niriti's and Ka Pui's final operation assignments.
