@@ -7,10 +7,12 @@ Google-backed GET behavior.
 
 Testing strategy: the GET and POST suites exercise the HTTP boundary through
 TestClient without a server, network access, or Google credentials.
-[tests/conftest.py](../tests/conftest.py) replaces the Google client with a controlled
-provider-shaped response and restores local events after each test, including failures.
-The fake exposes the local POST data for the historical create/read tests; it does
-not prove that the current local POST writes to Google. Expected values are independent of the application's data.
+[tests/conftest.py](../tests/conftest.py) replaces the Google client with controlled
+provider responses and isolates fake event data for each test. The fake insert
+stores events that the fake GET retrieves; no application memory bridge is used.
+Offline checks do not prove real Google writes. Expected values are independent
+of application data. Current real POST evidence is in
+[POST Level 2 verification](POST_LEVEL2_VERIFICATION.md).
 
 - [Calendar GET tests](../tests/test_calendars.py): primary returns 200 with exact
   metadata JSON; unknown IDs return the documented calendar 404.
@@ -21,7 +23,7 @@ not prove that the current local POST writes to Google. Expected values are inde
   GET retrieves the same event; repeated creation produces distinct IDs.
 - Invalid creation: missing fields, blank or invalid titles, malformed or
   timezone-free times, numeric timestamps, and equal/reversed time ranges
-  return 422 with a `detail` array and leave local events unchanged.
+  return 422 with a `detail` array without a provider write.
 - Time boundaries: ordering is checked across different UTC offsets, including
   a valid end time whose displayed local hour is earlier than the start hour.
 
@@ -51,8 +53,8 @@ returned 404 instead of 200. Restoring the mapping made the test pass. The
 experiment changed only in-memory behavior; source files were not modified.
 
 The preceding Level 1 checks establish local behavior, not Google integration, authentication,
-all-day support, multi-worker sharing, or durability. Teammate verification from
-another checkout, POST review, and CI for this branch remain pending. The
+all-day support, multi-worker sharing, or durability. At that revision, teammate verification from
+another checkout, POST review, and CI remained pending. The
 PowerShell walkthrough has not been executed locally.
 
 ### GET Level 2 tests and verification
@@ -95,16 +97,17 @@ curl -i http://localhost:8000/events/00000000000000000000000000
 Expect 200 and four event fields, then 404 with `{"detail":"Event not found"}`.
 Use your own local token, keep the GET test event intact, and do not attach token
 contents to the review. At least two team members must be able to run the
-provider-backed operation (Level 2 section 2.7). Kristie's execution is complete;
-one additional teammate's endpoint reproduction, policy review, and this PR's CI
-remain pending. Provider outages and token-expiry branches were simulated in
+provider-backed operation (Level 2 section 2.7). At that revision, Kristie's execution was complete and
+additional-member reproduction and review were pending. PR #8 is now merged;
+its conversation records later verification and reviews. Provider outages and token-expiry branches were simulated in
 fast tests; they were not induced against the live service.
 
 ### Local creation walkthrough (Level 1 history)
 
-This walkthrough records the earlier all-local behavior. On this branch POST
-still returns 201, but the following GET does not retrieve the local event.
-It becomes an end-to-end workflow again after POST Level 2 is integrated.
+This walkthrough records the earlier all-local behavior, including loss of
+created events after restart. The current branch uses Google for both POST and
+GET and requires authorization. Use [POST Level 2 verification](POST_LEVEL2_VERIFICATION.md)
+for the current workflow, restart behavior, and provider cleanup.
 
 Start the server using the README Run instructions. In another terminal,
 create an event (macOS/Linux or Git Bash):
@@ -158,15 +161,15 @@ in Level 1.
 
 ### Level 2 POST handoff
 
-Jim will replace the local creation write with an authenticated Google Calendar
-write while preserving the POST request, 201 response, and validation rules.
+Jim's Level 2 implementation replaces the local write with authenticated Google
+creation while preserving the request, 201 response, and validation rules.
 Invalid local input must be rejected before calling the provider.
 
 Use Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert)
 to verify the operation and write permissions. Translate `title` to `summary`,
 `start_time` to `start.dateTime`, and `end_time` to `end.dateTime`. Translate the
 created provider event back to the four-field `Event` response. Its returned ID
-must work with the team's GET implementation on the same calendar; callers
+works with the team's GET implementation on the same primary calendar; callers
 must not depend on Level 1's UUID format. Agree on the target test calendar
 and configuration with the team before integrating the operations.
 

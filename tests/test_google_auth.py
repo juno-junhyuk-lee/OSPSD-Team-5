@@ -69,7 +69,7 @@ def test_revoked_token_requires_authentication(
     credentials.valid = False
     credentials.expired = True
     credentials.refresh_token = "fake-refresh-token"
-    credentials.refresh.side_effect = RefreshError("revoked")  # type: ignore[no-untyped-call]
+    credentials.refresh.side_effect = RefreshError("revoked")
     token = tmp_path / "token.json"
 
     with pytest.raises(CalendarAuthenticationError):

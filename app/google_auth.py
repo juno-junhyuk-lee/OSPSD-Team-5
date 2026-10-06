@@ -18,7 +18,7 @@ class CalendarAuthenticationError(Exception):
 
 def load_credentials(token_path: Path = ROOT / "token.json") -> Any:
     try:
-        credentials = Credentials.from_authorized_user_file(str(token_path))  # type: ignore[no-untyped-call]
+        credentials = Credentials.from_authorized_user_file(str(token_path))
         if not credentials.has_scopes(SCOPES):
             raise CalendarAuthenticationError
         if not credentials.valid:

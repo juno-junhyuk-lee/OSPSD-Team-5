@@ -13,9 +13,7 @@ TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
 
 def get_primary_calendar() -> Calendar:
     """Read Google metadata and translate it into the public calendar model."""
-    credentials = Credentials.from_authorized_user_file(  # type: ignore[no-untyped-call]
-        str(TOKEN_PATH)
-    )
+    credentials = Credentials.from_authorized_user_file(str(TOKEN_PATH))
     try:
         with build("calendar", "v3", credentials=credentials) as service:
             data = cast(

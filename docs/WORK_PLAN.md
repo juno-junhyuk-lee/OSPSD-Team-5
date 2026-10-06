@@ -12,9 +12,9 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Juno Lee | `GET /calendars/{calendar_id}` | Level 2 Google lookup and offline tests implemented; Juno verified real HTTP retrieval; second-teammate verification, review, and PR CI pending | To be agreed with the team |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 implementation and 46-test suite verified locally; second-member reproduction, policy review, PR CI pending | To be agreed with the team |
-| Jim Lo | `POST /events` | Level 1 code, tests, walkthrough, and local verification complete; teammate review and branch CI pending | To be agreed with the team |
+| Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
+| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8 | See PR #8 reviews |
+| Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
 
 The team still needs to record Niriti's and Ka Pui's final operation assignments.
 The tables below retain the earlier GET implementation history; they do not
@@ -58,8 +58,8 @@ data. A controlled missing-write defect was detected by the POST-to-GET test;
 restoring normal storage made it pass. Details are in the README. Codex assisted
 with the POST implementation, tests, documentation, and local verification.
 
-Remaining steps: assign a reviewer, verify setup from another checkout, and
-check GitHub CI after publishing the branch. Google integration is Level 2 work.
+Level 1 was merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/5)
+after Ka Pui and Juno approved it, with passing CI. Google integration is Level 2 work.
 
 Level 1 completion requires `201` creation, generated IDs, retrieval through
 the existing GET route, documented `422` validation failures without state
@@ -82,18 +82,79 @@ A deliberately incorrect translated title was caught by a JSON assertion, then
 restored. Real Google requests through the FastAPI TestClient verified 200 for
 Team 5 GET Test and 404 for an absent ID. See the README for reproduction steps.
 
-Remaining: publish the PR, verify its CI, and have an additional teammate run
-the provider-backed FastAPI endpoint and record the commit/environment/results.
-Do not mark Level 2 fully verified before that second member's execution.
-The live POST-to-GET workflow is incomplete until Jim's POST uses Google;
-the offline fixture bridges local data only for historical Level 1 tests.
+This implementation was merged in
+[PR #8](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/8), including client
+cleanup on success and failure paths. The current POST integration uses the same
+primary calendar and ID space. Historical test counts above describe Kristie's
+earlier revision; current combined results are in the POST verification guide.
+
+## Jim Lo's POST Level 2 work
+
+Start from the current merged main, including POST Level 1, shared authentication
+(PR #6), and calendar details (PR #7). Use the shared test account's primary
+calendar and the existing OAuth client and `calendar.events` scope. The README
+records field mapping, setup, behavior, and tests.
+
+Work is split into four reviewable changes:
+
+1. Document the integration design and local setup, and update Level 1 status.
+2. Add Google creation and response translation with offline tests.
+3. Connect POST to Google and preserve HTTP contract tests and existing routes.
+4. Record real HTTP create/read verification, cleanup, and teammate instructions.
+
+All four changes are committed in the original PR revision. The third connects
+HTTP POST to Google
+and preserves offline HTTP tests through scoped SDK responses. The route returns
+503 for setup failure and 502 when creation cannot be confirmed, without local
+fallback or creation retries. A controlled lost-response test covers an accepted
+write, and a waiting SDK call allows an unrelated GET to complete in TestClient.
+The fourth change records real verification in Jim's environment and a walkthrough
+for the second verifier. Codex assisted with planning, implementation, offline
+tests, and HTTP/SDK verification; Jim completed browser login and consent.
+
+Local checks for this change passed on Python 3.14.8: 47 tests, Ruff lint/format,
+strict mypy, dependency compatibility, and diff checks. The existing TestClient
+deprecation warning remains. Real verification against implementation revision
+`af62da5` passed: HTTP POST 201, local GET 200, independent Google read with
+matching times, invalid input 422 without a matching provider event, provider
+persistence after stopping the server, and local GET 404 after restart. The
+verification event was deleted and confirmed cancelled; the server was stopped.
+See [POST Level 2 verification](POST_LEVEL2_VERIFICATION.md) for details and
+teammate reproduction. Juno and Ka Pui subsequently recorded real POST
+verification and approved
+PR #10. Their reviews establish additional-member execution; environment and
+cleanup details not provided in those comments are not inferred.
+
+Keep the API inputs, 201 response, validation rules, and returned event shape.
+Use Google's event ID. The original revision used a temporary local mirror while
+GET was local.
+Integration with merged PRs #8 and #9 removes that mirror: POST writes Google
+and event GET reads Google, including after a server restart. The POST module
+and its tests are renamed to `google_create_events` to preserve Juno's separate
+`google_calendar` metadata implementation and tests.
+Do not silently use local creation when authorization fails or automatically
+retry a write with an uncertain outcome.
+
+Completion requires passing offline checks, a real HTTP POST followed by an
+independent Google read, cleanup of verification events, teammate review, and
+at least two members running POST against Google with their own local tokens.
+The shared authentication script alone does not complete this operation.
+
+The integration is one proposed merge commit. Keep both GET implementations,
+POST's validation and failure behavior, both OAuth scopes, and all provider tests.
+The shared fixture now stores data inside the mocked provider insertion rather
+than the application. Local integration checks passed: 76 offline tests, lint, formatting, strict
+mypy, dependency compatibility, and diff checks. Real HTTP POST-to-GET, calendar
+metadata, restart persistence, invalid input, and cleanup also passed. See the
+POST verification guide for the uncommitted merge revision and execution details. Updated PR CI
+and review of the integration diff remain required after publication.
 
 ## Provider integration requirements
 
 The earlier plan to assign three members exclusively to Level 2 support tasks
 has been superseded by operation ownership. The existing GET handoff uses the
-authenticated user's primary calendar; POST provider details will be defined
-when its Level 2 work begins. At least two members must verify the real
+authenticated user's primary calendar; POST uses the same calendar and Google
+event IDs. At least two members must verify the real
 integration; by the first checkpoint everyone must be able to run the service
 and fast tests.
 
@@ -104,9 +165,10 @@ and fast tests.
 - October 21, 2026: Level 5, final release, review fixes, and demonstration.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
-GitHub Actions. Current calendar-details gaps: second-teammate real verification,
-review, and branch CI. Event provider integrations remain separate work. The foundation PR's CI initially failed
-at pytest because it had no tests; GET PR CI passed; the current Level 2 branch has 25 passing offline tests.
+GitHub Actions. Both GET Level 2 PRs are merged. POST Level 2 teammate execution
+and review are recorded in PR #10; the combined branch still needs its reviewed
+merge commit and updated PR checks. Historical test counts refer to the revisions
+where they were recorded, not the combined suite.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 
 ## Evidence to keep as work progresses

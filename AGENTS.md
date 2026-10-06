@@ -6,15 +6,19 @@
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 
-- `app/main.py`: FastAPI routes; Google-backed event GET and local POST/calendar GET.
+- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, and POST.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
+- `app/google_calendar.py`: Google calendar metadata retrieval and translation.
+- `app/google_create_events.py`: POST authorization, creation, and response translation.
+- `tests/test_google_calendar.py`: offline calendar metadata translation tests.
+- `tests/test_google_create_events.py`: offline POST provider and token tests.
 - `app/google_events.py`: Google event retrieval, translation, and service errors.
 - `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
 - `tests/test_google_auth.py`: isolated token lifecycle tests.
 - `app/models.py`: Event response model and creation input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
-- `tests/conftest.py`: controlled Google client, shared HTTP fixture, local state cleanup.
+- `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
@@ -22,7 +26,7 @@ Use the README setup and commands. Each member owns one distinct, useful public
 operation through Levels 1–5, including its tests and documentation. Keep Level 1
 operations small and backed by local data. Jim Lo owns `POST /events`; its
 implemented Level 1 creation contract is in the README. Preserve existing
-GET behavior when adding POST. Creation tests must restore local state.
+GET behavior when adding POST. Creation tests must isolate fake provider state.
 Preserve each operation's public contract for Level 2 and translate Google
 fields before returning them. Do not commit credentials or add unnecessary layers.
 Fast tests must run without internet or Google credentials.
@@ -30,9 +34,14 @@ Fast tests must run without internet or Google credentials.
 Kristie owns event GET. It uses the shared account's primary Google Calendar;
 run scripts/google_calendar_auth.py before serving requests. Never start browser
 authorization in a route. Preserve the four-field Event response and existing 404.
-Local POST IDs are not retrievable from Google until POST Level 2 is integrated.
-The provider fake bridges local creation and retrieval only in fast tests; do not
-claim it verifies the real create/read workflow.
+Jim's POST writes to the same primary calendar and returns Google's event ID.
+GET reads the provider directly; no local event mirror is used. Never fall back
+to local creation or automatically retry uncertain writes. The provider fake
+stores insert results for GET only in fast tests; do not claim it verifies a
+real create/read workflow. Keep both OAuth scopes in the shared setup script.
+See [POST verification](docs/POST_LEVEL2_VERIFICATION.md) for real-run evidence.
+Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
+are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 
 ## Working together
 

@@ -4,15 +4,12 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 ## Calendar service — Milestone 1
 
-Juno Lee owns `GET /calendars/{calendar_id}` and Kristie Lee owns
-`GET /events/{event_id}` through Levels 1–5. Both operations now use Google
-Calendar with locally authorized tokens and have offline tests.
-Jim Lo owns `POST /events`, which still uses its Level 1 local implementation.
-
-Local POST events are not written to Google and cannot be retrieved by the
-Google-backed GET. The shared create/read workflow requires POST Level 2
-integration. Fast tests use a controlled provider response to retain the
-earlier Level 1 create/read checks.
+Juno Lee owns `GET /calendars/{calendar_id}`, Kristie Lee owns
+`GET /events/{event_id}`, and Jim Lo owns `POST /events` through Levels 1–5.
+All three operations now call Google Calendar with locally authorized tokens.
+POST creates timed events in the same primary calendar that event GET reads;
+created events can be retrieved after a server restart. Offline tests control
+provider responses and do not require credentials or network access.
 
 ### Installation
 
@@ -146,9 +143,11 @@ This operation does not list calendars or events and does not alter event routes
 
 ### Event creation contract
 
-`POST /events` creates one timed event in the service's local memory. Jim Lo
+`POST /events` creates one timed event in Google Calendar's `primary` calendar. Jim Lo
 owns this operation, including its implementation, tests, and documentation
-through Levels 1–5. This endpoint implements the Level 1 behavior below.
+through Levels 1–5. Level 2 preserves the Level 1 input and success contract;
+it requires local authorization from the Shared Google Calendar authentication
+instructions below. One real-provider run is recorded in the verification guide.
 
 The request uses `Content-Type: application/json` and requires three body fields:
 
@@ -159,7 +158,7 @@ The request uses `Content-Type: application/json` and requires three body fields
 | `end_time` | ISO 8601 datetime string | Must include a UTC offset or `Z` and represent an instant after `start_time`. |
 
 There are no required path or query parameters. The caller does not supply
-the event ID; the service generates it. For example:
+the event ID; Google generates it. For example:
 
 ```json
 {
@@ -184,8 +183,8 @@ Success returns `201 Created` with exactly the existing `Event` response fields:
 The response contains the normalized title and datetime strings representing
 the supplied instants. Equivalent datetime serialization, such as `Z` versus
 `+00:00`, is permitted. The generated ID identifies the new event and must not
-overwrite an existing event. These IDs refer to process-local data; they are not
-retrievable through the Google-backed GET until POST Level 2 is integrated.
+overwrite an existing event. The event can then be retrieved through
+`GET /events/{event_id}` in the same running process.
 
 Missing required fields, invalid field values, timezone-free timestamps, and
 an end time equal to or earlier than the start time return `422 Unprocessable
@@ -195,16 +194,69 @@ applies to creation inputs; it does not add guarantees to the existing GET
 operation or shared response model.
 
 Each valid POST creates a new event, even when its body matches a previous
-request. Repeated requests receive different IDs; Level 1 does not provide
-idempotency. Created events are process-local and are lost on restart. The
-Level 1 workflow assumes one server process, with no cross-worker sharing,
-provider authentication, Google Calendar writes, or durable storage. All-day
-events are outside this timed-event contract.
+request. Repeated requests receive different IDs; this operation does not provide
+idempotency. The Google event persists independently of the server. Event GET
+retrieves the provider event by the returned ID, including after a server restart.
+The service does not keep a local event mirror. All-day events are outside this
+contract.
 
-Creation tests verify successful writes, validation and local state cleanup.
-The provider fake retains historical create/read coverage; a real create/read
-workflow remains pending POST integration. Review and verification details are
-in the [work plan](docs/WORK_PLAN.md) and [verification notes](docs/VERIFICATION.md).
+Setup failure returns 503 with a `detail` string directing the developer to the
+authorization script. Provider HTTP/transport failure or an unusable response
+returns 502 with a `detail` string stating that creation could not be confirmed
+and to check the calendar before retrying. Neither failure falls back to local
+creation. A 502 does not guarantee that Google created no event; do not blindly repeat a write with an uncertain result. Raw provider
+errors and credential contents are not included in these HTTP responses.
+
+Acceptance requires HTTP tests demonstrating successful
+creation, retrieval through GET, distinct IDs for repeated creation, and
+rejection without state changes for the invalid inputs above. Existing GET
+tests must continue to pass, and provider fixtures must be isolated so
+tests remain independent. Another teammate must review the contract,
+implementation, tests, and documentation. Level 1 was approved by Ka Pui and
+Juno and merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/5).
+
+### Create and retrieve an event
+
+Install current requirements and complete Shared Google Calendar authentication
+below, then start the server using the Run instructions above. In another terminal,
+create an event (macOS/Linux or Git Bash):
+
+```sh
+curl -i http://localhost:8000/events \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"  Team Meeting  ","start_time":"2026-10-05T10:00:00-04:00","end_time":"2026-10-05T11:00:00-04:00"}'
+```
+
+Expect `201`, a generated `id`, the title `Team Meeting` without surrounding
+spaces, and the supplied times. Copy the returned ID into the next request:
+
+```sh
+curl -i "http://localhost:8000/events/<returned-id>"
+```
+
+Replace `<returned-id>` before running the command. Expect `200` with the same
+event. A second POST with the same body returns a different ID.
+
+In PowerShell, use the same workflow through `Invoke-RestMethod`:
+
+```powershell
+$body = @{
+    title = "  Team Meeting  "
+    start_time = "2026-10-05T10:00:00-04:00"
+    end_time = "2026-10-05T11:00:00-04:00"
+} | ConvertTo-Json
+$event = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/events" -ContentType "application/json" -Body $body
+$event
+Invoke-RestMethod -Uri "http://localhost:8000/events/$($event.id)"
+```
+
+To check validation, use Swagger UI's `POST /events` operation and submit a
+body with `end_time` equal to `start_time`. Expect `422` with a `detail` array.
+The rejected request must not create an event. Restarting the server preserves
+Google events; event GET should still return 200 for the created ID. Delete only your own verification events afterward.
+
+Detailed reproduction steps, cleanup instructions, historical results, and
+teammate verification links are in [POST Level 2 verification](docs/POST_LEVEL2_VERIFICATION.md).
 
 ### Code map and request flow
 
@@ -218,12 +270,17 @@ Google's `events.get` on `primary` and translates the result to `Event`.
 `app/google_auth.py` loads and refreshes the local token for event retrieval.
 Neither GET operation starts browser authorization during a request.
 
-The synchronous GET handler keeps blocking SDK work off the async event loop.
+The synchronous handlers keep blocking SDK work off the async event loop.
 Each request constructs its own authorized client. No cross-request client cache,
 provider-independent interface, or retry layer is introduced at this level.
 
-POST still validates with `CreateEventRequest`, generates an unused ID,
-and stores an Event in `LOCAL_EVENTS`. Its Google integration is pending.
+POST validates and normalizes `CreateEventRequest`, then calls
+`create_google_event` in `app/google_create_events.py`. That module loads or
+refreshes local event authorization, calls `events.insert` on `primary`, closes
+the client, and translates the Google response to `Event`. Invalid input is
+rejected before a write. Each creation request uses `num_retries=0`; an uncertain
+result must be investigated before retrying. Authorization helpers remain
+operation-specific at this level; the shared setup script obtains both scopes.
 
 ### Checks and testing
 
@@ -257,13 +314,21 @@ review the diff.
 
 The fast suite runs without Google credentials or external network access.
 It covers HTTP contracts, provider translation, event authentication,
-and event failure cases. The shared fixture restores local event state
-and substitutes the Google client. Offline POST-to-GET checks do not
-establish a live Google write.
+and event failure cases. The shared fixture provides isolated provider data
+for mocked Google insertion and retrieval. Data is populated by the fake insert,
+not by the HTTP handler, so POST-to-GET checks exercise both provider paths.
+Offline checks do not establish a live Google write.
 
 Calendar HTTP tests use a controlled metadata lookup.
 `tests/test_google_calendar.py` verifies Google's metadata field translation
 and excludes provider-only fields from the public response.
+
+[Google creation tests](tests/test_google_create_events.py) cover outgoing fields,
+provider-assigned IDs, response validation, authorization, and disabled retries.
+HTTP creation tests also check validation without provider writes, sanitized
+503/502 responses, accepted writes with lost responses, and GET responsiveness
+while a mocked insertion is waiting. The last check uses TestClient, not a live
+single-worker server.
 
 See [verification notes](docs/VERIFICATION.md) for event test coverage,
 real-provider reproduction steps, and historical Level 1 verification.
@@ -334,12 +399,14 @@ Both calendar-details GET and event GET use local authorization to call Google.
 The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
 
 
-### Remaining provider integrations
+### Level 2 integration status
 
-POST remains local. Jim will connect it to Google while preserving its
-contract. The live create/read workflow becomes available after POST writes
-to the same primary calendar that event GET reads.
-[Integration notes](docs/VERIFICATION.md) retain the operation-specific handoffs.
+PRs #8 and #9 are merged. POST Level 2 is under review in
+[PR #10](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/10).
+Juno and Ka Pui recorded real POST verification and approved its earlier revision.
+The combined implementation must pass local checks and updated PR CI before
+merging. [POST verification](docs/POST_LEVEL2_VERIFICATION.md) records the current
+create/read workflow separately from earlier local-mirror evidence.
 
 ## Contributor documentation
 
