@@ -2,9 +2,9 @@
 
 ## Code and setup
 
-- `GET /calendars/{calendar_id}`: Local calendar metadata operation.
+- `GET /calendars/{calendar_id}`: Google-backed primary calendar metadata operation.
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
-  The Calendar response model lives in `app/models.py`; its lookup is in `app/main.py`.
+  The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 
 - `app/main.py`: FastAPI routes; Google-backed event GET and local POST/calendar GET.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
@@ -49,11 +49,11 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 and the pinned requirements. Run the README check commands:
 Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
 runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
-app and tests in strict mode. All 46 tests pass locally on Windows with Python 3.14.8.
+app and tests in strict mode. Calendar metadata and event retrieval have offline
+tests using controlled provider responses.
 Keep expected values independent of lookup data and fast tests offline.
-Do not bypass checks or report missing tests as passing. Implementation PR CI
-results for this GET Level 2 branch still need verification. See the README for
-real GET evidence and the additional teammate's required reproduction.
+Do not bypass checks or report missing tests as passing. See the README for
+real-provider verification evidence and remaining teammate verification.
 
 ## Releases
 
