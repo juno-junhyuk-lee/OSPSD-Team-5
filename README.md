@@ -5,11 +5,13 @@ This is Team 5's repository for CS 3943 OSPSD.
 ## Calendar service — Milestone 1
 
 Juno Lee owns `GET /calendars/{calendar_id}`, Kristie Lee owns
-`GET /events/{event_id}`, and Jim Lo owns `POST /events` through Levels 1–5.
-All three operations now call Google Calendar with locally authorized tokens.
-POST creates timed events in the same primary calendar that event GET reads;
-created events can be retrieved after a server restart. Offline tests control
-provider responses and do not require credentials or network access.
+`GET /events/{event_id}`, Jim Lo owns `POST /events`, Ka Pui Cheung owns
+`DELETE /events/{event_id}`, and Niriti Pahadi owns `PATCH /events/{event_id}`
+through Levels 1–5. These operations call Google Calendar with locally
+authorized tokens. POST creates timed events in the same primary calendar that
+event GET reads; created events can be retrieved after a server restart.
+Offline tests control provider responses and do not require credentials or
+network access.
 
 ### Installation
 
@@ -258,6 +260,38 @@ Google events; event GET should still return 200 for the created ID. Delete only
 Detailed reproduction steps, cleanup instructions, historical results, and
 teammate verification links are in [POST Level 2 verification](docs/POST_LEVEL2_VERIFICATION.md).
 
+### Event update contract
+
+`PATCH /events/{event_id}` updates one timed event on the shared test account's
+`primary` Google Calendar. Niriti Pahadi owns this operation through Levels 1–5.
+`event_id` is a required string path parameter (a Google event ID, as returned
+by POST). The body uses the same required fields and validation as create:
+
+```json
+{
+  "title": "  Updated Meeting  ",
+  "start_time": "2026-10-06T11:00:00-04:00",
+  "end_time": "2026-10-06T12:00:00-04:00"
+}
+```
+
+Success returns `200 OK` with the existing four-field `Event` response. The `id`
+is unchanged. The title is stripped of surrounding whitespace. A following
+`GET /events/{event_id}` returns the same JSON.
+
+| Result | Status | Body | State change? |
+| --- | --- | --- | --- |
+| Updated | `200` | `Event` JSON | Yes |
+| Unknown or deleted ID (Google 404 or 410) | `404` | `{"detail": "Event not found"}` | No |
+| Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | FastAPI `detail` array | No |
+| Local authorization missing or unusable | `503` | `detail` naming the auth script | No |
+| Google rejected the call, failed, or the response was unusable | `502` | update could not be confirmed | Uncertain — check calendar before retry |
+
+Partial/optional fields, all-day events, and changing `id` are outside this
+contract. Offline tests cover success with GET match, unknown ID, validation
+without state changes, provider failures, and missing authorization. Real
+Google verification evidence belongs in a follow-up Level 2 writeup.
+
 ### Event deletion contract
 
 `DELETE /events/{event_id}` deletes one event from the shared test account's
@@ -300,6 +334,13 @@ the client, and translates the Google response to `Event`. Invalid input is
 rejected before a write. Each creation request uses `num_retries=0`; an uncertain
 result must be investigated before retrying. Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
+
+PATCH validates and normalizes `UpdateEventRequest`, then calls
+`update_google_event` in `app/google_update_events.py`. That module reuses
+POST's `load_credentials`, calls `events.patch` on `primary` once without
+retries, and translates the response to `Event`. Google 404/410 raise
+`GoogleEventNotFoundError`; the handler maps that and other failures to the
+documented responses.
 
 DELETE calls `delete_google_event` in `app/google_delete_events.py`, which
 reuses POST's `load_credentials` and calls `events.delete` on `primary` once,

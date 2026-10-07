@@ -41,3 +41,7 @@ class CreateEventRequest(BaseModel):
         if self.end_time <= self.start_time:
             raise ValueError("End time must be after start time")
         return self
+
+
+class UpdateEventRequest(CreateEventRequest):
+    """Same fields and validation as create; used for PATCH updates."""
