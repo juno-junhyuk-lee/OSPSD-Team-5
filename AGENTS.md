@@ -6,18 +6,20 @@
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 
-- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, and DELETE.
+- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
 - `app/google_create_events.py`: POST authorization, creation, and response translation.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
+- `app/google_update_events.py`: PATCH provider call; reuses POST's token loading.
+- `tests/test_update_events.py`: offline update contract and provider-failure tests.
 - `app/google_delete_events.py`: DELETE provider call; reuses POST's token loading.
 - `tests/test_delete_events.py`: offline deletion contract and provider-failure tests.
 - `app/google_events.py`: Google event retrieval, translation, and service errors.
 - `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
 - `tests/test_google_auth.py`: isolated token lifecycle tests.
-- `app/models.py`: Event response model and creation input validation.
+- `app/models.py`: Event response model and creation/update input validation.
 - `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
 - `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.

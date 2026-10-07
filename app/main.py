@@ -15,7 +15,8 @@ from app.google_events import (
     UnsupportedEventError,
     retrieve_event,
 )
-from app.models import Calendar, CreateEventRequest, Event
+from app.google_update_events import update_google_event
+from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
 
@@ -89,6 +90,38 @@ def create_event(request: CreateEventRequest) -> Event:
     return event
 
 
+@app.patch("/events/{event_id}", response_model=Event)
+def update_event(event_id: str, request: UpdateEventRequest) -> Event:
+    """Update a timed Google event and return the refreshed Event fields."""
+    try:
+        return update_google_event(event_id, request)
+    except GoogleEventNotFoundError:
+        raise HTTPException(status_code=404, detail="Event not found") from None
+    except GoogleCalendarSetupError:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Google Calendar authorization is unavailable. "
+                "Run scripts/google_calendar_auth.py."
+            ),
+        ) from None
+    except (
+        HttpError,
+        TransportError,
+        HttpLib2Error,
+        RequestException,
+        OSError,
+        ValidationError,
+    ):
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Google Calendar update could not be confirmed. "
+                "Check the calendar before retrying."
+            ),
+        ) from None
+
+
 @app.delete("/events/{event_id}", status_code=204)
 def delete_event(event_id: str) -> Response:
     """Delete a Google event; repeating the request returns 404."""
@@ -104,7 +137,13 @@ def delete_event(event_id: str) -> Response:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except HttpError, TransportError, HttpLib2Error, RequestException, OSError:
+    except (
+        HttpError,
+        TransportError,
+        HttpLib2Error,
+        RequestException,
+        OSError,
+    ):
         raise HTTPException(
             status_code=502,
             detail=(

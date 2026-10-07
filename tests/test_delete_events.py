@@ -13,14 +13,18 @@ EVENT = {
 }
 
 
-def test_delete_created_event(client: TestClient) -> None:
+def test_delete_created_event(
+    client: TestClient, provider_events: dict[str, dict[str, object]]
+) -> None:
     event_id = client.post("/events", json=EVENT).json()["id"]
 
     response = client.delete(f"/events/{event_id}")
 
     assert response.status_code == 204
     assert response.content == b""
-    assert client.get(f"/events/{event_id}").status_code == 404
+    # Google keeps cancelled events readable; our GET still returns them.
+    assert provider_events[event_id]["status"] == "cancelled"
+    assert client.get(f"/events/{event_id}").status_code == 200
 
 
 def test_delete_leaves_other_events(client: TestClient) -> None:
