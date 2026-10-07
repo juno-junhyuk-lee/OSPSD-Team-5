@@ -39,6 +39,9 @@ def update_google_event(event_id: str, request: UpdateEventRequest) -> Event:
         if error.resp.status in (404, 410):
             raise GoogleEventNotFoundError(event_id) from error
         raise
+    # Google may still patch a deleted event and return status "cancelled".
+    if result.get("status") == "cancelled":
+        raise GoogleEventNotFoundError(event_id)
     provider_event = _GoogleEvent.model_validate(result)
     translated = UpdateEventRequest.model_validate(
         {
