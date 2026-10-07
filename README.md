@@ -290,7 +290,8 @@ is unchanged. The title is stripped of surrounding whitespace. A following
 Partial/optional fields, all-day events, and changing `id` are outside this
 contract. Offline tests cover success with GET match, unknown ID, validation
 without state changes, provider failures, and missing authorization. Real
-Google verification evidence belongs in a follow-up Level 2 writeup.
+Google verification evidence is in
+[PATCH Level 2 verification](docs/PATCH_LEVEL2_VERIFICATION.md).
 
 ### Event deletion contract
 
