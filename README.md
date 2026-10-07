@@ -282,7 +282,7 @@ is unchanged. The title is stripped of surrounding whitespace. A following
 | Result | Status | Body | State change? |
 | --- | --- | --- | --- |
 | Updated | `200` | `Event` JSON | Yes |
-| Unknown, deleted, or cancelled ID (Google 404/410, or patch body `status: cancelled`) | `404` | `{"detail": "Event not found"}` | No |
+| Unknown, deleted, or cancelled ID (Google 404/410, or `events.get` status `cancelled` before patch) | `404` | `{"detail": "Event not found"}` | No |
 | Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | FastAPI `detail` array | No |
 | Local authorization missing or unusable | `503` | `detail` naming the auth script | No |
 | Google rejected the call, failed, or the response was unusable | `502` | update could not be confirmed | Uncertain — check calendar before retry |

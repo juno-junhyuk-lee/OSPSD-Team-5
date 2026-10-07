@@ -30,6 +30,13 @@ def update_google_event(event_id: str, request: UpdateEventRequest) -> Event:
     }
     try:
         with build("calendar", "v3", credentials=credentials) as service:
+            existing = (
+                service.events()
+                .get(calendarId="primary", eventId=event_id)
+                .execute(num_retries=0)
+            )
+            if existing.get("status") == "cancelled":
+                raise GoogleEventNotFoundError(event_id)
             result = (
                 service.events()
                 .patch(calendarId="primary", eventId=event_id, body=body)
@@ -39,7 +46,7 @@ def update_google_event(event_id: str, request: UpdateEventRequest) -> Event:
         if error.resp.status in (404, 410):
             raise GoogleEventNotFoundError(event_id) from error
         raise
-    # Google may still patch a deleted event and return status "cancelled".
+    # Guard if Google still returns a cancelled body after patch.
     if result.get("status") == "cancelled":
         raise GoogleEventNotFoundError(event_id)
     provider_event = _GoogleEvent.model_validate(result)

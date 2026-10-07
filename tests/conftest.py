@@ -52,13 +52,30 @@ def google_service(
             return deepcopy(event)
 
         insert.return_value.execute.side_effect = execute
+
+        def get_request(*, calendarId: str, eventId: str) -> Mock:
+            assert calendarId == "primary"
+
+            def get_execute(*, num_retries: int = 0) -> dict[str, object]:
+                if eventId not in provider_events:
+                    raise HttpError(Mock(status=404, reason="Not Found"), b"")
+                return deepcopy(provider_events[eventId])
+
+            return Mock(execute=get_execute)
+
+        sdk.events.return_value.get.side_effect = get_request
         delete = sdk.events.return_value.delete
 
         def delete_execute(*, num_retries: int = 0) -> str:
             event_id = delete.call_args.kwargs["eventId"]
             if event_id not in provider_events:
                 raise HttpError(Mock(status=404, reason="Not Found"), b"")
-            del provider_events[event_id]
+            current = provider_events[event_id]
+            if current.get("status") == "cancelled":
+                raise HttpError(Mock(status=410, reason="Gone"), b"")
+            cancelled = deepcopy(current)
+            cancelled["status"] = "cancelled"
+            provider_events[event_id] = cancelled
             return ""
 
         delete.return_value.execute.side_effect = delete_execute
@@ -76,6 +93,8 @@ def google_service(
                 "end": body["end"],
                 "htmlLink": "https://calendar.google.com/example",
             }
+            if provider_events[event_id].get("status") == "cancelled":
+                updated["status"] = "cancelled"
             provider_events[event_id] = deepcopy(updated)
             return deepcopy(updated)
 

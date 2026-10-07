@@ -50,7 +50,7 @@ use `curl.exe`.
 | 4 | `200` with the same `id`, updated title/times |
 | 5 | Local GET matches PATCH JSON; auth script finds the updated title |
 | 6, DELETE | `204` (or `404` if already cancelled) |
-| 6, PATCH after DELETE | `404` `{"detail": "Event not found"}` (including Google `status: cancelled`) |
+| 6, PATCH after DELETE | `404` `{"detail": "Event not found"}`; no `events.patch` call when `events.get` shows `cancelled` |
 | 6, unknown PATCH | `404` `{"detail": "Event not found"}` |
 
 Keep `credentials.json` and `token.json` local and ignored by Git. Delete only

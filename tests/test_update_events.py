@@ -104,6 +104,8 @@ def test_update_calls_google_without_retries(
 
     assert client.patch(f"/events/{event_id}", json=UPDATE).status_code == 200
 
+    get_call = google_service.events.return_value.get
+    get_call.assert_called_once_with(calendarId="primary", eventId=event_id)
     patch_call = google_service.events.return_value.patch
     patch_call.assert_called_once_with(
         calendarId="primary",
@@ -129,34 +131,20 @@ def test_gone_google_event_returns_not_found(
     assert response.json() == {"detail": "Event not found"}
 
 
-def test_cancelled_google_event_returns_not_found(
-    client: TestClient, google_service: MagicMock
+def test_patch_after_delete_does_not_call_patch(
+    client: TestClient,
+    google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
 ) -> None:
-    """Google can return 200 with status cancelled for a deleted event."""
-    execute = google_service.events.return_value.patch.return_value.execute
-    execute.side_effect = None
-    execute.return_value = {
-        "id": "test-event",
-        "status": "cancelled",
-        "summary": "Updated Meeting",
-        "start": {"dateTime": "2026-10-06T11:00:00-04:00"},
-        "end": {"dateTime": "2026-10-06T12:00:00-04:00"},
-    }
-
-    response = client.patch("/events/test-event", json=UPDATE)
-
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Event not found"}
-
-
-def test_patch_after_delete_returns_not_found(client: TestClient) -> None:
     event_id = client.post("/events", json=EVENT).json()["id"]
     assert client.delete(f"/events/{event_id}").status_code == 204
+    assert provider_events[event_id]["status"] == "cancelled"
 
     response = client.patch(f"/events/{event_id}", json=UPDATE)
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Event not found"}
+    google_service.events.return_value.patch.assert_not_called()
 
 
 @pytest.mark.parametrize(
