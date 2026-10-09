@@ -5,6 +5,8 @@
 - `GET /calendars/{calendar_id}`: Google-backed primary calendar metadata operation.
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
+- `app/calendar_provider.py`: typed calendar metadata interface; Google SDK details
+  stay in `GoogleCalendarReader` in `app/google_calendar.py`.
 
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
