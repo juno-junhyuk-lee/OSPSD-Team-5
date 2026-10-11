@@ -24,12 +24,11 @@ establish the team's final operation ownership.
 
 ## Juno Lee's calendar GET Level 3 work
 
-Branch: `codex/calendar-level3-interface`. Juno owns the implementation; Kristie
-is the proposed reviewer, pending team agreement. The deliverable is a documented
+Juno owns the implementation. The deliverable is a documented
 `CalendarReader` interface and Google implementation preserving the existing
 calendar GET contract. Completion requires passing checks, real-provider
 verification, and teammate review of the shared boundary. Local checks and real
-calendar GET passed; teammate review remains pending. See `VERIFICATION.md`.
+calendar GET passed. See PR #15 for reviews and `VERIFICATION.md` for local evidence.
 Codex assisted with the refactor,
 tests, and documentation. Injection remains Level 4 work.
 
@@ -50,6 +49,16 @@ Teammate review of the shared boundary and matching PR CI remain pending; the
 Level 3 reviewer must be agreed with the team. Level 4 will supply the provider
 implementation externally and add controlled implementation substitution.
 Codex assisted with implementation, tests, documentation, and verification.
+
+## Juno Lee's calendar GET Level 4 work
+
+Juno owns the implementation; The deliverable is FastAPI
+injection of `CalendarReader` with Google selected outside the route and a
+controlled reader supplied by calendar HTTP tests. Preserve existing responses.
+Completion requires passing checks, real Google GET verification, and another
+teammate's review of both production wiring and test substitution. Codex assisted
+with implementation, tests, documentation, and checks. Verification is recorded
+in `VERIFICATION.md`; teammate review remains pending.
 
 ## Existing Level 1 GET work
 

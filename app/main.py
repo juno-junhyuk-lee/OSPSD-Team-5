@@ -1,10 +1,13 @@
-from fastapi import FastAPI, HTTPException, Response
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Response
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
 from pydantic import ValidationError
 from requests.exceptions import RequestException
 
+from app.calendar_dependencies import get_calendar_reader
 from app.calendar_provider import CalendarReader
 from app.event_provider import (
     CalendarAuthenticationError,
@@ -13,7 +16,6 @@ from app.event_provider import (
     EventReader,
     UnsupportedEventError,
 )
-from app.google_calendar import GoogleCalendarReader
 from app.google_create_events import GoogleCalendarSetupError, create_google_event
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.google_events import GoogleEventReader
@@ -22,18 +24,20 @@ from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
 
-# Fixed Google selection for Level 3; injection follows in Level 4.
-calendar_reader: CalendarReader = GoogleCalendarReader()
+# Event GET retains fixed selection until Level 4 introduces injection.
 event_reader: EventReader = GoogleEventReader()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
-def get_calendar(calendar_id: str) -> Calendar:
+def get_calendar(
+    calendar_id: str,
+    reader: Annotated[CalendarReader, Depends(get_calendar_reader)],
+) -> Calendar:
     """Retrieve the authenticated user's primary calendar metadata."""
     if calendar_id != "primary":
         raise HTTPException(status_code=404, detail="Calendar not found")
     try:
-        return calendar_reader.get_primary_calendar()
+        return reader.get_primary_calendar()
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=503, detail="Google authorization unavailable"

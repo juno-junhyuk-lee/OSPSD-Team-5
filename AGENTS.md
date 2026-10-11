@@ -7,6 +7,8 @@
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 - `app/calendar_provider.py`: typed calendar metadata interface; Google SDK details
   stay in `GoogleCalendarReader` in `app/google_calendar.py`.
+- `app/calendar_dependencies.py`: selects the calendar reader; calendar HTTP tests
+  substitute it through FastAPI dependency overrides.
 
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
@@ -43,7 +45,8 @@ run scripts/google_calendar_auth.py before serving requests. Never start browser
 authorization in a route. Preserve the four-field Event response and existing 404.
 Event GET calls the typed `EventReader` boundary; SDK calls and translation
 stay inside `GoogleEventReader`. Service errors come from `app/event_provider.py`.
-Google selection stays in `app/main.py` until Level 4 introduces injection.
+Event GET selects Google in `app/main.py` until its Level 4 injection work.
+Calendar GET already receives its reader through `app/calendar_dependencies.py`.
 Jim's POST writes to the same primary calendar and returns Google's event ID.
 GET reads the provider directly; no local event mirror is used. Never fall back
 to local creation or automatically retry uncertain writes. The provider fake
