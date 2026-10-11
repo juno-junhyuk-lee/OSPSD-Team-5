@@ -10,12 +10,13 @@ from app.event_provider import (
     CalendarAuthenticationError,
     CalendarProviderError,
     EventNotFoundError,
+    EventReader,
     UnsupportedEventError,
 )
 from app.google_calendar import GoogleCalendarReader
 from app.google_create_events import GoogleCalendarSetupError, create_google_event
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
-from app.google_events import retrieve_event
+from app.google_events import GoogleEventReader
 from app.google_update_events import update_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
@@ -23,6 +24,7 @@ app = FastAPI(title="Calendar Service")
 
 # Fixed Google selection for Level 3; injection follows in Level 4.
 calendar_reader: CalendarReader = GoogleCalendarReader()
+event_reader: EventReader = GoogleEventReader()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -46,7 +48,7 @@ def get_calendar(calendar_id: str) -> Calendar:
 def get_event(event_id: str) -> Event:
     """Retrieve one timed event from the authenticated primary Google Calendar."""
     try:
-        return retrieve_event(event_id)
+        return event_reader.get_event(event_id)
     except EventNotFoundError as error:
         raise HTTPException(status_code=404, detail="Event not found") from error
     except CalendarAuthenticationError as error:

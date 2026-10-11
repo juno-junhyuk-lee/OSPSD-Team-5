@@ -38,18 +38,23 @@ def translate_event(data: Mapping[str, object]) -> Event:
         raise CalendarProviderError from error
 
 
-def retrieve_event(event_id: str) -> Event:
-    try:
-        with closing(calendar_client()) as service:
-            data = (
-                service.events().get(calendarId="primary", eventId=event_id).execute()
-            )
-    except HttpError as error:
-        if error.resp.status == 404:
-            raise EventNotFoundError from error
-        raise CalendarProviderError from error
-    except OSError as error:
-        raise CalendarProviderError from error
-    if not isinstance(data, dict):
-        raise CalendarProviderError
-    return translate_event(data)
+class GoogleEventReader:
+    """Read Google events through the service event contract."""
+
+    def get_event(self, event_id: str) -> Event:
+        try:
+            with closing(calendar_client()) as service:
+                data = (
+                    service.events()
+                    .get(calendarId="primary", eventId=event_id)
+                    .execute()
+                )
+        except HttpError as error:
+            if error.resp.status == 404:
+                raise EventNotFoundError from error
+            raise CalendarProviderError from error
+        except OSError as error:
+            raise CalendarProviderError from error
+        if not isinstance(data, dict):
+            raise CalendarProviderError
+        return translate_event(data)
