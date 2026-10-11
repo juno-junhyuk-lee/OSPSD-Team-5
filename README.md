@@ -158,12 +158,30 @@ boundary and retains its existing 404, 503 authorization, and 502 provider-error
 responses. Existing `OSError`/`ValueError` and `RuntimeError` handling is preserved;
 consistent domain failure semantics belong to Level 5.
 
-Level 3 still selects Google directly in `app/main.py`. Supplying a replaceable
-implementation and overriding it in HTTP tests is Level 4 work. This boundary
-covers Juno's calendar metadata operation; event operations retain their current
-implementation. Local and real-provider verification are recorded in
-`docs/VERIFICATION.md`; teammate review remains required before declaring Level 3
-complete. Codex assisted with the implementation, tests, and documentation.
+This boundary covers Juno's calendar metadata operation;
+event operations retain their current implementation. Codex assisted
+with the implementation, tests, and documentation.
+
+#### Level 4 calendar provider injection
+
+`app/calendar_dependencies.py` selects Google in `get_calendar_reader()`, which
+returns a `CalendarReader`. FastAPI supplies that reader to the calendar route
+through `Depends`; the route does not import or construct the concrete calendar
+provider. The dependency creates a lightweight reader per request. Credentials
+and the SDK client are loaded only when metadata is requested, and the Google
+implementation closes the client after use. Unsupported IDs still return 404
+without a Google request.
+
+Calendar HTTP tests override `get_calendar_reader` with a controlled implementation
+of the same interface. They use their own TestClient fixture, without the shared
+event SDK mocks, Google credentials, or network access. The controlled reader
+returns fixed metadata or raises a configured error. Each test restores dependency
+overrides afterward. Google translation tests remain separate.
+
+Replacing the calendar provider requires another implementation of `CalendarReader`
+and a change to the dependency's selection; the route contract remains the same.
+Local and real-provider evidence is recorded in `docs/VERIFICATION.md`. Teammate
+review of production wiring and test substitution remains required for Level 4.
 
 ### Event creation contract
 
@@ -341,6 +359,8 @@ Calendar GET calls the `CalendarReader` interface, implemented by
 `GoogleCalendarReader.get_primary_calendar` in `app/google_calendar.py`,
 which loads local OAuth authorization, retrieves Google metadata, and
 returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
+FastAPI supplies the calendar reader through `get_calendar_reader` in
+`app/calendar_dependencies.py`.
 
 Event GET calls `retrieve_event` in `app/google_events.py`, which requests
 Google's `events.get` on `primary` and translates the result to `Event`.
@@ -348,8 +368,9 @@ Google's `events.get` on `primary` and translates the result to `Event`.
 Neither GET operation starts browser authorization during a request.
 
 The synchronous handlers keep blocking SDK work off the async event loop.
-Each request constructs its own authorized client. No cross-request client cache,
-provider-independent interface, or retry layer is introduced at this level.
+Each request constructs its own authorized client. Calendar metadata uses the
+interface and injection described above; event operations retain direct provider
+calls. No cross-request client cache or retry layer is introduced.
 
 POST validates and normalizes `CreateEventRequest`, then calls
 `create_google_event` in `app/google_create_events.py`. That module loads or
@@ -408,7 +429,7 @@ for mocked Google insertion and retrieval. Data is populated by the fake insert,
 not by the HTTP handler, so POST-to-GET checks exercise both provider paths.
 Offline checks do not establish a live Google write.
 
-Calendar HTTP tests use a controlled metadata lookup.
+Calendar HTTP tests use a controlled `CalendarReader` dependency override.
 `tests/test_google_calendar.py` verifies Google's metadata field translation
 and excludes provider-only fields from the public response.
 

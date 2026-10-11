@@ -1,75 +1,50 @@
 # Verification and integration notes
 
+## Calendar GET Level 4 verification
+
+October 11, 2026, macOS/Python 3.14.2, working changes on
+`feature/calendar-level4-injection`: all 103 tests, dependency checks, Ruff,
+strict mypy, and diff checks passed. The five calendar HTTP tests also passed
+with networking blocked, using a controlled reader and dependency overrides.
+
+Real Google GET through normal injection returned 200 with the three expected
+fields; an unsupported ID returned 404. No calendar data changed. PR CI and
+teammate review remain pending. The existing TestClient warning remains.
+
 ## Calendar GET Level 3 verification
 
-On October 9, 2026, the working changes on `codex/calendar-level3-interface`
-passed checks on macOS with Python 3.14.2: dependency compatibility, Ruff
-lint/format, strict mypy, all 103 offline tests, and `git diff --check`.
-The existing Starlette TestClient deprecation warning remains.
+October 9, 2026, macOS/Python 3.14.2: all 103 tests and required checks passed
+on the uncommitted Level 3 refactor. Real Google GET returned 200 with exactly
+`id`, `title`, and `time_zone`, with ID `primary`. No calendar data changed.
+Level 3 was subsequently merged in PR #15; see that PR for review evidence.
 
-A separate FastAPI TestClient request to `/calendars/primary` used the real
-Google implementation and existing local token. It returned 200; assertions
-confirmed exactly `id`, `title`, and `time_zone`, all strings, with ID `primary`.
-Metadata and credentials were omitted from output. No calendar data was changed.
-This verifies the uncommitted refactor, not release CI or another teammate's
-execution. Teammate review of the interface remains pending.
+## Test coverage
 
-See [README](../README.md) for current setup, authentication, commands and API contracts.
-This document preserves test strategy, verification evidence and earlier Level 1
-walkthroughs. Historical local create/read examples do not describe this branch's
-Google-backed GET behavior.
+See [README](../README.md) for setup and commands. Fast tests use isolated data
+and controlled providers without credentials or network access. Calendar HTTP
+tests override `CalendarReader`; event tests use the SDK fake in
+[conftest.py](../tests/conftest.py). Offline tests do not prove real Google writes;
+see [POST verification](POST_LEVEL2_VERIFICATION.md) for provider evidence.
 
-Testing strategy: the GET and POST suites exercise the HTTP boundary through
-TestClient without a server, network access, or Google credentials.
-[tests/conftest.py](../tests/conftest.py) replaces the Google client with controlled
-provider responses and isolates fake event data for each test. The fake insert
-stores events that the fake GET retrieves; no application memory bridge is used.
-Offline checks do not prove real Google writes. Expected values are independent
-of application data. Current real POST evidence is in
-[POST Level 2 verification](POST_LEVEL2_VERIFICATION.md).
+- GET: exact responses and missing-ID 404s.
+- POST: 201, trimmed titles, generated IDs, create/read, and distinct repeated IDs.
+- Validation: invalid titles/times and equal or reversed ranges return 422 without
+  writes; ordering accounts for UTC offsets.
 
-- [Calendar GET tests](../tests/test_calendars.py): primary returns 200 with exact
-  metadata JSON; unknown IDs return the documented calendar 404.
-- [Event GET tests](../tests/test_events.py): known ID returns 200 with exact JSON;
-  unknown ID returns the documented 404.
-- [POST tests](../tests/test_create_events.py): creation returns 201 with the four
-  response fields, a generated ID, a trimmed title, and the correct instants.
-  GET retrieves the same event; repeated creation produces distinct IDs.
-- Invalid creation: missing fields, blank or invalid titles, malformed or
-  timezone-free times, numeric timestamps, and equal/reversed time ranges
-  return 422 with a `detail` array without a provider write.
-- Time boundaries: ordering is checked across different UTC offsets, including
-  a valid end time whose displayed local hour is earlier than the start hour.
+## Level 1 verification history
 
-On October 4, 2026, the POST implementation was verified on macOS with Python
-3.14.8: all 22 tests, Ruff lint/format checks, strict mypy, dependency compatibility
-(`uv pip check`), and `git diff --check` passed. TestClient emits an existing
-Starlette deprecation warning with the pinned HTTPX dependency.
+October 4, 2026, macOS/Python 3.14.8: all 22 tests and required checks passed.
+Local curl verified POST 201, GET 200, invalid input 422, and unchanged predefined
+data. The server was stopped afterward.
 
-A single-worker Uvicorn server on `127.0.0.1:8765` was also checked with curl:
-POST returned 201 with a trimmed title, GET returned the same event with 200,
-an equal-time request returned 422, and the predefined event remained unchanged.
-The server was stopped after verification.
+Defect checks caught a wrong GET title (`Incorrect Event` instead of
+`Example Event`) and discarded POST writes (GET returned 404 instead of 200).
+Restoring the in-memory behavior made the tests pass again; source files were
+unchanged.
 
-Defect-detection evidence: temporarily changing the in-memory title to
-`Incorrect Event` made `test_get_known_event` fail at its JSON assertion:
-
-```text
-{'title': 'Incorrect Event'} != {'title': 'Example Event'}
-```
-
-The original title was restored without modifying source files, and both tests
-passed again. Include this evidence in the implementation PR.
-
-For POST, temporarily discarding writes to the local event mapping made
-`test_create_and_retrieve_event` fail: POST returned 201, but the following GET
-returned 404 instead of 200. Restoring the mapping made the test pass. The
-experiment changed only in-memory behavior; source files were not modified.
-
-The preceding Level 1 checks establish local behavior, not Google integration, authentication,
-all-day support, multi-worker sharing, or durability. At that revision, teammate verification from
-another checkout, POST review, and CI remained pending. The
-PowerShell walkthrough has not been executed locally.
+This evidence covers the earlier local implementation. At that revision,
+teammate verification, POST review, and CI were pending; the PowerShell
+walkthrough was unverified.
 
 ### GET Level 2 tests and verification
 
