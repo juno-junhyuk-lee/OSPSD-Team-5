@@ -109,6 +109,29 @@ The API does not expose provider error messages or launch browser login during
 requests. For 503, rerun the authentication script. Error handling does not cover
 every SDK exception; retry, cancellation, and uncertain write policies are later work.
 
+#### Level 3 event provider boundary
+
+`EventReader` in `app/event_provider.py` defines
+`get_event(event_id: str) -> Event`. It reads one timed event from the authorized
+calendar without changing events. The input is a provider-assigned event ID;
+the output is the service's four-field `Event` model, with an empty title when
+no title is supplied. The interface exposes no Google SDK types or payloads.
+The same module declares the existing missing-event, unsupported-event,
+authentication, and provider errors; their HTTP meanings remain unchanged.
+
+`GoogleEventReader` in `app/google_events.py` implements the contract. It uses
+`app/google_auth.py` for local authorization and client construction, owns the
+Google request and response translation, and closes the client on success or
+failure. The event GET route calls the typed `EventReader` boundary and maps
+service errors to the existing 404, 422, 503, and 502 responses.
+
+Google is still selected directly in `app/main.py`, consistently with calendar
+GET. External injection and a controlled replacement implementation belong to
+Level 4. POST, PATCH, and DELETE retain their existing implementations.
+[Verification notes](docs/VERIFICATION.md#event-get-level-3-verification) record
+local checks and real Google GET results; teammate review and PR CI remain
+pending. Codex assisted with implementation, tests, and documentation.
+
 ### Calendar details contract
 
 `GET /calendars/{calendar_id}` retrieves calendar metadata without changing state.
@@ -342,14 +365,15 @@ Calendar GET calls the `CalendarReader` interface, implemented by
 which loads local OAuth authorization, retrieves Google metadata, and
 returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
 
-Event GET calls `retrieve_event` in `app/google_events.py`, which requests
-Google's `events.get` on `primary` and translates the result to `Event`.
+Event GET calls the `EventReader` interface, implemented by
+`GoogleEventReader.get_event` in `app/google_events.py`. It requests Google's
+`events.get` on `primary` and translates the result to `Event`.
 `app/google_auth.py` loads and refreshes the local token for event retrieval.
 Neither GET operation starts browser authorization during a request.
 
 The synchronous handlers keep blocking SDK work off the async event loop.
-Each request constructs its own authorized client. No cross-request client cache,
-provider-independent interface, or retry layer is introduced at this level.
+Each request constructs its own authorized client. Calendar and event GET now
+use provider-independent interfaces; neither adds a client cache or retry layer.
 
 POST validates and normalizes `CreateEventRequest`, then calls
 `create_google_event` in `app/google_create_events.py`. That module loads or
