@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.google_calendar import get_primary_calendar
+from app.calendar_provider import CalendarReader
+from app.google_calendar import GoogleCalendarReader
 
 
 def test_provider_metadata_is_translated(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -33,7 +34,8 @@ def test_provider_metadata_is_translated(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     monkeypatch.setattr("app.google_calendar.build", lambda *args, **kwargs: Service())
 
-    assert get_primary_calendar().model_dump() == {
+    reader: CalendarReader = GoogleCalendarReader()
+    assert reader.get_primary_calendar().model_dump() == {
         "id": "primary",
         "title": "Real title",
         "time_zone": "Europe/London",

@@ -143,6 +143,28 @@ The timezone is an IANA timezone name. Other IDs return `404 Not Found` with
 `{"detail": "Calendar not found"}` before any Google request.
 This operation does not list calendars or events and does not alter event routes.
 
+#### Level 3 calendar provider boundary
+
+`CalendarReader` in `app/calendar_provider.py` defines the one operation this
+route needs: `get_primary_calendar() -> Calendar`. It accepts no arguments because
+the route rejects unsupported IDs before calling the provider. It reads external
+metadata without changing state and returns the service alias `primary`, a title,
+and a timezone. No Google SDK types or payload fields appear in the interface.
+
+`GoogleCalendarReader` in `app/google_calendar.py` implements that contract. It
+owns token loading, the Google request, and translation from `summary` and
+`timeZone` into the public model. The route depends on the typed `CalendarReader`
+boundary and retains its existing 404, 503 authorization, and 502 provider-error
+responses. Existing `OSError`/`ValueError` and `RuntimeError` handling is preserved;
+consistent domain failure semantics belong to Level 5.
+
+Level 3 still selects Google directly in `app/main.py`. Supplying a replaceable
+implementation and overriding it in HTTP tests is Level 4 work. This boundary
+covers Juno's calendar metadata operation; event operations retain their current
+implementation. Local and real-provider verification are recorded in
+`docs/VERIFICATION.md`; teammate review remains required before declaring Level 3
+complete. Codex assisted with the implementation, tests, and documentation.
+
 ### Event creation contract
 
 `POST /events` creates one timed event in Google Calendar's `primary` calendar. Jim Lo
@@ -315,7 +337,8 @@ returned. See [DELETE Level 2 verification](docs/DELETE_LEVEL2_VERIFICATION.md).
 ### Code map and request flow
 
 `app/main.py` owns the FastAPI routes.
-Calendar GET calls `get_primary_calendar` in `app/google_calendar.py`,
+Calendar GET calls the `CalendarReader` interface, implemented by
+`GoogleCalendarReader.get_primary_calendar` in `app/google_calendar.py`,
 which loads local OAuth authorization, retrieves Google metadata, and
 returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
 

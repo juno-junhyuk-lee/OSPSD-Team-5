@@ -5,8 +5,9 @@ from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
 from pydantic import ValidationError
 from requests.exceptions import RequestException
 
+from app.calendar_provider import CalendarReader
 from app.google_auth import CalendarAuthenticationError
-from app.google_calendar import get_primary_calendar
+from app.google_calendar import GoogleCalendarReader
 from app.google_create_events import GoogleCalendarSetupError, create_google_event
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.google_events import (
@@ -20,6 +21,9 @@ from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
 
+# Fixed Google selection for Level 3; injection follows in Level 4.
+calendar_reader: CalendarReader = GoogleCalendarReader()
+
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
 def get_calendar(calendar_id: str) -> Calendar:
@@ -27,7 +31,7 @@ def get_calendar(calendar_id: str) -> Calendar:
     if calendar_id != "primary":
         raise HTTPException(status_code=404, detail="Calendar not found")
     try:
-        return get_primary_calendar()
+        return calendar_reader.get_primary_calendar()
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=503, detail="Google authorization unavailable"

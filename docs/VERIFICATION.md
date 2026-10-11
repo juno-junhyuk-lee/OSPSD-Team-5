@@ -1,5 +1,19 @@
 # Verification and integration notes
 
+## Calendar GET Level 3 verification
+
+On October 9, 2026, the working changes on `codex/calendar-level3-interface`
+passed checks on macOS with Python 3.14.2: dependency compatibility, Ruff
+lint/format, strict mypy, all 103 offline tests, and `git diff --check`.
+The existing Starlette TestClient deprecation warning remains.
+
+A separate FastAPI TestClient request to `/calendars/primary` used the real
+Google implementation and existing local token. It returned 200; assertions
+confirmed exactly `id`, `title`, and `time_zone`, all strings, with ID `primary`.
+Metadata and credentials were omitted from output. No calendar data was changed.
+This verifies the uncommitted refactor, not release CI or another teammate's
+execution. Teammate review of the interface remains pending.
+
 See [README](../README.md) for current setup, authentication, commands and API contracts.
 This document preserves test strategy, verification evidence and earlier Level 1
 walkthroughs. Historical local create/read examples do not describe this branch's

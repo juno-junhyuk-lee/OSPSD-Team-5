@@ -22,6 +22,17 @@ Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
 
+## Juno Lee's calendar GET Level 3 work
+
+Branch: `codex/calendar-level3-interface`. Juno owns the implementation; Kristie
+is the proposed reviewer, pending team agreement. The deliverable is a documented
+`CalendarReader` interface and Google implementation preserving the existing
+calendar GET contract. Completion requires passing checks, real-provider
+verification, and teammate review of the shared boundary. Local checks and real
+calendar GET passed; teammate review remains pending. See `VERIFICATION.md`.
+Codex assisted with the refactor,
+tests, and documentation. Injection remains Level 4 work.
+
 ## Existing Level 1 GET work
 
 | Owner | Work | Reviewer |
