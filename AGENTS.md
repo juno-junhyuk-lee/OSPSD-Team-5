@@ -7,6 +7,8 @@
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 - `app/calendar_provider.py`: typed calendar metadata interface; Google SDK details
   stay in `GoogleCalendarReader` in `app/google_calendar.py`.
+- `app/calendar_dependencies.py`: selects the calendar reader; calendar HTTP tests
+  substitute it through FastAPI dependency overrides.
 
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
