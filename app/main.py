@@ -6,16 +6,16 @@ from pydantic import ValidationError
 from requests.exceptions import RequestException
 
 from app.calendar_provider import CalendarReader
-from app.google_auth import CalendarAuthenticationError
-from app.google_calendar import GoogleCalendarReader
-from app.google_create_events import GoogleCalendarSetupError, create_google_event
-from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
-from app.google_events import (
+from app.event_provider import (
+    CalendarAuthenticationError,
     CalendarProviderError,
     EventNotFoundError,
     UnsupportedEventError,
-    retrieve_event,
 )
+from app.google_calendar import GoogleCalendarReader
+from app.google_create_events import GoogleCalendarSetupError, create_google_event
+from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
+from app.google_events import retrieve_event
 from app.google_update_events import update_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 

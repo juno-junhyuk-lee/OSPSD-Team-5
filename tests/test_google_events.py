@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 
-from app.google_auth import CalendarAuthenticationError
+from app.event_provider import CalendarAuthenticationError
 
 
 @pytest.fixture

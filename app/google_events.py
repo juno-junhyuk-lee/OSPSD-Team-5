@@ -6,20 +6,13 @@ from contextlib import closing
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
+from app.event_provider import (
+    CalendarProviderError,
+    EventNotFoundError,
+    UnsupportedEventError,
+)
 from app.google_auth import calendar_client
 from app.models import Event
-
-
-class EventNotFoundError(Exception):
-    pass
-
-
-class CalendarProviderError(Exception):
-    pass
-
-
-class UnsupportedEventError(Exception):
-    pass
 
 
 def translate_event(data: Mapping[str, object]) -> Event:
