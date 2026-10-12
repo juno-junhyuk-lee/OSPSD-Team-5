@@ -21,11 +21,12 @@
 - `app/google_delete_events.py`: DELETE provider call; reuses POST's token loading.
 - `tests/test_delete_events.py`: offline deletion contract and provider-failure tests.
 - `app/event_provider.py`: `EventReader` contract and event retrieval service errors.
+- `app/event_dependencies.py`: selects the event reader for FastAPI injection.
 - `app/google_events.py`: `GoogleEventReader` implementation and Google field translation.
 - `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
 - `tests/test_google_auth.py`: isolated token lifecycle tests.
 - `app/models.py`: Event response model and creation/update input validation.
-- `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
+- `tests/test_events.py`: controlled reader HTTP contract tests and dependency overrides.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
 - `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
@@ -45,7 +46,9 @@ run scripts/google_calendar_auth.py before serving requests. Never start browser
 authorization in a route. Preserve the four-field Event response and existing 404.
 Event GET calls the typed `EventReader` boundary; SDK calls and translation
 stay inside `GoogleEventReader`. Service errors come from `app/event_provider.py`.
-Event GET selects Google in `app/main.py` until its Level 4 injection work.
+Event GET receives its reader through `app/event_dependencies.py`. Contract tests
+use dependency overrides and restore prior overrides after each test. Keep Google
+provider and CRUD fixtures separate from these controlled reader tests.
 Calendar GET already receives its reader through `app/calendar_dependencies.py`.
 Jim's POST writes to the same primary calendar and returns Google's event ID.
 GET reads the provider directly; no local event mirror is used. Never fall back
