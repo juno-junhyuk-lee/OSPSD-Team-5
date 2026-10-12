@@ -15,7 +15,7 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 interface, Google implementation, and route refactor implemented; offline checks passed, real verification and review pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
+| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
@@ -224,12 +224,17 @@ calls a module-level `EventCreator` and maps service errors to its existing
 responses. Provider tests use the typed interface and check error translation;
 HTTP regression tests continue checking validation, uncertain writes, retrieval,
 and responses. Google selection is still fixed for Level 3. Codex assisted with
-the refactor, tests, and documentation; real verification and review are pending.
+the refactor, tests, documentation, and verification; teammate review is pending.
 
-The uncommitted second change passed 115 offline tests, Ruff lint/format,
-strict mypy, and diff checks on Python 3.14.8. Eight additional parametrized
-cases cover known transport error families at the provider and HTTP boundaries.
-These results do not establish real Google verification of the refactor.
+Implementation commit `8741c90` passed 115 offline tests, Ruff lint/format,
+strict mypy, dependency compatibility, and diff checks on Python 3.14.8. All
+tests also passed with external socket connections blocked. Eight additional
+parametrized cases cover known transport error families at the provider and
+HTTP boundaries. Separate real Google verification passed: POST 201, matching
+HTTP and independent provider reads, invalid POST 422 without a created event,
+restart persistence, existing GET checks, and cleanup. See
+[POST Level 3 verification](POST_LEVEL3_VERIFICATION.md). Teammate review and
+matching PR CI remain required before treating Level 3 as complete.
 
 Preserve the public request, 201 response, four-field Event, 422 validation,
 503 authorization response, and 502 uncertain-creation response. Translate

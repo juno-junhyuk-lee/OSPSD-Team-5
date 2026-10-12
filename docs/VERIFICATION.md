@@ -1,5 +1,21 @@
 # Verification and integration notes
 
+## POST Level 3 verification
+
+Implementation commit `8741c90` was verified on October 12, 2026, in Jim's macOS
+environment with Python 3.14.8. All 115 offline tests and required checks passed;
+the tests also passed with external socket connections blocked. Real HTTP POST
+returned 201, HTTP GET returned matching JSON, and an independent Google read
+matched all public fields. Invalid input returned 422 without creating an event.
+The valid event persisted after stopping and restarting the server. Calendar
+metadata GET and missing-event GET also matched their contracts. Only this run's
+event was deleted and confirmed cancelled; the server was stopped.
+
+See [POST Level 3 verification](POST_LEVEL3_VERIFICATION.md) for the boundary,
+reproduction steps, environment details, and recorded results. POST still uses
+fixed Google selection for Level 3; injection is Level 4 work. Teammate review,
+matching PR CI, and release verification remain pending.
+
 ## Event GET Level 4 verification
 
 On October 11, 2026, implementation revision `c6ca9c6` was verified on Windows

@@ -333,8 +333,9 @@ failures into the two service errors above. The POST handler calls an
 The module-level creator in `app/main.py` still selects Google for Level 3;
 Level 4 will supply the creator externally and test POST with a controlled
 implementation. The shared `load_credentials` helper remains unchanged for
-PATCH and DELETE. Real verification of this refactor and teammate review are
-pending.
+PATCH and DELETE. [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md)
+records offline checks, real create/read, restart persistence, and cleanup for
+implementation commit `8741c90`. Teammate review and matching PR CI remain pending.
 
 ### Create and retrieve an event
 
