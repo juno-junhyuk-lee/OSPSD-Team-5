@@ -13,7 +13,7 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 implementation and verification complete locally; teammate review and PR CI pending | Level 3 reviewer to be agreed |
+| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
 | Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
@@ -45,10 +45,24 @@ Implementation revision `ce55c7a` passed all 104 tests, Ruff lint/format, strict
 mypy, dependency compatibility, and diff checks on Windows with Python 3.14.8.
 Real Google requests through TestClient returned 200 for the existing timed event
 and 404 for an absent ID. See [verification evidence](VERIFICATION.md#event-get-level-3-verification).
-Teammate review of the shared boundary and matching PR CI remain pending; the
-Level 3 reviewer must be agreed with the team. Level 4 will supply the provider
-implementation externally and add controlled implementation substitution.
+Level 3 was subsequently merged in PR #17; see that PR for review evidence.
 Codex assisted with implementation, tests, documentation, and verification.
+
+## Kristie Lee's event GET Level 4 work
+
+Kristie owns dependency injection for event GET. The work is split into three commits:
+
+1. Select Google in `event_dependencies.py` and inject `EventReader` into the route.
+2. Test the HTTP contract with a controlled reader and isolated dependency overrides.
+3. Document wiring, test boundaries, and local/real-provider verification.
+
+Implementation revision `c6ca9c6` passed 107 tests and required local checks on
+Windows/Python 3.14.8. The five controlled reader tests also passed with external
+socket connections and real credential loading blocked. Real Google retrieval
+through normal injection returned 200 for the existing event and 404 for an absent
+ID. See [verification evidence](VERIFICATION.md#event-get-level-4-verification).
+Another teammate's review of production wiring and test substitution and matching
+PR CI remain required. Codex assisted with implementation, tests, and verification.
 
 ## Juno Lee's calendar GET Level 4 work
 

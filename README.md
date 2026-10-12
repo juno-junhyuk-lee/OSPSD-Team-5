@@ -125,12 +125,31 @@ Google request and response translation, and closes the client on success or
 failure. The event GET route calls the typed `EventReader` boundary and maps
 service errors to the existing 404, 422, 503, and 502 responses.
 
-Event GET still selects Google directly in `app/main.py`; calendar GET already
-uses the Level 4 dependency injection described below. External injection and a
-controlled replacement implementation for event GET belong to Level 4. POST, PATCH, and DELETE retain their existing implementations.
-[Verification notes](docs/VERIFICATION.md#event-get-level-3-verification) record
-local checks and real Google GET results; teammate review and PR CI remain
-pending. Codex assisted with implementation, tests, and documentation.
+The Level 3 boundary was merged in PR #17. Codex assisted with implementation,
+tests, and documentation. POST, PATCH, and DELETE retain their existing implementations.
+
+#### Level 4 event provider injection
+
+`get_event_reader()` in `app/event_dependencies.py` selects `GoogleEventReader`
+and returns it as an `EventReader`. FastAPI supplies it to the event GET route
+through `Depends`; the route does not construct or import the concrete reader.
+The dependency creates a lightweight reader per request. Authorization and SDK
+client creation occur during retrieval, and the Google implementation closes
+the client after use. Existing success and error responses remain unchanged.
+
+`tests/test_events.py` overrides that dependency with a `ControlledEventReader`
+using its own TestClient fixture, without the shared Google SDK mocks. It checks
+success, missing events, 422/503/502 errors, and request ID forwarding. Each test
+gets fresh reader state and restores previous dependency overrides in `finally`.
+Google translation, authentication, cleanup, and CRUD tests keep their existing
+provider fixtures; the controlled reader does not reproduce Google's behavior.
+
+Replacing the provider requires an `EventReader` implementation and a change to
+`get_event_reader`; the route continues using the same contract.
+[Verification notes](docs/VERIFICATION.md#event-get-level-4-verification) record
+local checks, blocked-network contract tests, and real Google retrieval.
+Another teammate must review both normal wiring and test substitution, and
+matching PR CI remains required. Codex assisted with implementation and verification.
 
 ### Calendar details contract
 
@@ -388,13 +407,13 @@ FastAPI supplies the calendar reader through `get_calendar_reader` in
 Event GET calls the `EventReader` interface, implemented by
 `GoogleEventReader.get_event` in `app/google_events.py`. It requests Google's
 `events.get` on `primary` and translates the result to `Event`.
+FastAPI supplies the reader through `get_event_reader` in `app/event_dependencies.py`.
 `app/google_auth.py` loads and refreshes the local token for event retrieval.
 Neither GET operation starts browser authorization during a request.
 
 The synchronous handlers keep blocking SDK work off the async event loop.
 Each request constructs its own authorized client. Both GET operations use
-provider-independent interfaces. Calendar GET receives its reader through
-FastAPI dependencies; event GET retains fixed provider selection for Level 3.
+provider-independent interfaces and receive their readers through FastAPI dependencies.
 Neither adds a cross-request client cache or retry layer.
 
 POST validates and normalizes `CreateEventRequest`, then calls

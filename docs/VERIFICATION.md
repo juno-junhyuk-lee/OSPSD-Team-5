@@ -1,5 +1,32 @@
 # Verification and integration notes
 
+## Event GET Level 4 verification
+
+On October 11, 2026, implementation revision `c6ca9c6` was verified on Windows
+with Python 3.14.8: 107 tests, Ruff lint/format, strict mypy, dependency compatibility,
+and diff checks passed. The existing Starlette TestClient warning remains.
+
+All five `tests/test_events.py` cases passed in a separate run that blocked
+external socket `connect`/`connect_ex` calls and made real credential loading fail.
+Loopback was allowed for Windows event-loop internals. The module uses a controlled
+`EventReader` dependency override, checks exact 200/404/422/503/502 responses and
+request ID forwarding, and restores prior overrides in `finally`. Google provider
+and CRUD tests retain their existing SDK fixtures. Offline results do not prove
+real Google integration.
+
+Separate TestClient requests with no overrides used normal dependency wiring and
+the local token. The existing event `/events/lf797iogm23bfjn97ogpfocl80` returned
+200 with exactly four string fields, the requested ID, and valid `Event` data.
+`/events/00000000000000000000000000` returned 404 with
+`{"detail": "Event not found"}`. No events changed; metadata and credentials were
+omitted from output. This verifies local implementation, not a release tag,
+server/curl demonstration, or another teammate's execution.
+
+Teammate reviewers should use the GET reproduction steps below with the Level 4
+PR revision and inspect `get_event_reader`, the route's `Depends`, and controlled
+reader substitution/cleanup. Matching PR CI and a teammate review of both paths
+remain required. Codex assisted with implementation and verification.
+
 ## PR 17 merge integration verification
 
 On October 11, 2026, the working merge of event GET Level 3 revision `6d82a42`
@@ -46,8 +73,8 @@ Matching PR CI and teammate review of the boundary remain pending.
 For teammate reproduction, use the existing GET Level 2 walkthrough below with
 the Level 3 branch or PR commit. Confirm the current event metadata independently
 and record the tested revision, environment, commands, and results in the review.
-Event GET still selects Google in `app/main.py`; its Level 4 injection remains
-future work. Calendar GET uses the Level 4 injection described below.
+At this Level 3 revision, event GET selected Google in `app/main.py`.
+Current event GET injection is documented in the Level 4 evidence above.
 
 ## Calendar GET Level 4 verification
 
