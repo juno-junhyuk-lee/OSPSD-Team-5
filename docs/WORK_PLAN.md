@@ -15,7 +15,7 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Level 3 implementation and real verification complete at `8741c90`; Level 4 production injection implemented, controlled tests and real wiring verification pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
+| Jim Lo | `POST /events` | Level 3 implementation and real verification complete at `8741c90`; Level 4 injection and controlled HTTP tests implemented, real wiring verification pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
@@ -263,13 +263,26 @@ The changes are split into three reviewable commits:
 The first change removes the module-level creator from `app/main.py`. The
 factory supplies a lightweight `GoogleEventCreator` through FastAPI `Depends`.
 The handler uses `EventCreator` and retains its existing service-error mapping.
-Google provider and CRUD tests still use their original fixtures. Controlled
-creator tests, real wiring verification, teammate review, and PR CI remain
-pending. Codex assisted with the wiring and documentation.
+Google provider and CRUD tests still use their original fixtures. The second
+change adds `tests/test_create_event_contract.py` with a controlled creator and
+a separate TestClient fixture. It records normalized requests, returns
+predictable events, or raises configured service errors. Tests cover exact
+responses, returned IDs, UTC-offset ordering, validation before a creator call,
+and no retry after failure. Each test restores previous dependency overrides in
+`finally`. Real wiring verification, teammate review, and PR CI remain pending.
+Codex assisted with the wiring, tests, and documentation.
 
-The uncommitted wiring change passed all 115 existing tests, Ruff lint/format,
+Wiring commit `6e2bb8a` passed all 115 existing tests, Ruff lint/format,
 strict mypy, and diff checks on Python 3.14.8. These checks preserve the existing
-provider-backed test coverage; controlled creator substitution is the next step.
+provider-backed test coverage. The second change adds independent controlled
+creator substitution rather than replacing those Google integration tests.
+
+The uncommitted second change passed 130 tests and required local checks on
+Python 3.14.8. Its 15 controlled creator cases also passed with socket connections
+and real credential loading blocked. A pre-existing creator override was restored
+after the run, confirming that the fixture preserves earlier override state.
+These results verify substitution and HTTP behavior, not real Google writes
+through the new wiring; that verification belongs to the third change.
 
 ## Provider integration requirements
 

@@ -32,6 +32,8 @@
 - `app/models.py`: Event response model and creation/update input validation.
 - `tests/test_events.py`: controlled reader HTTP contract tests and dependency overrides.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
+- `tests/test_create_event_contract.py`: controlled creator HTTP tests with
+  isolated dependency overrides and cleanup, separate from Google SDK fixtures.
 - `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
@@ -61,8 +63,9 @@ The POST handler maps service errors to the existing 503 and 502 responses.
 Preserve the shared `load_credentials` helper used by PATCH and DELETE while
 refactoring creation. `app/event_creation_dependencies.py` selects Google and
 supplies the creator through `Depends`; POST does not construct the concrete
-provider. Controlled creator HTTP tests are the next Level 4 change; existing
-Google provider and CRUD fixtures remain separate.
+provider. Controlled creator HTTP tests override that dependency, use fresh
+creator state, and restore prior overrides in `finally`. Keep Google provider
+and CRUD fixtures separate from these interface-based tests.
 GET reads the provider directly; no local event mirror is used. Never fall back
 to local creation or automatically retry uncertain writes. The provider fake
 stores insert results for GET only in fast tests; do not claim it verifies a

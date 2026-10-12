@@ -347,10 +347,16 @@ stateless creator per request. Authorization and SDK client creation happen
 inside its creation operation, after request validation. The existing input,
 201 response, and 422/503/502 behavior remain in place.
 
-Tests can replace `get_event_creator` through `app.dependency_overrides` with
-another `EventCreator`. This first Level 4 change adds production wiring only;
-controlled creator HTTP tests and override cleanup are the next change. Existing
-Google translation, token, and CRUD tests retain their provider fixtures.
+`tests/test_create_event_contract.py` replaces `get_event_creator` through
+`app.dependency_overrides` with a `ControlledEventCreator`. Its own TestClient
+fixture uses no Google SDK mocks, credentials, or network access. The controlled
+implementation records normalized requests and returns predictable Event values
+or raises a configured service error. Tests check the exact 201 response,
+returned IDs, time instants, invalid input without a creator call, and existing
+503/502 responses without retries. Each test gets fresh creator state and restores
+previous dependency overrides in `finally`. Google translation, token, and CRUD
+tests retain their provider fixtures; the controlled creator does not reproduce
+Google or verify a real write.
 Replacing the provider requires another `EventCreator` implementation and a
 change to the factory's selection, while the handler keeps the same contract.
 Real verification of this wiring and teammate review remain pending.
