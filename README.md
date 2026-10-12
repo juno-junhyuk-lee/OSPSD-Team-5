@@ -109,6 +109,29 @@ The API does not expose provider error messages or launch browser login during
 requests. For 503, rerun the authentication script. Error handling does not cover
 every SDK exception; retry, cancellation, and uncertain write policies are later work.
 
+#### Level 3 event provider boundary
+
+`EventReader` in `app/event_provider.py` defines
+`get_event(event_id: str) -> Event`. It reads one timed event from the authorized
+calendar without changing events. The input is a provider-assigned event ID;
+the output is the service's four-field `Event` model, with an empty title when
+no title is supplied. The interface exposes no Google SDK types or payloads.
+The same module declares the existing missing-event, unsupported-event,
+authentication, and provider errors; their HTTP meanings remain unchanged.
+
+`GoogleEventReader` in `app/google_events.py` implements the contract. It uses
+`app/google_auth.py` for local authorization and client construction, owns the
+Google request and response translation, and closes the client on success or
+failure. The event GET route calls the typed `EventReader` boundary and maps
+service errors to the existing 404, 422, 503, and 502 responses.
+
+Event GET still selects Google directly in `app/main.py`; calendar GET already
+uses the Level 4 dependency injection described below. External injection and a
+controlled replacement implementation for event GET belong to Level 4. POST, PATCH, and DELETE retain their existing implementations.
+[Verification notes](docs/VERIFICATION.md#event-get-level-3-verification) record
+local checks and real Google GET results; teammate review and PR CI remain
+pending. Codex assisted with implementation, tests, and documentation.
+
 ### Calendar details contract
 
 `GET /calendars/{calendar_id}` retrieves calendar metadata without changing state.
@@ -158,8 +181,8 @@ boundary and retains its existing 404, 503 authorization, and 502 provider-error
 responses. Existing `OSError`/`ValueError` and `RuntimeError` handling is preserved;
 consistent domain failure semantics belong to Level 5.
 
-This boundary covers Juno's calendar metadata operation;
-event operations retain their current implementation. Codex assisted
+This boundary covers Juno's calendar metadata operation; event GET uses its
+own `EventReader` boundary described above. Codex assisted
 with the implementation, tests, and documentation.
 
 #### Level 4 calendar provider injection
@@ -362,15 +385,17 @@ returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
 FastAPI supplies the calendar reader through `get_calendar_reader` in
 `app/calendar_dependencies.py`.
 
-Event GET calls `retrieve_event` in `app/google_events.py`, which requests
-Google's `events.get` on `primary` and translates the result to `Event`.
+Event GET calls the `EventReader` interface, implemented by
+`GoogleEventReader.get_event` in `app/google_events.py`. It requests Google's
+`events.get` on `primary` and translates the result to `Event`.
 `app/google_auth.py` loads and refreshes the local token for event retrieval.
 Neither GET operation starts browser authorization during a request.
 
 The synchronous handlers keep blocking SDK work off the async event loop.
-Each request constructs its own authorized client. Calendar metadata uses the
-interface and injection described above; event operations retain direct provider
-calls. No cross-request client cache or retry layer is introduced.
+Each request constructs its own authorized client. Both GET operations use
+provider-independent interfaces. Calendar GET receives its reader through
+FastAPI dependencies; event GET retains fixed provider selection for Level 3.
+Neither adds a cross-request client cache or retry layer.
 
 POST validates and normalizes `CreateEventRequest`, then calls
 `create_google_event` in `app/google_create_events.py`. That module loads or

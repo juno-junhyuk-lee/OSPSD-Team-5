@@ -1,5 +1,54 @@
 # Verification and integration notes
 
+## PR 17 merge integration verification
+
+On October 11, 2026, the working merge of event GET Level 3 revision `6d82a42`
+and main revision `958c44d` was verified on Windows with Python 3.14.8.
+Calendar GET retains FastAPI dependency injection and controlled reader tests;
+event GET retains the `EventReader` boundary and `GoogleEventReader` implementation.
+Both operations' documentation and earlier verification evidence are preserved.
+
+Ruff lint/format, strict mypy, all 104 tests, and `git diff --check` passed.
+No conflict markers remain in application code, tests, or documentation.
+The existing Starlette TestClient deprecation warning remains. These checks
+verify the local merge working tree; real Google requests were not rerun for
+this merge. Updated PR CI and reviewer confirmation remain required after push.
+
+## Event GET Level 3 verification
+
+On October 11, 2026, implementation revision `ce55c7a` on
+`feature/calendar-event-get-level3-interface` was verified on Windows with
+Python 3.14.8. Ruff lint and formatting, strict mypy, all 104 tests, and
+`git diff --check` passed; `python -m pip check` reported no broken requirements.
+The existing Starlette TestClient deprecation warning remains.
+
+The additional `test_event_reader_translates_requested_event` test uses a
+`GoogleEventReader` through the typed `EventReader` interface. It checks the
+four-field domain result, the requested ID and primary calendar passed to
+Google, and client closure. Existing HTTP tests retain success, missing-event,
+authentication, all-day, malformed-data, transport-failure, and cleanup coverage.
+These controlled tests do not establish real Google integration.
+
+A separate FastAPI TestClient run used the real implementation and local token,
+without pytest fixtures or SDK replacements:
+
+- `GET /events/lf797iogm23bfjn97ogpfocl80` returned 200. Assertions confirmed
+  exactly `id`, `title`, `start_time`, and `end_time`, all strings, the requested
+  ID, and successful `Event` model validation.
+- `GET /events/00000000000000000000000000` returned 404 with exactly
+  `{"detail": "Event not found"}`.
+
+Event metadata and credentials were omitted from output. No events were created,
+updated, or deleted. This verifies the implementation commit locally, not a
+release tag, server/curl demonstration, or another teammate's execution.
+Matching PR CI and teammate review of the boundary remain pending.
+
+For teammate reproduction, use the existing GET Level 2 walkthrough below with
+the Level 3 branch or PR commit. Confirm the current event metadata independently
+and record the tested revision, environment, commands, and results in the review.
+Event GET still selects Google in `app/main.py`; its Level 4 injection remains
+future work. Calendar GET uses the Level 4 injection described below.
+
 ## Calendar GET Level 4 verification
 
 October 11, 2026, macOS/Python 3.14.2, working changes on

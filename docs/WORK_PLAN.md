@@ -13,7 +13,7 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8 | See PR #8 reviews |
+| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 implementation and verification complete locally; teammate review and PR CI pending | Level 3 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
 | Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
@@ -31,6 +31,24 @@ verification, and teammate review of the shared boundary. Local checks and real
 calendar GET passed. See PR #15 for reviews and `VERIFICATION.md` for local evidence.
 Codex assisted with the refactor,
 tests, and documentation. Injection remains Level 4 work.
+
+## Kristie Lee's event GET Level 3 work
+
+Branch: `feature/calendar-event-get-level3-interface`. Kristie owns the event
+GET interface and Google implementation. The changes are split into three commits:
+
+1. Define `EventReader` and move existing retrieval errors to the provider boundary.
+2. Connect `GoogleEventReader` to the route and verify the interface and ID mapping.
+3. Update the code map, contract documentation, and verification evidence.
+
+Implementation revision `ce55c7a` passed all 104 tests, Ruff lint/format, strict
+mypy, dependency compatibility, and diff checks on Windows with Python 3.14.8.
+Real Google requests through TestClient returned 200 for the existing timed event
+and 404 for an absent ID. See [verification evidence](VERIFICATION.md#event-get-level-3-verification).
+Teammate review of the shared boundary and matching PR CI remain pending; the
+Level 3 reviewer must be agreed with the team. Level 4 will supply the provider
+implementation externally and add controlled implementation substitution.
+Codex assisted with implementation, tests, documentation, and verification.
 
 ## Juno Lee's calendar GET Level 4 work
 
