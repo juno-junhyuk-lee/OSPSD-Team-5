@@ -16,7 +16,8 @@
 - `app/google_create_events.py`: `GoogleEventCreator`, shared authorization,
   creation, response translation, and creation error translation.
 - `app/event_creation_provider.py`: `EventCreator` contract and creation service errors;
-  POST calls this boundary with fixed Google selection until Level 4.
+  POST receives this interface through FastAPI injection.
+- `app/event_creation_dependencies.py`: selects the creator supplied to POST.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
 - `app/google_update_events.py`: PATCH provider call; reuses POST's token loading.
@@ -58,8 +59,10 @@ POST calls the typed `EventCreator` boundary in `app/event_creation_provider.py`
 Google calls, translation, and known failure handling stay in `GoogleEventCreator`.
 The POST handler maps service errors to the existing 503 and 502 responses.
 Preserve the shared `load_credentials` helper used by PATCH and DELETE while
-refactoring creation. Google selection remains fixed in `app/main.py` for Level 3;
-external injection and controlled creator tests belong to Level 4.
+refactoring creation. `app/event_creation_dependencies.py` selects Google and
+supplies the creator through `Depends`; POST does not construct the concrete
+provider. Controlled creator HTTP tests are the next Level 4 change; existing
+Google provider and CRUD fixtures remain separate.
 GET reads the provider directly; no local event mirror is used. Never fall back
 to local creation or automatically retry uncertain writes. The provider fake
 stores insert results for GET only in fast tests; do not claim it verifies a
