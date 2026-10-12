@@ -15,7 +15,7 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10 with teammate review and real verification; Level 3 interface defined, Google implementation and route refactor pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
+| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 interface, Google implementation, and route refactor implemented; offline checks passed, real verification and review pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
@@ -217,10 +217,19 @@ The work is split into three reviewable changes:
    interface, connect POST to it, and update provider and HTTP regression tests.
 3. Record required checks and real create/read, restart, and cleanup verification.
 
-The first change defines the interface in `app/event_creation_provider.py` and
-documents it in the README. It does not connect the route or replace the Google
-implementation. Existing POST behavior remains in place. Codex assisted with
-the interface and documentation; implementation and verification are pending.
+The first change defines and documents `EventCreator`. The second introduces
+`GoogleEventCreator`, which delegates to the existing Google insertion helper
+and translates known failures into the interface's service errors. POST now
+calls a module-level `EventCreator` and maps service errors to its existing
+responses. Provider tests use the typed interface and check error translation;
+HTTP regression tests continue checking validation, uncertain writes, retrieval,
+and responses. Google selection is still fixed for Level 3. Codex assisted with
+the refactor, tests, and documentation; real verification and review are pending.
+
+The uncommitted second change passed 115 offline tests, Ruff lint/format,
+strict mypy, and diff checks on Python 3.14.8. Eight additional parametrized
+cases cover known transport error families at the provider and HTTP boundaries.
+These results do not establish real Google verification of the refactor.
 
 Preserve the public request, 201 response, four-field Event, 422 validation,
 503 authorization response, and 502 uncertain-creation response. Translate
@@ -231,7 +240,7 @@ offline tests. Completion also requires teammate review of the provider boundary
 
 After Level 3, Level 4 will inject `EventCreator` through a dependency factory
 and add controlled implementation tests. Provider selection and test substitution
-are separate from this first change.
+are separate from this Level 3 refactor.
 
 ## Provider integration requirements
 

@@ -311,7 +311,7 @@ creation contract. Jim Lo owns this boundary for POST through Levels 1–5.
 The interface uses service models and exposes no SDK requests, credentials, or
 provider response types. The provider implementation is responsible for
 authorization, creation, and translation to `Event`. The Google implementation
-will keep `events.insert`, the `primary` calendar selection, and Google field
+keeps `events.insert`, the `primary` calendar selection, and Google field
 mapping inside `app/google_create_events.py`. Callers rely on the returned ID,
 not on a particular ID format. Repeating a successful request creates another
 event; this contract does not provide idempotency.
@@ -319,20 +319,22 @@ event; this contract does not provide idempotency.
 The two service errors describe the existing POST failure behavior:
 
 - `EventCreationUnavailableError`: local authorization is unusable before any
-  provider write; the planned route mapping preserves the existing 503 response.
+  provider write; the route preserves the existing 503 response.
 - `EventCreationUnconfirmedError`: a provider call failed or its response could
-  not confirm creation; the planned route mapping preserves the existing 502
+  not confirm creation; the route preserves the existing 502
   response. A provider event may already exist, so creation is not automatically
   retried. This error does not promise rollback or unchanged provider state.
 
-This change defines the interface and its contract only. POST still calls
-`create_google_event` directly and retains its current error handling. The next
-Level 3 change will implement `GoogleEventCreator`, translate existing provider
-errors at that boundary, and connect POST to `EventCreator`. Existing validation,
-201 responses, and GET retrieval must continue to pass. Level 4 will supply the
-creator externally and test POST with a controlled implementation. The shared
-`load_credentials` helper is also used by PATCH and DELETE; its behavior must
-remain compatible during this refactor.
+`GoogleEventCreator` in `app/google_create_events.py` implements the interface.
+It delegates insertion and translation to the existing `create_google_event`
+helper and converts its known setup, SDK, transport, and response-validation
+failures into the two service errors above. The POST handler calls an
+`EventCreator` and handles those errors without inspecting Google SDK exceptions.
+The module-level creator in `app/main.py` still selects Google for Level 3;
+Level 4 will supply the creator externally and test POST with a controlled
+implementation. The shared `load_credentials` helper remains unchanged for
+PATCH and DELETE. Real verification of this refactor and teammate review are
+pending.
 
 ### Create and retrieve an event
 
@@ -452,11 +454,14 @@ provider-independent interfaces and receive their readers through FastAPI depend
 Neither adds a cross-request client cache or retry layer.
 
 POST validates and normalizes `CreateEventRequest`, then calls
-`create_google_event` in `app/google_create_events.py`. That module loads or
+`EventCreator.create_event`. `GoogleEventCreator` in `app/google_create_events.py`
+uses the existing insertion helper, which loads or
 refreshes local event authorization, calls `events.insert` on `primary`, closes
 the client, and translates the Google response to `Event`. Invalid input is
 rejected before a write. Each creation request uses `num_retries=0`; an uncertain
-result must be investigated before retrying. Authorization helpers remain
+result must be investigated before retrying. The adapter translates known
+failures into service errors; the POST handler retains its 503 and 502 responses.
+Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
 
 PATCH validates and normalizes `UpdateEventRequest`, then calls
