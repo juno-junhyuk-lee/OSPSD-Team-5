@@ -359,7 +359,11 @@ tests retain their provider fixtures; the controlled creator does not reproduce
 Google or verify a real write.
 Replacing the provider requires another `EventCreator` implementation and a
 change to the factory's selection, while the handler keeps the same contract.
-Real verification of this wiring and teammate review remain pending.
+[POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) records 130 passing
+tests, blocked-network/credential controlled tests, and a real create/read,
+restart, and cleanup workflow through normal injection at `c54f52e`. Teammate
+review of both normal wiring and test substitution and matching PR CI remain
+pending.
 
 ### Create and retrieve an event
 

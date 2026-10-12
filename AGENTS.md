@@ -73,6 +73,8 @@ real create/read workflow. Keep both OAuth scopes in the shared setup script.
 See [POST verification](docs/POST_LEVEL2_VERIFICATION.md) for real-run evidence.
 See [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md) for the provider
 boundary, refactor checks, and teammate reproduction steps.
+See [POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) for normal wiring,
+controlled substitution, and real verification through dependency injection.
 Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
 are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 
