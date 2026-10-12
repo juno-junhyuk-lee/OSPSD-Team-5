@@ -14,6 +14,8 @@
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
 - `app/google_create_events.py`: POST authorization, creation, and response translation.
+- `app/event_creation_provider.py`: `EventCreator` contract and creation service errors;
+  the Google implementation and POST route refactor are the next Level 3 change.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
 - `app/google_update_events.py`: PATCH provider call; reuses POST's token loading.
@@ -51,6 +53,9 @@ use dependency overrides and restore prior overrides after each test. Keep Googl
 provider and CRUD fixtures separate from these controlled reader tests.
 Calendar GET already receives its reader through `app/calendar_dependencies.py`.
 Jim's POST writes to the same primary calendar and returns Google's event ID.
+POST's Level 3 creation contract is defined in `app/event_creation_provider.py`.
+Preserve the shared `load_credentials` helper used by PATCH and DELETE while
+moving creation behind this interface. The route still uses the Level 2 helper.
 GET reads the provider directly; no local event mirror is used. Never fall back
 to local creation or automatically retry uncertain writes. The provider fake
 stores insert results for GET only in fast tests; do not claim it verifies a

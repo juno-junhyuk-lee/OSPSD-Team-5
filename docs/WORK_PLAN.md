@@ -15,7 +15,7 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
+| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10 with teammate review and real verification; Level 3 interface defined, Google implementation and route refactor pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
@@ -202,6 +202,36 @@ mypy, dependency compatibility, and diff checks. Real HTTP POST-to-GET, calendar
 metadata, restart persistence, invalid input, and cleanup also passed. See the
 POST verification guide for the uncommitted merge revision and execution details. Updated PR CI
 and review of the integration diff remain required after publication.
+
+## Jim Lo's POST Level 3 work
+
+Start from main `aa97365`, including the event GET Level 4 injection in PR #18.
+Jim owns `EventCreator` and its Google implementation. Follow the small typed
+interface style used by `EventReader` and `CalendarReader`.
+
+The work is split into three reviewable changes:
+
+1. Define `EventCreator` and its existing failure contract, and document the
+   input, return value, external write, and implementation responsibilities.
+2. Implement `GoogleEventCreator`, keep SDK calls and translation behind the
+   interface, connect POST to it, and update provider and HTTP regression tests.
+3. Record required checks and real create/read, restart, and cleanup verification.
+
+The first change defines the interface in `app/event_creation_provider.py` and
+documents it in the README. It does not connect the route or replace the Google
+implementation. Existing POST behavior remains in place. Codex assisted with
+the interface and documentation; implementation and verification are pending.
+
+Preserve the public request, 201 response, four-field Event, 422 validation,
+503 authorization response, and 502 uncertain-creation response. Translate
+existing Google failures into service errors without exposing SDK types to the
+POST handler. Preserve the shared `load_credentials` behavior used by PATCH and
+DELETE. Keep creation retries disabled and keep real verification separate from
+offline tests. Completion also requires teammate review of the provider boundary.
+
+After Level 3, Level 4 will inject `EventCreator` through a dependency factory
+and add controlled implementation tests. Provider selection and test substitution
+are separate from this first change.
 
 ## Provider integration requirements
 
