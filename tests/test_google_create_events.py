@@ -3,14 +3,25 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from google.auth.exceptions import RefreshError
+from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-from httplib2 import Response  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error, Response  # type: ignore[import-untyped]
 from pydantic import ValidationError
+from requests.exceptions import RequestException
 
 from app import google_create_events
+from app.event_creation_provider import (
+    EventCreationUnavailableError,
+    EventCreationUnconfirmedError,
+    EventCreator,
+)
 from app.models import CreateEventRequest
+
+
+@pytest.fixture
+def creator() -> EventCreator:
+    return google_create_events.GoogleEventCreator()
 
 
 @pytest.fixture
@@ -50,9 +61,9 @@ def service(provider_response: dict[str, object]) -> Iterator[MagicMock]:
 
 
 def test_create_translates_google_fields(
-    creation_request: CreateEventRequest, service: MagicMock
+    creator: EventCreator, creation_request: CreateEventRequest, service: MagicMock
 ) -> None:
-    event = google_create_events.create_google_event(creation_request)
+    event = creator.create_event(creation_request)
 
     service.events.return_value.insert.assert_called_once_with(
         calendarId="primary",
@@ -73,6 +84,7 @@ def test_create_translates_google_fields(
 
 
 def test_repeated_creation_returns_provider_ids(
+    creator: EventCreator,
     creation_request: CreateEventRequest,
     service: MagicMock,
     provider_response: dict[str, object],
@@ -83,8 +95,8 @@ def test_repeated_creation_returns_provider_ids(
         {**provider_response, "id": "google-second-event"},
     ]
 
-    first = google_create_events.create_google_event(creation_request)
-    second = google_create_events.create_google_event(creation_request)
+    first = creator.create_event(creation_request)
+    second = creator.create_event(creation_request)
 
     assert first.id == "google-first-event"
     assert second.id == "google-second-event"
@@ -102,6 +114,7 @@ def test_repeated_creation_returns_provider_ids(
     ],
 )
 def test_unusable_provider_response_is_not_a_success(
+    creator: EventCreator,
     creation_request: CreateEventRequest,
     service: MagicMock,
     provider_response: dict[str, object],
@@ -110,8 +123,10 @@ def test_unusable_provider_response_is_not_a_success(
 ) -> None:
     provider_response[field] = value
 
-    with pytest.raises(ValidationError):
-        google_create_events.create_google_event(creation_request)
+    with pytest.raises(EventCreationUnconfirmedError) as raised:
+        creator.create_event(creation_request)
+
+    assert isinstance(raised.value.__cause__, ValidationError)
 
 
 @pytest.mark.parametrize(
@@ -119,17 +134,25 @@ def test_unusable_provider_response_is_not_a_success(
     [
         HttpError(Response({"status": "403"}), b'{"error": "denied"}'),
         TimeoutError("Provider may have accepted the write."),
+        TransportError("Private transport details"),
+        HttpLib2Error("Private HTTP details"),
+        RequestException("Private request details"),
+        OSError("Private connection details"),
     ],
 )
 def test_provider_failure_does_not_retry(
-    creation_request: CreateEventRequest, service: MagicMock, error: Exception
+    creator: EventCreator,
+    creation_request: CreateEventRequest,
+    service: MagicMock,
+    error: Exception,
 ) -> None:
     execute = service.events.return_value.insert.return_value.execute
     execute.side_effect = error
 
-    with pytest.raises(type(error)):
-        google_create_events.create_google_event(creation_request)
+    with pytest.raises(EventCreationUnconfirmedError) as raised:
+        creator.create_event(creation_request)
 
+    assert raised.value.__cause__ is error
     execute.assert_called_once_with(num_retries=0)
 
 
@@ -141,12 +164,15 @@ def local_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_missing_token_prevents_provider_creation(
-    creation_request: CreateEventRequest, local_token: Path
+    creator: EventCreator, creation_request: CreateEventRequest, local_token: Path
 ) -> None:
     with patch.object(google_create_events, "build") as build:
-        with pytest.raises(google_create_events.GoogleCalendarSetupError):
-            google_create_events.create_google_event(creation_request)
+        with pytest.raises(EventCreationUnavailableError) as raised:
+            creator.create_event(creation_request)
 
+    assert isinstance(
+        raised.value.__cause__, google_create_events.GoogleCalendarSetupError
+    )
     build.assert_not_called()
     assert not local_token.exists()
 

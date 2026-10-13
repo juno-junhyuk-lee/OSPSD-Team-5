@@ -9,6 +9,11 @@ from requests.exceptions import RequestException
 
 from app.calendar_dependencies import get_calendar_reader
 from app.calendar_provider import CalendarReader
+from app.event_creation_provider import (
+    EventCreationUnavailableError,
+    EventCreationUnconfirmedError,
+    EventCreator,
+)
 from app.event_dependencies import get_event_reader
 from app.event_provider import (
     CalendarAuthenticationError,
@@ -17,12 +22,15 @@ from app.event_provider import (
     EventReader,
     UnsupportedEventError,
 )
-from app.google_create_events import GoogleCalendarSetupError, create_google_event
+from app.google_create_events import GoogleCalendarSetupError, GoogleEventCreator
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.google_update_events import update_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
+
+# POST retains fixed provider selection until Level 4 introduces injection.
+event_creator: EventCreator = GoogleEventCreator()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -73,8 +81,8 @@ def get_event(
 def create_event(request: CreateEventRequest) -> Event:
     """Create a timed Google event and return its provider-assigned ID."""
     try:
-        event = create_google_event(request)
-    except GoogleCalendarSetupError:
+        event = event_creator.create_event(request)
+    except EventCreationUnavailableError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -82,14 +90,7 @@ def create_event(request: CreateEventRequest) -> Event:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except (
-        HttpError,
-        TransportError,
-        HttpLib2Error,
-        RequestException,
-        OSError,
-        ValidationError,
-    ):
+    except EventCreationUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(

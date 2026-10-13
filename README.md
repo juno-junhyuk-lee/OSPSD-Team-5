@@ -299,6 +299,44 @@ tests remain independent. Another teammate must review the contract,
 implementation, tests, and documentation. Level 1 was approved by Ka Pui and
 Juno and merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/5).
 
+#### Level 3 event creation provider boundary
+
+`EventCreator` in `app/event_creation_provider.py` defines the provider-independent
+creation contract. Jim Lo owns this boundary for POST through Levels 1–5.
+
+| Operation | Input | Return value | External state |
+| --- | --- | --- | --- |
+| `create_event(request)` | A validated `CreateEventRequest` with a normalized title and timezone-aware start/end times | An `Event` with a generated ID, normalized title, and the submitted time instants | Creates one new timed event in the configured calendar |
+
+The interface uses service models and exposes no SDK requests, credentials, or
+provider response types. The provider implementation is responsible for
+authorization, creation, and translation to `Event`. The Google implementation
+keeps `events.insert`, the `primary` calendar selection, and Google field
+mapping inside `app/google_create_events.py`. Callers rely on the returned ID,
+not on a particular ID format. Repeating a successful request creates another
+event; this contract does not provide idempotency.
+
+The two service errors describe the existing POST failure behavior:
+
+- `EventCreationUnavailableError`: local authorization is unusable before any
+  provider write; the route preserves the existing 503 response.
+- `EventCreationUnconfirmedError`: a provider call failed or its response could
+  not confirm creation; the route preserves the existing 502
+  response. A provider event may already exist, so creation is not automatically
+  retried. This error does not promise rollback or unchanged provider state.
+
+`GoogleEventCreator` in `app/google_create_events.py` implements the interface.
+It delegates insertion and translation to the existing `create_google_event`
+helper and converts its known setup, SDK, transport, and response-validation
+failures into the two service errors above. The POST handler calls an
+`EventCreator` and handles those errors without inspecting Google SDK exceptions.
+The module-level creator in `app/main.py` still selects Google for Level 3;
+Level 4 will supply the creator externally and test POST with a controlled
+implementation. The shared `load_credentials` helper remains unchanged for
+PATCH and DELETE. [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md)
+records offline checks, real create/read, restart persistence, and cleanup for
+implementation commit `8741c90`. Teammate review and matching PR CI remain pending.
+
 ### Create and retrieve an event
 
 Install current requirements and complete Shared Google Calendar authentication
@@ -417,11 +455,14 @@ provider-independent interfaces and receive their readers through FastAPI depend
 Neither adds a cross-request client cache or retry layer.
 
 POST validates and normalizes `CreateEventRequest`, then calls
-`create_google_event` in `app/google_create_events.py`. That module loads or
+`EventCreator.create_event`. `GoogleEventCreator` in `app/google_create_events.py`
+uses the existing insertion helper, which loads or
 refreshes local event authorization, calls `events.insert` on `primary`, closes
 the client, and translates the Google response to `Event`. Invalid input is
 rejected before a write. Each creation request uses `num_retries=0`; an uncertain
-result must be investigated before retrying. Authorization helpers remain
+result must be investigated before retrying. The adapter translates known
+failures into service errors; the POST handler retains its 503 and 502 responses.
+Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
 
 PATCH validates and normalizes `UpdateEventRequest`, then calls

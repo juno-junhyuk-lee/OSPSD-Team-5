@@ -6,8 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-from httplib2 import Response  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error, Response  # type: ignore[import-untyped]
+from requests.exceptions import RequestException
 
 from app import google_create_events
 
@@ -166,6 +168,10 @@ def test_missing_authorization_returns_503_without_provider_write(
     [
         HttpError(Response({"status": "403"}), b'{"error": "private details"}'),
         TimeoutError("Private transport details"),
+        TransportError("Private transport details"),
+        HttpLib2Error("Private HTTP details"),
+        RequestException("Private request details"),
+        OSError("Private connection details"),
     ],
 )
 def test_provider_failure_returns_502_without_retry(

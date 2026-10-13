@@ -15,7 +15,7 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
+| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
@@ -202,6 +202,50 @@ mypy, dependency compatibility, and diff checks. Real HTTP POST-to-GET, calendar
 metadata, restart persistence, invalid input, and cleanup also passed. See the
 POST verification guide for the uncommitted merge revision and execution details. Updated PR CI
 and review of the integration diff remain required after publication.
+
+## Jim Lo's POST Level 3 work
+
+Start from main `aa97365`, including the event GET Level 4 injection in PR #18.
+Jim owns `EventCreator` and its Google implementation. Follow the small typed
+interface style used by `EventReader` and `CalendarReader`.
+
+The work is split into three reviewable changes:
+
+1. Define `EventCreator` and its existing failure contract, and document the
+   input, return value, external write, and implementation responsibilities.
+2. Implement `GoogleEventCreator`, keep SDK calls and translation behind the
+   interface, connect POST to it, and update provider and HTTP regression tests.
+3. Record required checks and real create/read, restart, and cleanup verification.
+
+The first change defines and documents `EventCreator`. The second introduces
+`GoogleEventCreator`, which delegates to the existing Google insertion helper
+and translates known failures into the interface's service errors. POST now
+calls a module-level `EventCreator` and maps service errors to its existing
+responses. Provider tests use the typed interface and check error translation;
+HTTP regression tests continue checking validation, uncertain writes, retrieval,
+and responses. Google selection is still fixed for Level 3. Codex assisted with
+the refactor, tests, documentation, and verification; teammate review is pending.
+
+Implementation commit `8741c90` passed 115 offline tests, Ruff lint/format,
+strict mypy, dependency compatibility, and diff checks on Python 3.14.8. All
+tests also passed with external socket connections blocked. Eight additional
+parametrized cases cover known transport error families at the provider and
+HTTP boundaries. Separate real Google verification passed: POST 201, matching
+HTTP and independent provider reads, invalid POST 422 without a created event,
+restart persistence, existing GET checks, and cleanup. See
+[POST Level 3 verification](POST_LEVEL3_VERIFICATION.md). Teammate review and
+matching PR CI remain required before treating Level 3 as complete.
+
+Preserve the public request, 201 response, four-field Event, 422 validation,
+503 authorization response, and 502 uncertain-creation response. Translate
+existing Google failures into service errors without exposing SDK types to the
+POST handler. Preserve the shared `load_credentials` behavior used by PATCH and
+DELETE. Keep creation retries disabled and keep real verification separate from
+offline tests. Completion also requires teammate review of the provider boundary.
+
+After Level 3, Level 4 will inject `EventCreator` through a dependency factory
+and add controlled implementation tests. Provider selection and test substitution
+are separate from this Level 3 refactor.
 
 ## Provider integration requirements
 
