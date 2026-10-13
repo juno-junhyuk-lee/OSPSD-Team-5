@@ -14,7 +14,7 @@ individual operation ownership.
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
-| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
+| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 offline checks pass at `89fb596`; real Level 3 run, review, and PR CI pending | Level 3 reviewer to be agreed |
 | Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
@@ -246,6 +246,20 @@ offline tests. Completion also requires teammate review of the provider boundary
 After Level 3, Level 4 will inject `EventCreator` through a dependency factory
 and add controlled implementation tests. Provider selection and test substitution
 are separate from this Level 3 refactor.
+
+## Ka Pui Cheung's DELETE Level 3 work
+
+Ka Pui owns `EventDeleter` and its Google implementation, following the
+`EventCreator` style. The work is split into two reviewable changes:
+
+1. Define `EventDeleter`, wrap the existing Google call in `GoogleEventDeleter`,
+   route DELETE through it, and add provider translation tests (`89fb596`).
+2. Document the contract, code map, and verification evidence.
+
+Public responses stay 204, 404, 503, and 502. Google selection stays fixed in
+`app/main.py` for Level 3. Offline checks passed; see
+[DELETE Level 3 verification](DELETE_LEVEL3_VERIFICATION.md). A real Google run,
+teammate review of the boundary, and matching PR CI remain required.
 
 ## Provider integration requirements
 
