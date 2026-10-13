@@ -20,7 +20,7 @@ from app.event_deletion_provider import (
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
 )
-from app.event_dependencies import get_event_reader
+from app.event_dependencies import get_event_deleter, get_event_reader
 from app.event_provider import (
     CalendarAuthenticationError,
     CalendarProviderError,
@@ -29,7 +29,7 @@ from app.event_provider import (
     UnsupportedEventError,
 )
 from app.google_create_events import GoogleCalendarSetupError, GoogleEventCreator
-from app.google_delete_events import GoogleEventDeleter, GoogleEventNotFoundError
+from app.google_delete_events import GoogleEventNotFoundError
 from app.google_update_events import update_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
@@ -37,8 +37,6 @@ app = FastAPI(title="Calendar Service")
 
 # POST retains fixed provider selection until Level 4 introduces injection.
 event_creator: EventCreator = GoogleEventCreator()
-# DELETE retains fixed provider selection until Level 4 introduces injection.
-event_deleter: EventDeleter = GoogleEventDeleter()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -142,10 +140,13 @@ def update_event(event_id: str, request: UpdateEventRequest) -> Event:
 
 
 @app.delete("/events/{event_id}", status_code=204)
-def delete_event(event_id: str) -> Response:
+def delete_event(
+    event_id: str,
+    deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
+) -> Response:
     """Delete an event; repeating the request returns 404."""
     try:
-        event_deleter.delete_event(event_id)
+        deleter.delete_event(event_id)
     except EventDeletionNotFoundError:
         raise HTTPException(status_code=404, detail="Event not found") from None
     except EventDeletionUnavailableError:
