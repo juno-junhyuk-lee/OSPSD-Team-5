@@ -14,7 +14,7 @@ individual operation ownership.
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
-| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 offline checks pass at `89fb596`; real Level 3 run, review, and PR CI pending | Level 3 reviewer to be agreed |
+| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
@@ -260,6 +260,19 @@ Public responses stay 204, 404, 503, and 502. Google selection stays fixed in
 `app/main.py` for Level 3. Offline checks passed; see
 [DELETE Level 3 verification](DELETE_LEVEL3_VERIFICATION.md). A real Google run,
 teammate review of the boundary, and matching PR CI remain required.
+
+## Ka Pui Cheung's DELETE Level 4 work
+
+Ka Pui owns dependency injection for DELETE, following event GET's Level 4 work:
+
+1. Select Google in `get_event_deleter`, inject `EventDeleter` into the route,
+   and test the HTTP contract with a controlled deleter (`8057588`).
+2. Document wiring, test boundaries, and verification.
+
+The controlled tests passed with socket connections and credential loading
+blocked. A real Google DELETE run through normal injection, another teammate's
+review of production wiring and test substitution, and matching PR CI remain
+required. See [DELETE Level 4 verification](DELETE_LEVEL4_VERIFICATION.md).
 
 ## Provider integration requirements
 
