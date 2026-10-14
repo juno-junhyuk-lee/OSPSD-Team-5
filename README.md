@@ -15,50 +15,26 @@ network access.
 
 ### Installation
 
-Run commands from the repository root. Use Python 3.14. Installation and checks
-were verified on Windows with Python 3.14.8; the foundation was also checked on
-macOS with Python 3.14.2. Requirements are pinned in requirements.txt. On Windows,
-pip also installs pytest's platform-specific colorama dependency.
+Run commands from the repository root. Use Python 3.14 and
+[uv](https://docs.astral.sh/uv/) for environments and locked dependencies.
+`pyproject.toml` and `uv.lock` are authoritative; `requirements.txt` is an
+exported convenience file.
 
-macOS/Linux:
+Install uv using its [installation instructions](https://docs.astral.sh/uv/getting-started/installation/),
+then run on macOS, Linux, or Windows:
 
 ```sh
-python3.14 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+uv sync --frozen
 ```
 
-Windows PowerShell:
-
-```powershell
-py -3.14 -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.txt
-```
-
-Windows Git Bash:
-
-```bash
-py -3.14 -m venv .venv
-source .venv/Scripts/activate
-python -m pip install -r requirements.txt
-```
-
-Git Bash paths use forward slashes. The PowerShell commands below invoke the
-virtual environment directly, so activation and execution-policy changes are
-unnecessary.
+This creates `.venv` and installs the locked dependencies. Activation is not
+required when using `uv run`. Historical installation and verification results
+refer to their recorded revisions.
 
 ### Run
 
-macOS/Linux or activated Git Bash:
-
 ```sh
-python -m uvicorn app.main:app --reload
-```
-
-PowerShell:
-
-```powershell
-./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 Keep the server running while making requests in another terminal. Stop it with
@@ -369,7 +345,7 @@ pending.
 
 ### Create and retrieve an event
 
-Install current requirements and complete Shared Google Calendar authentication
+Install the locked dependencies and complete Shared Google Calendar authentication
 below, then start the server using the Run instructions above. In another terminal,
 create an event (macOS/Linux or Git Bash):
 
@@ -600,33 +576,22 @@ in `app/event_deletion_dependencies.py`.
 
 ### Checks and testing
 
-macOS/Linux or activated Git Bash:
+Run the same commands on macOS, Linux, or Windows:
 
 ```sh
-python -m pip check
-python -m ruff check .
-python -m ruff format --check .
-python -m mypy
-python -m pytest -v
-git diff --check
-```
-
-PowerShell:
-
-```powershell
-./.venv/Scripts/python.exe -m pip check
-./.venv/Scripts/python.exe -m ruff check .
-./.venv/Scripts/python.exe -m ruff format --check .
-./.venv/Scripts/python.exe -m mypy
-./.venv/Scripts/python.exe -m pytest -v
+uv sync --frozen
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run pytest -v
 git diff --check
 ```
 
 Ruff checks lint and formatting; mypy checks both app and tests in strict mode.
-Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs lint,
-formatting, types, and tests on pushes and pull requests using Python 3.14 on
-Linux. For intentional formatting changes, run `python -m ruff format .` and
-review the diff.
+Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs these
+uv-based lint, formatting, type, and test checks on pushes and pull requests
+using Python 3.14 on Linux. For intentional formatting changes, run
+`uv run ruff format .` and review the diff.
 
 The fast suite runs without Google credentials or external network access.
 It covers HTTP contracts, provider translation, event authentication,
@@ -687,14 +652,13 @@ The authentication script also requests `calendar.calendars.readonly` for
 calendar metadata; add that scope in Data Access as well.
 
 Privately obtain the client JSON and save it as `credentials.json` in the
-repository root. Install the updated pinned requirements, then run:
+repository root. Run `uv sync --frozen`, then authorize on any supported platform:
 
 ```sh
-# Windows Git Bash or PowerShell; no activation required
-./.venv/Scripts/python.exe scripts/google_calendar_auth.py
+uv run python scripts/google_calendar_auth.py
 ```
 
-On macOS/Linux, use `.venv/bin/python` instead. Sign in to the shared test account
+Sign in to the shared test account
 in the browser and approve event access within five minutes. The script stores
 `token.json` locally, refreshes usable expired tokens, and requests authorization
 again if a token is revoked or lacks the agreed scope. Each teammate generates
@@ -704,7 +668,7 @@ The verification request lists up to ten events from `primary` without changing
 state. Copy a returned API event ID to verify that specific event:
 
 ```sh
-./.venv/Scripts/python.exe scripts/google_calendar_auth.py --event-id EVENT_ID
+uv run python scripts/google_calendar_auth.py --event-id EVENT_ID
 ```
 
 A successful API request with no returned events still verifies authentication;
