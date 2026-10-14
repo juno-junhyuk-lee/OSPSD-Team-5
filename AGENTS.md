@@ -19,8 +19,12 @@
   POST calls this boundary with fixed Google selection until Level 4.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
-- `app/google_update_events.py`: PATCH provider call; reuses POST's token loading.
+- `app/event_update_provider.py`: `EventUpdater` contract and update service errors;
+  PATCH calls this boundary with fixed Google selection until Level 4.
+- `app/google_update_events.py`: `GoogleEventUpdater`, shared authorization,
+  patch/get, response translation, and update error translation.
 - `tests/test_update_events.py`: offline update contract and provider-failure tests.
+- `tests/test_google_update_events.py`: offline PATCH provider translation tests.
 - `app/google_delete_events.py`: DELETE provider call; reuses POST's token loading.
 - `tests/test_delete_events.py`: offline deletion contract and provider-failure tests.
 - `app/event_provider.py`: `EventReader` contract and event retrieval service errors.
