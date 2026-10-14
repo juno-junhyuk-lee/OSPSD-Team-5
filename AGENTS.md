@@ -82,9 +82,9 @@ resolves comments and merges after approval and passing checks. Disclose AI
 assistance; each student must understand and verify their submitted work.
 Discuss contract changes together and update tests and docs with the code.
 
-Use Python 3.14 and the pinned requirements. Run the README check commands:
-Ruff lint/format checks, strict mypy, pytest, and git diff --check. GitHub Actions
-runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
+Use Python 3.14 with uv (`uv sync`, `uv.lock`). Run the README check commands:
+Ruff lint/format checks, strict mypy, pytest, and git diff --check via `uv run`.
+GitHub Actions runs lint, formatting, types, and tests on pushes and PRs. Mypy currently covers
 app and tests in strict mode. Calendar metadata and event retrieval have offline
 tests using controlled provider responses.
 Keep expected values independent of lookup data and fast tests offline.

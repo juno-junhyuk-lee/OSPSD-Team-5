@@ -15,50 +15,24 @@ network access.
 
 ### Installation
 
-Run commands from the repository root. Use Python 3.14. Installation and checks
-were verified on Windows with Python 3.14.8; the foundation was also checked on
-macOS with Python 3.14.2. Requirements are pinned in requirements.txt. On Windows,
-pip also installs pytest's platform-specific colorama dependency.
+Run commands from the repository root. Use Python 3.14 and
+[uv](https://docs.astral.sh/uv/) for environments and locked dependencies.
+`pyproject.toml` and `uv.lock` are authoritative; `requirements.txt` is an
+exported convenience file. Installation was verified on Windows with Python
+3.14.8; the foundation was also checked on macOS with Python 3.14.2.
 
-macOS/Linux:
+Install uv once if needed: https://docs.astral.sh/uv/getting-started/installation/
 
 ```sh
-python3.14 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+uv sync
 ```
 
-Windows PowerShell:
-
-```powershell
-py -3.14 -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.txt
-```
-
-Windows Git Bash:
-
-```bash
-py -3.14 -m venv .venv
-source .venv/Scripts/activate
-python -m pip install -r requirements.txt
-```
-
-Git Bash paths use forward slashes. The PowerShell commands below invoke the
-virtual environment directly, so activation and execution-policy changes are
-unnecessary.
+This creates `.venv` and installs the locked dependencies from `uv.lock`.
 
 ### Run
 
-macOS/Linux or activated Git Bash:
-
 ```sh
-python -m uvicorn app.main:app --reload
-```
-
-PowerShell:
-
-```powershell
-./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 Keep the server running while making requests in another terminal. Stop it with
@@ -479,33 +453,19 @@ maps that and other failures to the documented responses.
 
 ### Checks and testing
 
-macOS/Linux or activated Git Bash:
-
 ```sh
-python -m pip check
-python -m ruff check .
-python -m ruff format --check .
-python -m mypy
-python -m pytest -v
-git diff --check
-```
-
-PowerShell:
-
-```powershell
-./.venv/Scripts/python.exe -m pip check
-./.venv/Scripts/python.exe -m ruff check .
-./.venv/Scripts/python.exe -m ruff format --check .
-./.venv/Scripts/python.exe -m mypy
-./.venv/Scripts/python.exe -m pytest -v
+uv sync --frozen
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run pytest -v
 git diff --check
 ```
 
 Ruff checks lint and formatting; mypy checks both app and tests in strict mode.
-Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs lint,
-formatting, types, and tests on pushes and pull requests using Python 3.14 on
-Linux. For intentional formatting changes, run `python -m ruff format .` and
-review the diff.
+Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs the same
+uv-based checks on pushes and pull requests using Python 3.14 on Linux. For
+intentional formatting changes, run `uv run ruff format .` and review the diff.
 
 The fast suite runs without Google credentials or external network access.
 It covers HTTP contracts, provider translation, event authentication,
