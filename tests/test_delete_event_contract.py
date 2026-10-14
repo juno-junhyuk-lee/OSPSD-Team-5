@@ -3,13 +3,13 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app.event_deletion_dependencies import get_event_deleter
 from app.event_deletion_provider import (
     EventDeleter,
     EventDeletionNotFoundError,
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
 )
-from app.event_dependencies import get_event_deleter
 from app.google_delete_events import GoogleEventDeleter
 from app.main import app
 

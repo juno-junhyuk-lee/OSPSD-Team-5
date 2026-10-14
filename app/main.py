@@ -10,13 +10,14 @@ from app.event_creation_provider import (
     EventCreationUnconfirmedError,
     EventCreator,
 )
+from app.event_deletion_dependencies import get_event_deleter
 from app.event_deletion_provider import (
     EventDeleter,
     EventDeletionNotFoundError,
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
 )
-from app.event_dependencies import get_event_deleter, get_event_reader
+from app.event_dependencies import get_event_reader
 from app.event_provider import (
     CalendarAuthenticationError,
     CalendarProviderError,

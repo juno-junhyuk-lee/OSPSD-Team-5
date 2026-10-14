@@ -5,11 +5,11 @@ record covers implementation commit `8057588`.
 
 ## Wiring to review
 
-- `get_event_deleter()` in `app/event_dependencies.py` is the only code that
+- `get_event_deleter()` in `app/event_deletion_dependencies.py` is the only code that
   selects `GoogleEventDeleter`.
 - The DELETE route receives an `EventDeleter` through `Depends` and handles only
   the service errors from `app/event_deletion_provider.py`.
-- `tests/test_delete_contract.py` overrides `get_event_deleter` with a
+- `tests/test_delete_event_contract.py` overrides `get_event_deleter` with a
   `ControlledEventDeleter` and restores prior overrides after each test.
 - Swapping providers means a new `EventDeleter` implementation and a one-line
   change in `get_event_deleter`.

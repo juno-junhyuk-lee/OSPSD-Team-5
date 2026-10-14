@@ -525,7 +525,7 @@ tests. See [DELETE Level 3 verification](docs/DELETE_LEVEL3_VERIFICATION.md).
 
 #### Level 4 event deletion provider injection
 
-`get_event_deleter()` in `app/event_dependencies.py` is the only place that
+`get_event_deleter()` in `app/event_deletion_dependencies.py` is the only place that
 selects `GoogleEventDeleter`; it returns it as an `EventDeleter`. FastAPI
 supplies it to the DELETE route through `Depends`, so the route neither
 constructs nor imports the concrete deleter. The dependency creates a
@@ -533,7 +533,7 @@ lightweight deleter per request; authorization and SDK client creation happen
 during deletion. The real deleter needs the local `token.json` from the shared
 setup script. Existing responses are unchanged.
 
-`tests/test_delete_contract.py` overrides that dependency with a
+`tests/test_delete_event_contract.py` overrides that dependency with a
 `ControlledEventDeleter` that holds a set of IDs. It checks 204 with an empty
 body, a repeated delete returning 404, an unknown ID, and the 503/502 responses,
 plus that normal requests select Google. Each test gets fresh deleter state and
@@ -596,7 +596,7 @@ DELETE calls `EventDeleter.delete_event`. `GoogleEventDeleter` in
 `events.delete` on `primary` once, without retries. It translates Google 404/410
 and other known failures into service errors, which the handler maps to the
 documented responses. FastAPI supplies the deleter through `get_event_deleter`
-in `app/event_dependencies.py`.
+in `app/event_deletion_dependencies.py`.
 
 ### Checks and testing
 
