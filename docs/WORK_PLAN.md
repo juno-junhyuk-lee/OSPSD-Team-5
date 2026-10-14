@@ -16,9 +16,30 @@ individual operation ownership.
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
+
+## Niriti Pahadi's event PATCH Level 3 work
+
+Branch: `feature/calendar-patch-level3-interface`. Niriti owns the event update
+interface and Google implementation. The changes:
+
+1. Define `EventUpdater` and update service errors in `event_update_provider.py`.
+2. Implement `GoogleEventUpdater` and route PATCH through the interface.
+3. Add offline provider translation tests and document the boundary.
+
+## Niriti Pahadi's event PATCH Level 4 work
+
+Branch: `feature/calendar-patch-level4-injection` (stacked on Level 3). Niriti
+owns dependency injection for event PATCH:
+
+1. Select Google in `event_update_dependencies.py` and inject `EventUpdater`.
+2. Test the HTTP contract with a controlled updater and dependency overrides.
+3. Document wiring and verification evidence.
+
+The public PATCH contract is unchanged.
+
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
 
