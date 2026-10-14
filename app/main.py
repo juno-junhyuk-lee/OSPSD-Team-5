@@ -1,33 +1,52 @@
-from fastapi import FastAPI, HTTPException, Response
-from google.auth.exceptions import TransportError
-from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
-from pydantic import ValidationError
-from requests.exceptions import RequestException
+from typing import Annotated
 
-from app.google_auth import CalendarAuthenticationError
-from app.google_calendar import get_primary_calendar
-from app.google_create_events import GoogleCalendarSetupError, create_google_event
-from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
-from app.google_events import (
+from fastapi import Depends, FastAPI, HTTPException, Response
+
+from app.calendar_dependencies import get_calendar_reader
+from app.calendar_provider import CalendarReader
+from app.event_creation_dependencies import get_event_creator
+from app.event_creation_provider import (
+    EventCreationUnavailableError,
+    EventCreationUnconfirmedError,
+    EventCreator,
+)
+from app.event_deletion_dependencies import get_event_deleter
+from app.event_deletion_provider import (
+    EventDeleter,
+    EventDeletionNotFoundError,
+    EventDeletionUnavailableError,
+    EventDeletionUnconfirmedError,
+)
+from app.event_dependencies import get_event_reader
+from app.event_provider import (
+    CalendarAuthenticationError,
     CalendarProviderError,
     EventNotFoundError,
+    EventReader,
     UnsupportedEventError,
-    retrieve_event,
 )
-from app.google_update_events import update_google_event
+from app.event_update_dependencies import get_event_updater
+from app.event_update_provider import (
+    EventUpdateNotFoundError,
+    EventUpdater,
+    EventUpdateUnavailableError,
+    EventUpdateUnconfirmedError,
+)
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
-def get_calendar(calendar_id: str) -> Calendar:
+def get_calendar(
+    calendar_id: str,
+    reader: Annotated[CalendarReader, Depends(get_calendar_reader)],
+) -> Calendar:
     """Retrieve the authenticated user's primary calendar metadata."""
     if calendar_id != "primary":
         raise HTTPException(status_code=404, detail="Calendar not found")
     try:
-        return get_primary_calendar()
+        return reader.get_primary_calendar()
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=503, detail="Google authorization unavailable"
@@ -39,10 +58,13 @@ def get_calendar(calendar_id: str) -> Calendar:
 
 
 @app.get("/events/{event_id}", response_model=Event)
-def get_event(event_id: str) -> Event:
+def get_event(
+    event_id: str,
+    reader: Annotated[EventReader, Depends(get_event_reader)],
+) -> Event:
     """Retrieve one timed event from the authenticated primary Google Calendar."""
     try:
-        return retrieve_event(event_id)
+        return reader.get_event(event_id)
     except EventNotFoundError as error:
         raise HTTPException(status_code=404, detail="Event not found") from error
     except CalendarAuthenticationError as error:
@@ -60,11 +82,14 @@ def get_event(event_id: str) -> Event:
 
 
 @app.post("/events", response_model=Event, status_code=201)
-def create_event(request: CreateEventRequest) -> Event:
+def create_event(
+    request: CreateEventRequest,
+    creator: Annotated[EventCreator, Depends(get_event_creator)],
+) -> Event:
     """Create a timed Google event and return its provider-assigned ID."""
     try:
-        event = create_google_event(request)
-    except GoogleCalendarSetupError:
+        event = creator.create_event(request)
+    except EventCreationUnavailableError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -72,14 +97,7 @@ def create_event(request: CreateEventRequest) -> Event:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except (
-        HttpError,
-        TransportError,
-        HttpLib2Error,
-        RequestException,
-        OSError,
-        ValidationError,
-    ):
+    except EventCreationUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(
@@ -91,13 +109,17 @@ def create_event(request: CreateEventRequest) -> Event:
 
 
 @app.patch("/events/{event_id}", response_model=Event)
-def update_event(event_id: str, request: UpdateEventRequest) -> Event:
+def update_event(
+    event_id: str,
+    request: UpdateEventRequest,
+    updater: Annotated[EventUpdater, Depends(get_event_updater)],
+) -> Event:
     """Update a timed Google event and return the refreshed Event fields."""
     try:
-        return update_google_event(event_id, request)
-    except GoogleEventNotFoundError:
+        return updater.update_event(event_id, request)
+    except EventUpdateNotFoundError:
         raise HTTPException(status_code=404, detail="Event not found") from None
-    except GoogleCalendarSetupError:
+    except EventUpdateUnavailableError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -105,14 +127,7 @@ def update_event(event_id: str, request: UpdateEventRequest) -> Event:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except (
-        HttpError,
-        TransportError,
-        HttpLib2Error,
-        RequestException,
-        OSError,
-        ValidationError,
-    ):
+    except EventUpdateUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(
@@ -123,13 +138,16 @@ def update_event(event_id: str, request: UpdateEventRequest) -> Event:
 
 
 @app.delete("/events/{event_id}", status_code=204)
-def delete_event(event_id: str) -> Response:
-    """Delete a Google event; repeating the request returns 404."""
+def delete_event(
+    event_id: str,
+    deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
+) -> Response:
+    """Delete an event; repeating the request returns 404."""
     try:
-        delete_google_event(event_id)
-    except GoogleEventNotFoundError:
+        deleter.delete_event(event_id)
+    except EventDeletionNotFoundError:
         raise HTTPException(status_code=404, detail="Event not found") from None
-    except GoogleCalendarSetupError:
+    except EventDeletionUnavailableError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -137,13 +155,7 @@ def delete_event(event_id: str) -> Response:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except (
-        HttpError,
-        TransportError,
-        HttpLib2Error,
-        RequestException,
-        OSError,
-    ):
+    except EventDeletionUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(

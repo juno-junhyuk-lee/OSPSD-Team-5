@@ -1,10 +1,18 @@
 """Update timed events using the team's local Google authorization."""
 
+from google.auth.exceptions import TransportError
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-from pydantic import AwareDatetime, BaseModel, Field
+from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
+from pydantic import AwareDatetime, BaseModel, Field, ValidationError
+from requests.exceptions import RequestException
 
-from app.google_create_events import load_credentials
+from app.event_update_provider import (
+    EventUpdateNotFoundError,
+    EventUpdateUnavailableError,
+    EventUpdateUnconfirmedError,
+)
+from app.google_create_events import GoogleCalendarSetupError, load_credentials
 from app.google_delete_events import GoogleEventNotFoundError
 from app.models import Event, UpdateEventRequest
 
@@ -63,3 +71,24 @@ def update_google_event(event_id: str, request: UpdateEventRequest) -> Event:
         start_time=translated.start_time,
         end_time=translated.end_time,
     )
+
+
+class GoogleEventUpdater:
+    """Update Google events through the service update contract."""
+
+    def update_event(self, event_id: str, request: UpdateEventRequest) -> Event:
+        try:
+            return update_google_event(event_id, request)
+        except GoogleEventNotFoundError as error:
+            raise EventUpdateNotFoundError from error
+        except GoogleCalendarSetupError as error:
+            raise EventUpdateUnavailableError from error
+        except (
+            HttpError,
+            TransportError,
+            HttpLib2Error,
+            RequestException,
+            OSError,
+            ValidationError,
+        ) as error:
+            raise EventUpdateUnconfirmedError from error

@@ -1,9 +1,17 @@
 """Delete events using the team's local Google authorization."""
 
+from google.auth.exceptions import TransportError
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
+from requests.exceptions import RequestException
 
-from app.google_create_events import load_credentials
+from app.event_deletion_provider import (
+    EventDeletionNotFoundError,
+    EventDeletionUnavailableError,
+    EventDeletionUnconfirmedError,
+)
+from app.google_create_events import GoogleCalendarSetupError, load_credentials
 
 
 class GoogleEventNotFoundError(LookupError):
@@ -23,3 +31,23 @@ def delete_google_event(event_id: str) -> None:
         if error.resp.status in (404, 410):
             raise GoogleEventNotFoundError(event_id) from error
         raise
+
+
+class GoogleEventDeleter:
+    """Delete Google events through the service deletion contract."""
+
+    def delete_event(self, event_id: str) -> None:
+        try:
+            delete_google_event(event_id)
+        except GoogleEventNotFoundError as error:
+            raise EventDeletionNotFoundError from error
+        except GoogleCalendarSetupError as error:
+            raise EventDeletionUnavailableError from error
+        except (
+            HttpError,
+            TransportError,
+            HttpLib2Error,
+            RequestException,
+            OSError,
+        ) as error:
+            raise EventDeletionUnconfirmedError from error

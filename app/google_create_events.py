@@ -3,12 +3,19 @@
 from pathlib import Path
 from typing import cast
 
-from google.auth.exceptions import RefreshError
+from google.auth.exceptions import RefreshError, TransportError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
-from pydantic import AwareDatetime, BaseModel, Field
+from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
+from pydantic import AwareDatetime, BaseModel, Field, ValidationError
+from requests.exceptions import RequestException
 
+from app.event_creation_provider import (
+    EventCreationUnavailableError,
+    EventCreationUnconfirmedError,
+)
 from app.models import CreateEventRequest, Event
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
@@ -92,3 +99,22 @@ def create_google_event(request: CreateEventRequest) -> Event:
         start_time=translated.start_time,
         end_time=translated.end_time,
     )
+
+
+class GoogleEventCreator:
+    """Create Google events through the service creation contract."""
+
+    def create_event(self, request: CreateEventRequest) -> Event:
+        try:
+            return create_google_event(request)
+        except GoogleCalendarSetupError as error:
+            raise EventCreationUnavailableError from error
+        except (
+            HttpError,
+            TransportError,
+            HttpLib2Error,
+            RequestException,
+            OSError,
+            ValidationError,
+        ) as error:
+            raise EventCreationUnconfirmedError from error

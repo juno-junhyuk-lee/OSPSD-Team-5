@@ -8,12 +8,10 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 
+from app.event_provider import CalendarAuthenticationError
+
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 ROOT = Path(__file__).resolve().parents[1]
-
-
-class CalendarAuthenticationError(Exception):
-    """Local authorization is unavailable; run the authentication script."""
 
 
 def load_credentials(token_path: Path = ROOT / "token.json") -> Any:
