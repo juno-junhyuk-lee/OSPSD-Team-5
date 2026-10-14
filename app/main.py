@@ -1,48 +1,33 @@
-from typing import Annotated
-
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
 from pydantic import ValidationError
 from requests.exceptions import RequestException
 
-from app.calendar_dependencies import get_calendar_reader
-from app.calendar_provider import CalendarReader
-from app.event_creation_provider import (
-    EventCreationUnavailableError,
-    EventCreationUnconfirmedError,
-    EventCreator,
-)
-from app.event_dependencies import get_event_reader
-from app.event_provider import (
-    CalendarAuthenticationError,
+from app.google_auth import CalendarAuthenticationError
+from app.google_calendar import get_primary_calendar
+from app.google_create_events import GoogleCalendarSetupError, create_google_event
+from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
+from app.google_events import (
     CalendarProviderError,
     EventNotFoundError,
-    EventReader,
     UnsupportedEventError,
+    retrieve_event,
 )
-from app.google_create_events import GoogleCalendarSetupError, GoogleEventCreator
-from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.google_update_events import update_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
 
-# POST retains fixed provider selection until Level 4 introduces injection.
-event_creator: EventCreator = GoogleEventCreator()
-
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
-def get_calendar(
-    calendar_id: str,
-    reader: Annotated[CalendarReader, Depends(get_calendar_reader)],
-) -> Calendar:
+def get_calendar(calendar_id: str) -> Calendar:
     """Retrieve the authenticated user's primary calendar metadata."""
     if calendar_id != "primary":
         raise HTTPException(status_code=404, detail="Calendar not found")
     try:
-        return reader.get_primary_calendar()
+        return get_primary_calendar()
     except (OSError, ValueError) as error:
         raise HTTPException(
             status_code=503, detail="Google authorization unavailable"
@@ -54,13 +39,10 @@ def get_calendar(
 
 
 @app.get("/events/{event_id}", response_model=Event)
-def get_event(
-    event_id: str,
-    reader: Annotated[EventReader, Depends(get_event_reader)],
-) -> Event:
+def get_event(event_id: str) -> Event:
     """Retrieve one timed event from the authenticated primary Google Calendar."""
     try:
-        return reader.get_event(event_id)
+        return retrieve_event(event_id)
     except EventNotFoundError as error:
         raise HTTPException(status_code=404, detail="Event not found") from error
     except CalendarAuthenticationError as error:
@@ -81,8 +63,8 @@ def get_event(
 def create_event(request: CreateEventRequest) -> Event:
     """Create a timed Google event and return its provider-assigned ID."""
     try:
-        event = event_creator.create_event(request)
-    except EventCreationUnavailableError:
+        event = create_google_event(request)
+    except GoogleCalendarSetupError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -90,7 +72,14 @@ def create_event(request: CreateEventRequest) -> Event:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except EventCreationUnconfirmedError:
+    except (
+        HttpError,
+        TransportError,
+        HttpLib2Error,
+        RequestException,
+        OSError,
+        ValidationError,
+    ):
         raise HTTPException(
             status_code=502,
             detail=(

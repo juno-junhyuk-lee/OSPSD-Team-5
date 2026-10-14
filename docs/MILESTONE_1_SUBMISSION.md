@@ -1,6 +1,6 @@
 # Milestone 1 submission — Team 5
 
-## Release pointer
+## Historical October 7 submission pointer
 
 | Field | Value |
 | --- | --- |
@@ -9,20 +9,29 @@
 | Tag URL | https://github.com/juno-junhyuk-lee/OSPSD-Team-5/releases/tag/v0.1.0-alpha.1 |
 | Commit URL | https://github.com/juno-junhyuk-lee/OSPSD-Team-5/commit/9500e0309f7cd43b39f8b08941c7b7bff3b287f0 |
 
-This PR branch includes the calendar service implementation (merged from `main`)
-plus submission docs and uv-based setup. Reviewers should inspect the full
-branch, not only this markdown file. The original Milestone 1 freeze remains
-tag `v0.1.0-alpha.1`.
+This corrected submission presents the complete Level 1/2 implementation,
+tests, and feature documentation relative to Homework 0 commit
+`d32ea5d166698949f63f2c7684a317a377c2472d` on `baseline/homework-0`.
+Application code, tests, and scripts are restored from October 7 commit
+`9500e0309f7cd43b39f8b08941c7b7bff3b287f0`. Later Level 3/4 implementation
+changes are excluded. The requested uv configuration, lockfile, exported
+requirements, CI changes, and setup instructions are retained.
+
+The original tag and commit above identify the historical submission, not the
+corrected PR head. Existing tags and `main` remain unchanged. Reviewers should
+inspect the complete diff in PR #14 against `baseline/homework-0`.
+Codex assisted with this documentation correction.
 
 Checkout this PR branch:
 
 ```sh
 git fetch origin docs/milestone-1-submission
 git checkout docs/milestone-1-submission
-uv sync
+uv sync --frozen
 ```
 
-Or checkout the tagged Milestone 1 freeze:
+For the historical Milestone 1 freeze, checkout the tag and follow its own
+README setup; that revision predates the uv configuration:
 
 ```sh
 git fetch origin tag v0.1.0-alpha.1
@@ -68,8 +77,13 @@ git checkout v0.1.0-alpha.1
 
 ## CI
 
-GitHub Actions **Checks** use `uv sync --frozen` then ruff/mypy/pytest.
-See the Actions tab for this branch and for tagged commit `9500e03`.
+The corrected branch's GitHub Actions **Checks** use `uv sync --frozen`, then
+uv-based Ruff, mypy, and pytest commands. New local results and CI evidence must
+match the corrective commit; they are not yet recorded here.
+
+Historical checks for `9500e03` passed with 100 tests and the earlier pip-based
+setup. Their [CI run](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/37679291707)
+is evidence for that snapshot, not for the corrected branch's uv setup.
 
 Reproduce locally:
 
@@ -79,6 +93,7 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy
 uv run pytest -v
+git diff --check
 ```
 
 ## Development workflow (summary)

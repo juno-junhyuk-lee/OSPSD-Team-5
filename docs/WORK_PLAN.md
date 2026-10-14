@@ -13,66 +13,14 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
+| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8 | See PR #8 reviews |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
+| Jim Lo | `POST /events` | Level 1 merged in PR #5; Level 2 PR #10 has teammate approval and real verification; integration with main awaits reviewed merge commit and CI | Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
-
-## Juno Lee's calendar GET Level 3 work
-
-Juno owns the implementation. The deliverable is a documented
-`CalendarReader` interface and Google implementation preserving the existing
-calendar GET contract. Completion requires passing checks, real-provider
-verification, and teammate review of the shared boundary. Local checks and real
-calendar GET passed. See PR #15 for reviews and `VERIFICATION.md` for local evidence.
-Codex assisted with the refactor,
-tests, and documentation. Injection remains Level 4 work.
-
-## Kristie Lee's event GET Level 3 work
-
-Branch: `feature/calendar-event-get-level3-interface`. Kristie owns the event
-GET interface and Google implementation. The changes are split into three commits:
-
-1. Define `EventReader` and move existing retrieval errors to the provider boundary.
-2. Connect `GoogleEventReader` to the route and verify the interface and ID mapping.
-3. Update the code map, contract documentation, and verification evidence.
-
-Implementation revision `ce55c7a` passed all 104 tests, Ruff lint/format, strict
-mypy, dependency compatibility, and diff checks on Windows with Python 3.14.8.
-Real Google requests through TestClient returned 200 for the existing timed event
-and 404 for an absent ID. See [verification evidence](VERIFICATION.md#event-get-level-3-verification).
-Level 3 was subsequently merged in PR #17; see that PR for review evidence.
-Codex assisted with implementation, tests, documentation, and verification.
-
-## Kristie Lee's event GET Level 4 work
-
-Kristie owns dependency injection for event GET. The work is split into three commits:
-
-1. Select Google in `event_dependencies.py` and inject `EventReader` into the route.
-2. Test the HTTP contract with a controlled reader and isolated dependency overrides.
-3. Document wiring, test boundaries, and local/real-provider verification.
-
-Implementation revision `c6ca9c6` passed 107 tests and required local checks on
-Windows/Python 3.14.8. The five controlled reader tests also passed with external
-socket connections and real credential loading blocked. Real Google retrieval
-through normal injection returned 200 for the existing event and 404 for an absent
-ID. See [verification evidence](VERIFICATION.md#event-get-level-4-verification).
-Another teammate's review of production wiring and test substitution and matching
-PR CI remain required. Codex assisted with implementation, tests, and verification.
-
-## Juno Lee's calendar GET Level 4 work
-
-Juno owns the implementation; The deliverable is FastAPI
-injection of `CalendarReader` with Google selected outside the route and a
-controlled reader supplied by calendar HTTP tests. Preserve existing responses.
-Completion requires passing checks, real Google GET verification, and another
-teammate's review of both production wiring and test substitution. Codex assisted
-with implementation, tests, documentation, and checks. Verification is recorded
-in `VERIFICATION.md`; teammate review remains pending.
 
 ## Existing Level 1 GET work
 
@@ -202,50 +150,6 @@ mypy, dependency compatibility, and diff checks. Real HTTP POST-to-GET, calendar
 metadata, restart persistence, invalid input, and cleanup also passed. See the
 POST verification guide for the uncommitted merge revision and execution details. Updated PR CI
 and review of the integration diff remain required after publication.
-
-## Jim Lo's POST Level 3 work
-
-Start from main `aa97365`, including the event GET Level 4 injection in PR #18.
-Jim owns `EventCreator` and its Google implementation. Follow the small typed
-interface style used by `EventReader` and `CalendarReader`.
-
-The work is split into three reviewable changes:
-
-1. Define `EventCreator` and its existing failure contract, and document the
-   input, return value, external write, and implementation responsibilities.
-2. Implement `GoogleEventCreator`, keep SDK calls and translation behind the
-   interface, connect POST to it, and update provider and HTTP regression tests.
-3. Record required checks and real create/read, restart, and cleanup verification.
-
-The first change defines and documents `EventCreator`. The second introduces
-`GoogleEventCreator`, which delegates to the existing Google insertion helper
-and translates known failures into the interface's service errors. POST now
-calls a module-level `EventCreator` and maps service errors to its existing
-responses. Provider tests use the typed interface and check error translation;
-HTTP regression tests continue checking validation, uncertain writes, retrieval,
-and responses. Google selection is still fixed for Level 3. Codex assisted with
-the refactor, tests, documentation, and verification; teammate review is pending.
-
-Implementation commit `8741c90` passed 115 offline tests, Ruff lint/format,
-strict mypy, dependency compatibility, and diff checks on Python 3.14.8. All
-tests also passed with external socket connections blocked. Eight additional
-parametrized cases cover known transport error families at the provider and
-HTTP boundaries. Separate real Google verification passed: POST 201, matching
-HTTP and independent provider reads, invalid POST 422 without a created event,
-restart persistence, existing GET checks, and cleanup. See
-[POST Level 3 verification](POST_LEVEL3_VERIFICATION.md). Teammate review and
-matching PR CI remain required before treating Level 3 as complete.
-
-Preserve the public request, 201 response, four-field Event, 422 validation,
-503 authorization response, and 502 uncertain-creation response. Translate
-existing Google failures into service errors without exposing SDK types to the
-POST handler. Preserve the shared `load_credentials` behavior used by PATCH and
-DELETE. Keep creation retries disabled and keep real verification separate from
-offline tests. Completion also requires teammate review of the provider boundary.
-
-After Level 3, Level 4 will inject `EventCreator` through a dependency factory
-and add controlled implementation tests. Provider selection and test substitution
-are separate from this Level 3 refactor.
 
 ## Provider integration requirements
 

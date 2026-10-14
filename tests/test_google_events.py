@@ -5,8 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 
-from app.event_provider import CalendarAuthenticationError, EventReader
-from app.google_events import GoogleEventReader
+from app.google_auth import CalendarAuthenticationError
 
 
 @pytest.fixture
@@ -163,26 +162,4 @@ def test_google_client_is_closed_after_request(
     response = client.get("/events/google-event")
 
     assert response.status_code == expected_status
-    service.close.assert_called_once_with()
-
-
-def test_event_reader_translates_requested_event(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    service = Mock()
-    service.events.return_value.get.return_value.execute.return_value = timed_event()
-    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
-    reader: EventReader = GoogleEventReader()
-
-    event = reader.get_event("google-event")
-
-    assert event.model_dump(mode="json") == {
-        "id": "google-event",
-        "title": "Provider meeting",
-        "start_time": "2026-10-05T10:00:00-04:00",
-        "end_time": "2026-10-05T11:00:00-04:00",
-    }
-    service.events.return_value.get.assert_called_once_with(
-        calendarId="primary", eventId="google-event"
-    )
     service.close.assert_called_once_with()

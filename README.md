@@ -18,16 +18,18 @@ network access.
 Run commands from the repository root. Use Python 3.14 and
 [uv](https://docs.astral.sh/uv/) for environments and locked dependencies.
 `pyproject.toml` and `uv.lock` are authoritative; `requirements.txt` is an
-exported convenience file. Installation was verified on Windows with Python
-3.14.8; the foundation was also checked on macOS with Python 3.14.2.
+exported convenience file.
 
-Install uv once if needed: https://docs.astral.sh/uv/getting-started/installation/
+Install uv using its [installation instructions](https://docs.astral.sh/uv/getting-started/installation/),
+then run on macOS, Linux, or Windows:
 
 ```sh
-uv sync
+uv sync --frozen
 ```
 
-This creates `.venv` and installs the locked dependencies from `uv.lock`.
+This creates `.venv` and installs the locked dependencies. Activation is not
+required when using `uv run`. Historical installation and verification results
+refer to their recorded revisions; this corrected submission needs its own checks.
 
 ### Run
 
@@ -83,48 +85,6 @@ The API does not expose provider error messages or launch browser login during
 requests. For 503, rerun the authentication script. Error handling does not cover
 every SDK exception; retry, cancellation, and uncertain write policies are later work.
 
-#### Level 3 event provider boundary
-
-`EventReader` in `app/event_provider.py` defines
-`get_event(event_id: str) -> Event`. It reads one timed event from the authorized
-calendar without changing events. The input is a provider-assigned event ID;
-the output is the service's four-field `Event` model, with an empty title when
-no title is supplied. The interface exposes no Google SDK types or payloads.
-The same module declares the existing missing-event, unsupported-event,
-authentication, and provider errors; their HTTP meanings remain unchanged.
-
-`GoogleEventReader` in `app/google_events.py` implements the contract. It uses
-`app/google_auth.py` for local authorization and client construction, owns the
-Google request and response translation, and closes the client on success or
-failure. The event GET route calls the typed `EventReader` boundary and maps
-service errors to the existing 404, 422, 503, and 502 responses.
-
-The Level 3 boundary was merged in PR #17. Codex assisted with implementation,
-tests, and documentation. POST, PATCH, and DELETE retain their existing implementations.
-
-#### Level 4 event provider injection
-
-`get_event_reader()` in `app/event_dependencies.py` selects `GoogleEventReader`
-and returns it as an `EventReader`. FastAPI supplies it to the event GET route
-through `Depends`; the route does not construct or import the concrete reader.
-The dependency creates a lightweight reader per request. Authorization and SDK
-client creation occur during retrieval, and the Google implementation closes
-the client after use. Existing success and error responses remain unchanged.
-
-`tests/test_events.py` overrides that dependency with a `ControlledEventReader`
-using its own TestClient fixture, without the shared Google SDK mocks. It checks
-success, missing events, 422/503/502 errors, and request ID forwarding. Each test
-gets fresh reader state and restores previous dependency overrides in `finally`.
-Google translation, authentication, cleanup, and CRUD tests keep their existing
-provider fixtures; the controlled reader does not reproduce Google's behavior.
-
-Replacing the provider requires an `EventReader` implementation and a change to
-`get_event_reader`; the route continues using the same contract.
-[Verification notes](docs/VERIFICATION.md#event-get-level-4-verification) record
-local checks, blocked-network contract tests, and real Google retrieval.
-Another teammate must review both normal wiring and test substitution, and
-matching PR CI remains required. Codex assisted with implementation and verification.
-
 ### Calendar details contract
 
 `GET /calendars/{calendar_id}` retrieves calendar metadata without changing state.
@@ -158,46 +118,6 @@ Only `primary` is supported. Its ID is a service lookup alias and remains
 The timezone is an IANA timezone name. Other IDs return `404 Not Found` with
 `{"detail": "Calendar not found"}` before any Google request.
 This operation does not list calendars or events and does not alter event routes.
-
-#### Level 3 calendar provider boundary
-
-`CalendarReader` in `app/calendar_provider.py` defines the one operation this
-route needs: `get_primary_calendar() -> Calendar`. It accepts no arguments because
-the route rejects unsupported IDs before calling the provider. It reads external
-metadata without changing state and returns the service alias `primary`, a title,
-and a timezone. No Google SDK types or payload fields appear in the interface.
-
-`GoogleCalendarReader` in `app/google_calendar.py` implements that contract. It
-owns token loading, the Google request, and translation from `summary` and
-`timeZone` into the public model. The route depends on the typed `CalendarReader`
-boundary and retains its existing 404, 503 authorization, and 502 provider-error
-responses. Existing `OSError`/`ValueError` and `RuntimeError` handling is preserved;
-consistent domain failure semantics belong to Level 5.
-
-This boundary covers Juno's calendar metadata operation; event GET uses its
-own `EventReader` boundary described above. Codex assisted
-with the implementation, tests, and documentation.
-
-#### Level 4 calendar provider injection
-
-`app/calendar_dependencies.py` selects Google in `get_calendar_reader()`, which
-returns a `CalendarReader`. FastAPI supplies that reader to the calendar route
-through `Depends`; the route does not import or construct the concrete calendar
-provider. The dependency creates a lightweight reader per request. Credentials
-and the SDK client are loaded only when metadata is requested, and the Google
-implementation closes the client after use. Unsupported IDs still return 404
-without a Google request.
-
-Calendar HTTP tests override `get_calendar_reader` with a controlled implementation
-of the same interface. They use their own TestClient fixture, without the shared
-event SDK mocks, Google credentials, or network access. The controlled reader
-returns fixed metadata or raises a configured error. Each test restores dependency
-overrides afterward. Google translation tests remain separate.
-
-Replacing the calendar provider requires another implementation of `CalendarReader`
-and a change to the dependency's selection; the route contract remains the same.
-Local and real-provider evidence is recorded in `docs/VERIFICATION.md`. Teammate
-review of production wiring and test substitution remains required for Level 4.
 
 ### Event creation contract
 
@@ -273,47 +193,9 @@ tests remain independent. Another teammate must review the contract,
 implementation, tests, and documentation. Level 1 was approved by Ka Pui and
 Juno and merged in [PR #5](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/5).
 
-#### Level 3 event creation provider boundary
-
-`EventCreator` in `app/event_creation_provider.py` defines the provider-independent
-creation contract. Jim Lo owns this boundary for POST through Levels 1–5.
-
-| Operation | Input | Return value | External state |
-| --- | --- | --- | --- |
-| `create_event(request)` | A validated `CreateEventRequest` with a normalized title and timezone-aware start/end times | An `Event` with a generated ID, normalized title, and the submitted time instants | Creates one new timed event in the configured calendar |
-
-The interface uses service models and exposes no SDK requests, credentials, or
-provider response types. The provider implementation is responsible for
-authorization, creation, and translation to `Event`. The Google implementation
-keeps `events.insert`, the `primary` calendar selection, and Google field
-mapping inside `app/google_create_events.py`. Callers rely on the returned ID,
-not on a particular ID format. Repeating a successful request creates another
-event; this contract does not provide idempotency.
-
-The two service errors describe the existing POST failure behavior:
-
-- `EventCreationUnavailableError`: local authorization is unusable before any
-  provider write; the route preserves the existing 503 response.
-- `EventCreationUnconfirmedError`: a provider call failed or its response could
-  not confirm creation; the route preserves the existing 502
-  response. A provider event may already exist, so creation is not automatically
-  retried. This error does not promise rollback or unchanged provider state.
-
-`GoogleEventCreator` in `app/google_create_events.py` implements the interface.
-It delegates insertion and translation to the existing `create_google_event`
-helper and converts its known setup, SDK, transport, and response-validation
-failures into the two service errors above. The POST handler calls an
-`EventCreator` and handles those errors without inspecting Google SDK exceptions.
-The module-level creator in `app/main.py` still selects Google for Level 3;
-Level 4 will supply the creator externally and test POST with a controlled
-implementation. The shared `load_credentials` helper remains unchanged for
-PATCH and DELETE. [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md)
-records offline checks, real create/read, restart persistence, and cleanup for
-implementation commit `8741c90`. Teammate review and matching PR CI remain pending.
-
 ### Create and retrieve an event
 
-Install current requirements and complete Shared Google Calendar authentication
+Install the locked dependencies and complete Shared Google Calendar authentication
 below, then start the server using the Run instructions above. In another terminal,
 create an event (macOS/Linux or Git Bash):
 
@@ -409,34 +291,25 @@ returned. See [DELETE Level 2 verification](docs/DELETE_LEVEL2_VERIFICATION.md).
 ### Code map and request flow
 
 `app/main.py` owns the FastAPI routes.
-Calendar GET calls the `CalendarReader` interface, implemented by
-`GoogleCalendarReader.get_primary_calendar` in `app/google_calendar.py`,
+Calendar GET calls `get_primary_calendar` in `app/google_calendar.py`,
 which loads local OAuth authorization, retrieves Google metadata, and
 returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
-FastAPI supplies the calendar reader through `get_calendar_reader` in
-`app/calendar_dependencies.py`.
 
-Event GET calls the `EventReader` interface, implemented by
-`GoogleEventReader.get_event` in `app/google_events.py`. It requests Google's
-`events.get` on `primary` and translates the result to `Event`.
-FastAPI supplies the reader through `get_event_reader` in `app/event_dependencies.py`.
+Event GET calls `retrieve_event` in `app/google_events.py`, which requests
+Google's `events.get` on `primary` and translates the result to `Event`.
 `app/google_auth.py` loads and refreshes the local token for event retrieval.
 Neither GET operation starts browser authorization during a request.
 
 The synchronous handlers keep blocking SDK work off the async event loop.
-Each request constructs its own authorized client. Both GET operations use
-provider-independent interfaces and receive their readers through FastAPI dependencies.
-Neither adds a cross-request client cache or retry layer.
+Each request constructs its own authorized client. No cross-request client cache,
+provider-independent interface, or retry layer is introduced at this level.
 
 POST validates and normalizes `CreateEventRequest`, then calls
-`EventCreator.create_event`. `GoogleEventCreator` in `app/google_create_events.py`
-uses the existing insertion helper, which loads or
+`create_google_event` in `app/google_create_events.py`. That module loads or
 refreshes local event authorization, calls `events.insert` on `primary`, closes
 the client, and translates the Google response to `Event`. Invalid input is
 rejected before a write. Each creation request uses `num_retries=0`; an uncertain
-result must be investigated before retrying. The adapter translates known
-failures into service errors; the POST handler retains its 503 and 502 responses.
-Authorization helpers remain
+result must be investigated before retrying. Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
 
 PATCH validates and normalizes `UpdateEventRequest`, then calls
@@ -453,6 +326,8 @@ maps that and other failures to the documented responses.
 
 ### Checks and testing
 
+Run the same commands on macOS, Linux, or Windows:
+
 ```sh
 uv sync --frozen
 uv run ruff check .
@@ -463,9 +338,10 @@ git diff --check
 ```
 
 Ruff checks lint and formatting; mypy checks both app and tests in strict mode.
-Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs the same
-uv-based checks on pushes and pull requests using Python 3.14 on Linux. For
-intentional formatting changes, run `uv run ruff format .` and review the diff.
+Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs these
+uv-based lint, formatting, type, and test checks on pushes and pull requests
+using Python 3.14 on Linux. For intentional formatting changes, run
+`uv run ruff format .` and review the diff.
 
 The fast suite runs without Google credentials or external network access.
 It covers HTTP contracts, provider translation, event authentication,
@@ -474,7 +350,7 @@ for mocked Google insertion and retrieval. Data is populated by the fake insert,
 not by the HTTP handler, so POST-to-GET checks exercise both provider paths.
 Offline checks do not establish a live Google write.
 
-Calendar HTTP tests use a controlled `CalendarReader` dependency override.
+Calendar HTTP tests use a controlled metadata lookup.
 `tests/test_google_calendar.py` verifies Google's metadata field translation
 and excludes provider-only fields from the public response.
 
@@ -526,14 +402,13 @@ The authentication script also requests `calendar.calendars.readonly` for
 calendar metadata; add that scope in Data Access as well.
 
 Privately obtain the client JSON and save it as `credentials.json` in the
-repository root. Install the updated pinned requirements, then run:
+repository root. Run `uv sync --frozen`, then authorize on any supported platform:
 
 ```sh
-# Windows Git Bash or PowerShell; no activation required
 uv run python scripts/google_calendar_auth.py
 ```
 
-On macOS/Linux, use `.venv/bin/python` instead. Sign in to the shared test account
+Sign in to the shared test account
 in the browser and approve event access within five minutes. The script stores
 `token.json` locally, refreshes usable expired tokens, and requests authorization
 again if a token is revoked or lacks the agreed scope. Each teammate generates
