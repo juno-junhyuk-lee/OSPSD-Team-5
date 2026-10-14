@@ -1,5 +1,20 @@
 # Verification and integration notes
 
+## POST Level 4 verification
+
+Implementation commit `c54f52e` was verified on October 12, 2026, in Jim's macOS
+environment with Python 3.14.8. All 130 tests and required checks passed. The 15
+controlled creator cases also passed with socket connections and real credential
+loading blocked, and an earlier creator override was restored afterward.
+
+Real HTTP requests through normal FastAPI injection verified POST 201, matching
+GET and independent Google reads, invalid POST 422 without a created event,
+calendar metadata and missing-ID responses, and restart persistence. Only this
+run's event was deleted and confirmed cancelled; the server was stopped.
+See [POST Level 4 verification](POST_LEVEL4_VERIFICATION.md) for wiring,
+substitution, reproduction steps, environment details, and results. Teammate
+review of both paths, matching PR CI, and release verification remain pending.
+
 ## POST Level 3 verification
 
 Implementation commit `8741c90` was verified on October 12, 2026, in Jim's macOS
@@ -12,8 +27,9 @@ metadata GET and missing-event GET also matched their contracts. Only this run's
 event was deleted and confirmed cancelled; the server was stopped.
 
 See [POST Level 3 verification](POST_LEVEL3_VERIFICATION.md) for the boundary,
-reproduction steps, environment details, and recorded results. POST still uses
-fixed Google selection for Level 3; injection is Level 4 work. Teammate review,
+reproduction steps, environment details, and recorded results. This Level 3
+revision used fixed Google selection; current injection is recorded above.
+Teammate review,
 matching PR CI, and release verification remain pending.
 
 ## Event GET Level 4 verification
