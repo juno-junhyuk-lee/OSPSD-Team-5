@@ -330,12 +330,40 @@ It delegates insertion and translation to the existing `create_google_event`
 helper and converts its known setup, SDK, transport, and response-validation
 failures into the two service errors above. The POST handler calls an
 `EventCreator` and handles those errors without inspecting Google SDK exceptions.
-The module-level creator in `app/main.py` still selects Google for Level 3;
-Level 4 will supply the creator externally and test POST with a controlled
-implementation. The shared `load_credentials` helper remains unchanged for
+At implementation commit `8741c90`, Level 3 selected Google in `app/main.py`.
+Current provider injection is described below. The shared `load_credentials`
+helper remains unchanged for
 PATCH and DELETE. [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md)
 records offline checks, real create/read, restart persistence, and cleanup for
 implementation commit `8741c90`. Teammate review and matching PR CI remain pending.
+
+#### Level 4 event creation provider injection
+
+`get_event_creator()` in `app/event_creation_dependencies.py` selects
+`GoogleEventCreator` and returns it as an `EventCreator`. FastAPI supplies it
+to POST through `Depends`; the handler calls the interface without constructing
+or importing the concrete creator. The dependency creates a lightweight,
+stateless creator per request. Authorization and SDK client creation happen
+inside its creation operation, after request validation. The existing input,
+201 response, and 422/503/502 behavior remain in place.
+
+`tests/test_create_event_contract.py` replaces `get_event_creator` through
+`app.dependency_overrides` with a `ControlledEventCreator`. Its own TestClient
+fixture uses no Google SDK mocks, credentials, or network access. The controlled
+implementation records normalized requests and returns predictable Event values
+or raises a configured service error. Tests check the exact 201 response,
+returned IDs, time instants, invalid input without a creator call, and existing
+503/502 responses without retries. Each test gets fresh creator state and restores
+previous dependency overrides in `finally`. Google translation, token, and CRUD
+tests retain their provider fixtures; the controlled creator does not reproduce
+Google or verify a real write.
+Replacing the provider requires another `EventCreator` implementation and a
+change to the factory's selection, while the handler keeps the same contract.
+[POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) records 130 passing
+tests, blocked-network/credential controlled tests, and a real create/read,
+restart, and cleanup workflow through normal injection at `c54f52e`. Teammate
+review of both normal wiring and test substitution and matching PR CI remain
+pending.
 
 ### Create and retrieve an event
 
@@ -456,6 +484,7 @@ Neither adds a cross-request client cache or retry layer.
 
 POST validates and normalizes `CreateEventRequest`, then calls
 `EventCreator.create_event`. `GoogleEventCreator` in `app/google_create_events.py`
+is supplied through `get_event_creator` in `app/event_creation_dependencies.py` and
 uses the existing insertion helper, which loads or
 refreshes local event authorization, calls `events.insert` on `primary`, closes
 the client, and translates the Google response to `Event`. Invalid input is

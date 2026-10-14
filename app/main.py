@@ -9,6 +9,7 @@ from requests.exceptions import RequestException
 
 from app.calendar_dependencies import get_calendar_reader
 from app.calendar_provider import CalendarReader
+from app.event_creation_dependencies import get_event_creator
 from app.event_creation_provider import (
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
@@ -22,15 +23,12 @@ from app.event_provider import (
     EventReader,
     UnsupportedEventError,
 )
-from app.google_create_events import GoogleCalendarSetupError, GoogleEventCreator
+from app.google_create_events import GoogleCalendarSetupError
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.google_update_events import update_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
-
-# POST retains fixed provider selection until Level 4 introduces injection.
-event_creator: EventCreator = GoogleEventCreator()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -78,10 +76,13 @@ def get_event(
 
 
 @app.post("/events", response_model=Event, status_code=201)
-def create_event(request: CreateEventRequest) -> Event:
+def create_event(
+    request: CreateEventRequest,
+    creator: Annotated[EventCreator, Depends(get_event_creator)],
+) -> Event:
     """Create a timed Google event and return its provider-assigned ID."""
     try:
-        event = event_creator.create_event(request)
+        event = creator.create_event(request)
     except EventCreationUnavailableError:
         raise HTTPException(
             status_code=503,

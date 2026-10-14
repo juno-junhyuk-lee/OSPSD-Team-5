@@ -16,7 +16,8 @@
 - `app/google_create_events.py`: `GoogleEventCreator`, shared authorization,
   creation, response translation, and creation error translation.
 - `app/event_creation_provider.py`: `EventCreator` contract and creation service errors;
-  POST calls this boundary with fixed Google selection until Level 4.
+  POST receives this interface through FastAPI injection.
+- `app/event_creation_dependencies.py`: selects the creator supplied to POST.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
 - `app/google_update_events.py`: PATCH provider call; reuses POST's token loading.
@@ -31,6 +32,8 @@
 - `app/models.py`: Event response model and creation/update input validation.
 - `tests/test_events.py`: controlled reader HTTP contract tests and dependency overrides.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
+- `tests/test_create_event_contract.py`: controlled creator HTTP tests with
+  isolated dependency overrides and cleanup, separate from Google SDK fixtures.
 - `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
@@ -58,8 +61,11 @@ POST calls the typed `EventCreator` boundary in `app/event_creation_provider.py`
 Google calls, translation, and known failure handling stay in `GoogleEventCreator`.
 The POST handler maps service errors to the existing 503 and 502 responses.
 Preserve the shared `load_credentials` helper used by PATCH and DELETE while
-refactoring creation. Google selection remains fixed in `app/main.py` for Level 3;
-external injection and controlled creator tests belong to Level 4.
+refactoring creation. `app/event_creation_dependencies.py` selects Google and
+supplies the creator through `Depends`; POST does not construct the concrete
+provider. Controlled creator HTTP tests override that dependency, use fresh
+creator state, and restore prior overrides in `finally`. Keep Google provider
+and CRUD fixtures separate from these interface-based tests.
 GET reads the provider directly; no local event mirror is used. Never fall back
 to local creation or automatically retry uncertain writes. The provider fake
 stores insert results for GET only in fast tests; do not claim it verifies a
@@ -67,6 +73,8 @@ real create/read workflow. Keep both OAuth scopes in the shared setup script.
 See [POST verification](docs/POST_LEVEL2_VERIFICATION.md) for real-run evidence.
 See [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md) for the provider
 boundary, refactor checks, and teammate reproduction steps.
+See [POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) for normal wiring,
+controlled substitution, and real verification through dependency injection.
 Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
 are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 
