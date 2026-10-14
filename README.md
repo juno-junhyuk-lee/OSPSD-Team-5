@@ -530,7 +530,7 @@ repository root. Install the updated pinned requirements, then run:
 
 ```sh
 # Windows Git Bash or PowerShell; no activation required
-./.venv/Scripts/python.exe scripts/google_calendar_auth.py
+uv run python scripts/google_calendar_auth.py
 ```
 
 On macOS/Linux, use `.venv/bin/python` instead. Sign in to the shared test account
@@ -543,7 +543,7 @@ The verification request lists up to ten events from `primary` without changing
 state. Copy a returned API event ID to verify that specific event:
 
 ```sh
-./.venv/Scripts/python.exe scripts/google_calendar_auth.py --event-id EVENT_ID
+uv run python scripts/google_calendar_auth.py --event-id EVENT_ID
 ```
 
 A successful API request with no returned events still verifies authentication;
