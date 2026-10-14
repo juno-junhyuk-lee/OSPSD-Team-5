@@ -4,7 +4,6 @@ from fastapi import Depends, FastAPI, HTTPException, Response
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
-from pydantic import ValidationError
 from requests.exceptions import RequestException
 
 from app.calendar_dependencies import get_calendar_reader
@@ -23,12 +22,21 @@ from app.event_provider import (
     EventReader,
     UnsupportedEventError,
 )
+from app.event_update_provider import (
+    EventUpdateNotFoundError,
+    EventUpdater,
+    EventUpdateUnavailableError,
+    EventUpdateUnconfirmedError,
+)
 from app.google_create_events import GoogleCalendarSetupError
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
-from app.google_update_events import update_google_event
+from app.google_update_events import GoogleEventUpdater
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
+
+# PATCH retains fixed provider selection until Level 4 introduces injection.
+event_updater: EventUpdater = GoogleEventUpdater()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -106,10 +114,10 @@ def create_event(
 def update_event(event_id: str, request: UpdateEventRequest) -> Event:
     """Update a timed Google event and return the refreshed Event fields."""
     try:
-        return update_google_event(event_id, request)
-    except GoogleEventNotFoundError:
+        return event_updater.update_event(event_id, request)
+    except EventUpdateNotFoundError:
         raise HTTPException(status_code=404, detail="Event not found") from None
-    except GoogleCalendarSetupError:
+    except EventUpdateUnavailableError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -117,14 +125,7 @@ def update_event(event_id: str, request: UpdateEventRequest) -> Event:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except (
-        HttpError,
-        TransportError,
-        HttpLib2Error,
-        RequestException,
-        OSError,
-        ValidationError,
-    ):
+    except EventUpdateUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(

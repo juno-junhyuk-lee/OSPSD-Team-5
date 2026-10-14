@@ -16,9 +16,21 @@ individual operation ownership.
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
 | Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 implemented on `feature/calendar-patch-events`; real Google run recorded in `docs/PATCH_LEVEL2_VERIFICATION.md`; PR review and second verifier pending | TBD |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 merged; Level 3 `EventUpdater` boundary on `feature/calendar-patch-level3-interface`; see `docs/PATCH_LEVEL3_VERIFICATION.md` | Level 3 reviewer: Kristie (approved; conflicts resolved) |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
+
+## Niriti Pahadi's event PATCH Level 3 work
+
+Branch: `feature/calendar-patch-level3-interface`. Niriti owns the event update
+interface and Google implementation. The changes:
+
+1. Define `EventUpdater` and update service errors in `event_update_provider.py`.
+2. Implement `GoogleEventUpdater` and route PATCH through the interface.
+3. Add offline provider translation tests and document the boundary.
+
+Injection remains Level 4 work. The public PATCH contract is unchanged.
+
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
 
