@@ -43,4 +43,10 @@ Closes #
 
 ## Notes for reviewers
 
+Student owner:
+
+AI assistance (if used):
+
+Remaining work / next owner:
+
 <!-- Open questions, tradeoffs you made, follow-up work, or anything you're unsure about. -->
