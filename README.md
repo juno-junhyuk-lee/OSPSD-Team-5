@@ -126,8 +126,9 @@ failure. The event GET route calls the typed `EventReader` boundary and maps
 service errors to the existing 404, 422, 503, and 502 responses.
 
 The Level 3 boundary was merged in PR #17. Codex assisted with implementation,
-tests, and documentation. POST and PATCH use provider-independent interfaces with
-fixed Google selection until Level 4; DELETE retains its existing implementation.
+tests, and documentation. POST uses a provider-independent interface with fixed
+Google selection until Level 4; PATCH injects `EventUpdater` through FastAPI;
+DELETE retains its existing implementation.
 
 #### Level 4 event provider injection
 
@@ -456,7 +457,8 @@ provider response types. `GoogleEventUpdater` in `app/google_update_events.py`
 keeps `events.get`/`events.patch`, cancelled-status checks, and Google field
 mapping behind that contract. The PATCH handler calls an `EventUpdater` and maps
 service errors to the existing 404, 503, and 502 responses. Fixed Google
-selection remains in `app/main.py` until Level 4 injection.
+selection is supplied by FastAPI through `get_event_updater` in
+`app/event_update_dependencies.py` (Level 4).
 
 | Service error | HTTP mapping |
 | --- | --- |
@@ -464,7 +466,8 @@ selection remains in `app/main.py` until Level 4 injection.
 | `EventUpdateUnavailableError` | `503` authorization unavailable |
 | `EventUpdateUnconfirmedError` | `502` update could not be confirmed |
 
-See [PATCH Level 3 verification](docs/PATCH_LEVEL3_VERIFICATION.md).
+See [PATCH Level 3 verification](docs/PATCH_LEVEL3_VERIFICATION.md) and
+[PATCH Level 4 verification](docs/PATCH_LEVEL4_VERIFICATION.md).
 
 ### Event deletion contract
 
@@ -520,12 +523,15 @@ Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
 
 PATCH validates and normalizes `UpdateEventRequest`, then calls
-`EventUpdater.update_event`. `GoogleEventUpdater` in `app/google_update_events.py`
-reuses POST's `load_credentials`, checks cancelled status with `events.get`,
-calls `events.patch` on `primary` once without retries, and translates the
-response to `Event`. The adapter maps missing/cancelled events and other
-failures into service errors; the PATCH handler retains its 404, 503, and 502
-responses. External injection remains Level 4 work.
+`EventUpdater.update_event`. FastAPI supplies the updater through
+`get_event_updater` in `app/event_update_dependencies.py`.
+`GoogleEventUpdater` in `app/google_update_events.py` reuses POST's
+`load_credentials`, checks cancelled status with `events.get`, calls
+`events.patch` on `primary` once without retries, and translates the response
+to `Event`. The adapter maps missing/cancelled events and other failures into
+service errors; the PATCH handler retains its 404, 503, and 502 responses.
+Controlled updater tests override the dependency without constructing Google
+clients.
 
 DELETE calls `delete_google_event` in `app/google_delete_events.py`, which
 reuses POST's `load_credentials` and calls `events.delete` on `primary` once,
