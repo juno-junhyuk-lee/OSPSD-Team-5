@@ -5,22 +5,31 @@
 - `GET /calendars/{calendar_id}`: Google-backed primary calendar metadata operation.
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
+- `app/calendar_provider.py`: typed calendar metadata interface; Google SDK details
+  stay in `GoogleCalendarReader` in `app/google_calendar.py`.
+- `app/calendar_dependencies.py`: selects the calendar reader; calendar HTTP tests
+  substitute it through FastAPI dependency overrides.
 
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
-- `app/google_create_events.py`: POST authorization, creation, and response translation.
+- `app/google_create_events.py`: `GoogleEventCreator`, shared authorization,
+  creation, response translation, and creation error translation.
+- `app/event_creation_provider.py`: `EventCreator` contract and creation service errors;
+  POST calls this boundary with fixed Google selection until Level 4.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
 - `app/google_update_events.py`: PATCH provider call; reuses POST's token loading.
 - `tests/test_update_events.py`: offline update contract and provider-failure tests.
 - `app/google_delete_events.py`: DELETE provider call; reuses POST's token loading.
 - `tests/test_delete_events.py`: offline deletion contract and provider-failure tests.
-- `app/google_events.py`: Google event retrieval, translation, and service errors.
+- `app/event_provider.py`: `EventReader` contract and event retrieval service errors.
+- `app/event_dependencies.py`: selects the event reader for FastAPI injection.
+- `app/google_events.py`: `GoogleEventReader` implementation and Google field translation.
 - `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
 - `tests/test_google_auth.py`: isolated token lifecycle tests.
 - `app/models.py`: Event response model and creation/update input validation.
-- `tests/test_events.py`: offline HTTP success and missing-ID contract tests.
+- `tests/test_events.py`: controlled reader HTTP contract tests and dependency overrides.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
 - `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
@@ -38,12 +47,26 @@ Fast tests must run without internet or Google credentials.
 Kristie owns event GET. It uses the shared account's primary Google Calendar;
 run scripts/google_calendar_auth.py before serving requests. Never start browser
 authorization in a route. Preserve the four-field Event response and existing 404.
+Event GET calls the typed `EventReader` boundary; SDK calls and translation
+stay inside `GoogleEventReader`. Service errors come from `app/event_provider.py`.
+Event GET receives its reader through `app/event_dependencies.py`. Contract tests
+use dependency overrides and restore prior overrides after each test. Keep Google
+provider and CRUD fixtures separate from these controlled reader tests.
+Calendar GET already receives its reader through `app/calendar_dependencies.py`.
 Jim's POST writes to the same primary calendar and returns Google's event ID.
+POST calls the typed `EventCreator` boundary in `app/event_creation_provider.py`.
+Google calls, translation, and known failure handling stay in `GoogleEventCreator`.
+The POST handler maps service errors to the existing 503 and 502 responses.
+Preserve the shared `load_credentials` helper used by PATCH and DELETE while
+refactoring creation. Google selection remains fixed in `app/main.py` for Level 3;
+external injection and controlled creator tests belong to Level 4.
 GET reads the provider directly; no local event mirror is used. Never fall back
 to local creation or automatically retry uncertain writes. The provider fake
 stores insert results for GET only in fast tests; do not claim it verifies a
 real create/read workflow. Keep both OAuth scopes in the shared setup script.
 See [POST verification](docs/POST_LEVEL2_VERIFICATION.md) for real-run evidence.
+See [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md) for the provider
+boundary, refactor checks, and teammate reproduction steps.
 Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
 are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 

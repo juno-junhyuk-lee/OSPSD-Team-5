@@ -1,61 +1,142 @@
 # Verification and integration notes
 
-See [README](../README.md) for current setup, authentication, commands and API contracts.
-This document preserves test strategy, verification evidence and earlier Level 1
-walkthroughs. Historical local create/read examples do not describe this branch's
-Google-backed GET behavior.
+## POST Level 3 verification
 
-Testing strategy: the GET and POST suites exercise the HTTP boundary through
-TestClient without a server, network access, or Google credentials.
-[tests/conftest.py](../tests/conftest.py) replaces the Google client with controlled
-provider responses and isolates fake event data for each test. The fake insert
-stores events that the fake GET retrieves; no application memory bridge is used.
-Offline checks do not prove real Google writes. Expected values are independent
-of application data. Current real POST evidence is in
-[POST Level 2 verification](POST_LEVEL2_VERIFICATION.md).
+Implementation commit `8741c90` was verified on October 12, 2026, in Jim's macOS
+environment with Python 3.14.8. All 115 offline tests and required checks passed;
+the tests also passed with external socket connections blocked. Real HTTP POST
+returned 201, HTTP GET returned matching JSON, and an independent Google read
+matched all public fields. Invalid input returned 422 without creating an event.
+The valid event persisted after stopping and restarting the server. Calendar
+metadata GET and missing-event GET also matched their contracts. Only this run's
+event was deleted and confirmed cancelled; the server was stopped.
 
-- [Calendar GET tests](../tests/test_calendars.py): primary returns 200 with exact
-  metadata JSON; unknown IDs return the documented calendar 404.
-- [Event GET tests](../tests/test_events.py): known ID returns 200 with exact JSON;
-  unknown ID returns the documented 404.
-- [POST tests](../tests/test_create_events.py): creation returns 201 with the four
-  response fields, a generated ID, a trimmed title, and the correct instants.
-  GET retrieves the same event; repeated creation produces distinct IDs.
-- Invalid creation: missing fields, blank or invalid titles, malformed or
-  timezone-free times, numeric timestamps, and equal/reversed time ranges
-  return 422 with a `detail` array without a provider write.
-- Time boundaries: ordering is checked across different UTC offsets, including
-  a valid end time whose displayed local hour is earlier than the start hour.
+See [POST Level 3 verification](POST_LEVEL3_VERIFICATION.md) for the boundary,
+reproduction steps, environment details, and recorded results. POST still uses
+fixed Google selection for Level 3; injection is Level 4 work. Teammate review,
+matching PR CI, and release verification remain pending.
 
-On October 4, 2026, the POST implementation was verified on macOS with Python
-3.14.8: all 22 tests, Ruff lint/format checks, strict mypy, dependency compatibility
-(`uv pip check`), and `git diff --check` passed. TestClient emits an existing
-Starlette deprecation warning with the pinned HTTPX dependency.
+## Event GET Level 4 verification
 
-A single-worker Uvicorn server on `127.0.0.1:8765` was also checked with curl:
-POST returned 201 with a trimmed title, GET returned the same event with 200,
-an equal-time request returned 422, and the predefined event remained unchanged.
-The server was stopped after verification.
+On October 11, 2026, implementation revision `c6ca9c6` was verified on Windows
+with Python 3.14.8: 107 tests, Ruff lint/format, strict mypy, dependency compatibility,
+and diff checks passed. The existing Starlette TestClient warning remains.
 
-Defect-detection evidence: temporarily changing the in-memory title to
-`Incorrect Event` made `test_get_known_event` fail at its JSON assertion:
+All five `tests/test_events.py` cases passed in a separate run that blocked
+external socket `connect`/`connect_ex` calls and made real credential loading fail.
+Loopback was allowed for Windows event-loop internals. The module uses a controlled
+`EventReader` dependency override, checks exact 200/404/422/503/502 responses and
+request ID forwarding, and restores prior overrides in `finally`. Google provider
+and CRUD tests retain their existing SDK fixtures. Offline results do not prove
+real Google integration.
 
-```text
-{'title': 'Incorrect Event'} != {'title': 'Example Event'}
-```
+Separate TestClient requests with no overrides used normal dependency wiring and
+the local token. The existing event `/events/lf797iogm23bfjn97ogpfocl80` returned
+200 with exactly four string fields, the requested ID, and valid `Event` data.
+`/events/00000000000000000000000000` returned 404 with
+`{"detail": "Event not found"}`. No events changed; metadata and credentials were
+omitted from output. This verifies local implementation, not a release tag,
+server/curl demonstration, or another teammate's execution.
 
-The original title was restored without modifying source files, and both tests
-passed again. Include this evidence in the implementation PR.
+Teammate reviewers should use the GET reproduction steps below with the Level 4
+PR revision and inspect `get_event_reader`, the route's `Depends`, and controlled
+reader substitution/cleanup. Matching PR CI and a teammate review of both paths
+remain required. Codex assisted with implementation and verification.
 
-For POST, temporarily discarding writes to the local event mapping made
-`test_create_and_retrieve_event` fail: POST returned 201, but the following GET
-returned 404 instead of 200. Restoring the mapping made the test pass. The
-experiment changed only in-memory behavior; source files were not modified.
+## PR 17 merge integration verification
 
-The preceding Level 1 checks establish local behavior, not Google integration, authentication,
-all-day support, multi-worker sharing, or durability. At that revision, teammate verification from
-another checkout, POST review, and CI remained pending. The
-PowerShell walkthrough has not been executed locally.
+On October 11, 2026, the working merge of event GET Level 3 revision `6d82a42`
+and main revision `958c44d` was verified on Windows with Python 3.14.8.
+Calendar GET retains FastAPI dependency injection and controlled reader tests;
+event GET retains the `EventReader` boundary and `GoogleEventReader` implementation.
+Both operations' documentation and earlier verification evidence are preserved.
+
+Ruff lint/format, strict mypy, all 104 tests, and `git diff --check` passed.
+No conflict markers remain in application code, tests, or documentation.
+The existing Starlette TestClient deprecation warning remains. These checks
+verify the local merge working tree; real Google requests were not rerun for
+this merge. Updated PR CI and reviewer confirmation remain required after push.
+
+## Event GET Level 3 verification
+
+On October 11, 2026, implementation revision `ce55c7a` on
+`feature/calendar-event-get-level3-interface` was verified on Windows with
+Python 3.14.8. Ruff lint and formatting, strict mypy, all 104 tests, and
+`git diff --check` passed; `python -m pip check` reported no broken requirements.
+The existing Starlette TestClient deprecation warning remains.
+
+The additional `test_event_reader_translates_requested_event` test uses a
+`GoogleEventReader` through the typed `EventReader` interface. It checks the
+four-field domain result, the requested ID and primary calendar passed to
+Google, and client closure. Existing HTTP tests retain success, missing-event,
+authentication, all-day, malformed-data, transport-failure, and cleanup coverage.
+These controlled tests do not establish real Google integration.
+
+A separate FastAPI TestClient run used the real implementation and local token,
+without pytest fixtures or SDK replacements:
+
+- `GET /events/lf797iogm23bfjn97ogpfocl80` returned 200. Assertions confirmed
+  exactly `id`, `title`, `start_time`, and `end_time`, all strings, the requested
+  ID, and successful `Event` model validation.
+- `GET /events/00000000000000000000000000` returned 404 with exactly
+  `{"detail": "Event not found"}`.
+
+Event metadata and credentials were omitted from output. No events were created,
+updated, or deleted. This verifies the implementation commit locally, not a
+release tag, server/curl demonstration, or another teammate's execution.
+Matching PR CI and teammate review of the boundary remain pending.
+
+For teammate reproduction, use the existing GET Level 2 walkthrough below with
+the Level 3 branch or PR commit. Confirm the current event metadata independently
+and record the tested revision, environment, commands, and results in the review.
+At this Level 3 revision, event GET selected Google in `app/main.py`.
+Current event GET injection is documented in the Level 4 evidence above.
+
+## Calendar GET Level 4 verification
+
+October 11, 2026, macOS/Python 3.14.2, working changes on
+`feature/calendar-level4-injection`: all 103 tests, dependency checks, Ruff,
+strict mypy, and diff checks passed. The five calendar HTTP tests also passed
+with networking blocked, using a controlled reader and dependency overrides.
+
+Real Google GET through normal injection returned 200 with the three expected
+fields; an unsupported ID returned 404. No calendar data changed. PR CI and
+teammate review remain pending. The existing TestClient warning remains.
+
+## Calendar GET Level 3 verification
+
+October 9, 2026, macOS/Python 3.14.2: all 103 tests and required checks passed
+on the uncommitted Level 3 refactor. Real Google GET returned 200 with exactly
+`id`, `title`, and `time_zone`, with ID `primary`. No calendar data changed.
+Level 3 was subsequently merged in PR #15; see that PR for review evidence.
+
+## Test coverage
+
+See [README](../README.md) for setup and commands. Fast tests use isolated data
+and controlled providers without credentials or network access. Calendar HTTP
+tests override `CalendarReader`; event tests use the SDK fake in
+[conftest.py](../tests/conftest.py). Offline tests do not prove real Google writes;
+see [POST verification](POST_LEVEL2_VERIFICATION.md) for provider evidence.
+
+- GET: exact responses and missing-ID 404s.
+- POST: 201, trimmed titles, generated IDs, create/read, and distinct repeated IDs.
+- Validation: invalid titles/times and equal or reversed ranges return 422 without
+  writes; ordering accounts for UTC offsets.
+
+## Level 1 verification history
+
+October 4, 2026, macOS/Python 3.14.8: all 22 tests and required checks passed.
+Local curl verified POST 201, GET 200, invalid input 422, and unchanged predefined
+data. The server was stopped afterward.
+
+Defect checks caught a wrong GET title (`Incorrect Event` instead of
+`Example Event`) and discarded POST writes (GET returned 404 instead of 200).
+Restoring the in-memory behavior made the tests pass again; source files were
+unchanged.
+
+This evidence covers the earlier local implementation. At that revision,
+teammate verification, POST review, and CI were pending; the PowerShell
+walkthrough was unverified.
 
 ### GET Level 2 tests and verification
 

@@ -4,7 +4,8 @@ from unittest.mock import Mock
 import pytest
 from google.auth.exceptions import RefreshError
 
-from app.google_auth import SCOPES, CalendarAuthenticationError, load_credentials
+from app.event_provider import CalendarAuthenticationError
+from app.google_auth import SCOPES, load_credentials
 
 
 @pytest.mark.parametrize("contents", [None, "not-json", "{}"])
