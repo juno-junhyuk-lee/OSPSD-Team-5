@@ -21,6 +21,7 @@ from app.event_provider import (
     EventReader,
     UnsupportedEventError,
 )
+from app.event_update_dependencies import get_event_updater
 from app.event_update_provider import (
     EventUpdateNotFoundError,
     EventUpdater,
@@ -29,14 +30,12 @@ from app.event_update_provider import (
 )
 from app.google_create_events import GoogleCalendarSetupError, GoogleEventCreator
 from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
-from app.google_update_events import GoogleEventUpdater
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
 
-# POST and PATCH retain fixed provider selection until Level 4 introduces injection.
+# POST retains fixed provider selection until Level 4 introduces injection.
 event_creator: EventCreator = GoogleEventCreator()
-event_updater: EventUpdater = GoogleEventUpdater()
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -108,10 +107,14 @@ def create_event(request: CreateEventRequest) -> Event:
 
 
 @app.patch("/events/{event_id}", response_model=Event)
-def update_event(event_id: str, request: UpdateEventRequest) -> Event:
+def update_event(
+    event_id: str,
+    request: UpdateEventRequest,
+    updater: Annotated[EventUpdater, Depends(get_event_updater)],
+) -> Event:
     """Update a timed Google event and return the refreshed Event fields."""
     try:
-        return event_updater.update_event(event_id, request)
+        return updater.update_event(event_id, request)
     except EventUpdateNotFoundError:
         raise HTTPException(status_code=404, detail="Event not found") from None
     except EventUpdateUnavailableError:

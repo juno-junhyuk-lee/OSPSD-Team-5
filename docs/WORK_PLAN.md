@@ -16,7 +16,7 @@ individual operation ownership.
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
 | Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 merged; Level 3 `EventUpdater` boundary on `feature/calendar-patch-level3-interface`; see `docs/PATCH_LEVEL3_VERIFICATION.md` | Level 3 reviewer to be agreed |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 merged; Level 3 on `feature/calendar-patch-level3-interface`; Level 4 injection on `feature/calendar-patch-level4-injection` | Level 3/4 reviewer to be agreed |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 
@@ -29,7 +29,16 @@ interface and Google implementation. The changes:
 2. Implement `GoogleEventUpdater` and route PATCH through the interface.
 3. Add offline provider translation tests and document the boundary.
 
-Injection remains Level 4 work. The public PATCH contract is unchanged.
+## Niriti Pahadi's event PATCH Level 4 work
+
+Branch: `feature/calendar-patch-level4-injection` (stacked on Level 3). Niriti
+owns dependency injection for event PATCH:
+
+1. Select Google in `event_update_dependencies.py` and inject `EventUpdater`.
+2. Test the HTTP contract with a controlled updater and dependency overrides.
+3. Document wiring and verification evidence.
+
+The public PATCH contract is unchanged.
 
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
