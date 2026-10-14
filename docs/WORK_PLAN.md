@@ -15,8 +15,8 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
-| Jim Lo | `POST /events` | Levels 1–2 merged in PRs #5 and #10; Level 3 implementation and real verification complete at `8741c90`, teammate review and PR CI pending | Level 3 reviewer to be agreed; Level 2 reviewed by Juno and Ka Pui |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 merged; Level 3 on `feature/calendar-patch-level3-interface`; Level 4 injection on `feature/calendar-patch-level4-injection` | Level 3/4 reviewer to be agreed |
+| Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 
@@ -264,9 +264,52 @@ POST handler. Preserve the shared `load_credentials` behavior used by PATCH and
 DELETE. Keep creation retries disabled and keep real verification separate from
 offline tests. Completion also requires teammate review of the provider boundary.
 
-After Level 3, Level 4 will inject `EventCreator` through a dependency factory
-and add controlled implementation tests. Provider selection and test substitution
-are separate from this Level 3 refactor.
+The Level 3 results above describe fixed Google selection at `8741c90`.
+Current injection work is recorded below.
+
+## Jim Lo's POST Level 4 work
+
+Branch: `feature/calendar-post-level4-injection`, based on the Level 3 branch
+at `b1eb94e`. Keep this work separate from the pending Level 3 PR.
+
+The changes are split into three reviewable commits:
+
+1. Select Google in `event_creation_dependencies.py` and inject `EventCreator`
+   into POST while preserving its public contract and existing tests.
+2. Test POST with a controlled creator, isolated dependency overrides, and
+   cleanup, without real credentials or network access.
+3. Record required checks, blocked-network controlled tests, and real Google
+   verification through normal injection, including test-event cleanup.
+
+The first change removes the module-level creator from `app/main.py`. The
+factory supplies a lightweight `GoogleEventCreator` through FastAPI `Depends`.
+The handler uses `EventCreator` and retains its existing service-error mapping.
+Google provider and CRUD tests still use their original fixtures. The second
+change adds `tests/test_create_event_contract.py` with a controlled creator and
+a separate TestClient fixture. It records normalized requests, returns
+predictable events, or raises configured service errors. Tests cover exact
+responses, returned IDs, UTC-offset ordering, validation before a creator call,
+and no retry after failure. Each test restores previous dependency overrides in
+`finally`. The third change records normal wiring verification and reproduction
+steps. Teammate review and PR CI remain pending. Codex assisted with the wiring,
+tests, documentation, and verification.
+
+Wiring commit `6e2bb8a` passed all 115 existing tests, Ruff lint/format,
+strict mypy, and diff checks on Python 3.14.8. These checks preserve the existing
+provider-backed test coverage. The second change adds independent controlled
+creator substitution rather than replacing those Google integration tests.
+
+Implementation commit `c54f52e` passed 130 tests and required local checks on
+Python 3.14.8. Its 15 controlled creator cases also passed with socket connections
+and real credential loading blocked. A pre-existing creator override was restored
+after the run, confirming that the fixture preserves earlier override state.
+These controlled results verify substitution and HTTP behavior. Separate real
+Google verification at the same commit passed: injected POST 201, matching
+HTTP GET and independent Google reads, invalid input without a created event,
+restart persistence, other GET checks, and cleanup. See
+[POST Level 4 verification](POST_LEVEL4_VERIFICATION.md). Another teammate must
+review both normal wiring and test substitution; matching PR CI and release
+verification remain required.
 
 ## Provider integration requirements
 
