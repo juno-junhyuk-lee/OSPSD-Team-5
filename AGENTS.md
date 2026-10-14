@@ -26,12 +26,18 @@
 - `app/google_update_events.py`: `GoogleEventUpdater`, shared authorization,
   patch/get, response translation, and update error translation.
 - `tests/test_update_events.py`: offline update contract and provider-failure tests.
+- `app/event_deletion_provider.py`: `EventDeleter` contract and deletion service errors.
+- `app/google_delete_events.py`: `GoogleEventDeleter`; DELETE provider call and
+  error translation; reuses POST's token loading.
+- `tests/test_google_delete_events.py`: offline DELETE provider translation tests.
 - `tests/test_google_update_events.py`: offline PATCH provider translation tests.
 - `tests/test_update_event_contract.py`: controlled updater HTTP contract tests.
-- `app/google_delete_events.py`: DELETE provider call; reuses POST's token loading.
 - `tests/test_delete_events.py`: offline deletion contract and provider-failure tests.
+- `tests/test_delete_event_contract.py`: controlled deleter HTTP contract tests and
+  dependency overrides.
 - `app/event_provider.py`: `EventReader` contract and event retrieval service errors.
 - `app/event_dependencies.py`: selects the event reader for FastAPI injection.
+- `app/event_deletion_dependencies.py`: selects the event deleter for FastAPI injection.
 - `app/google_events.py`: `GoogleEventReader` implementation and Google field translation.
 - `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
 - `tests/test_google_auth.py`: isolated token lifecycle tests.

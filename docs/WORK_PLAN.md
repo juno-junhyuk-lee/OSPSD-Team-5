@@ -14,7 +14,7 @@ individual operation ownership.
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
-| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 in PR #11, stacked on PR #10; real Google run recorded in `docs/DELETE_LEVEL2_VERIFICATION.md`; second verifier and review pending | Requested in PR #11 |
+| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
 
@@ -310,6 +310,33 @@ restart persistence, other GET checks, and cleanup. See
 [POST Level 4 verification](POST_LEVEL4_VERIFICATION.md). Another teammate must
 review both normal wiring and test substitution; matching PR CI and release
 verification remain required.
+
+## Ka Pui Cheung's DELETE Level 3 work
+
+Ka Pui owns `EventDeleter` and its Google implementation, following the
+`EventCreator` style. The work is split into two reviewable changes:
+
+1. Define `EventDeleter`, wrap the existing Google call in `GoogleEventDeleter`,
+   route DELETE through it, and add provider translation tests (`89fb596`).
+2. Document the contract, code map, and verification evidence.
+
+Public responses stay 204, 404, 503, and 502. Google selection stays fixed in
+`app/main.py` for Level 3. Offline checks passed; see
+[DELETE Level 3 verification](DELETE_LEVEL3_VERIFICATION.md). A real Google run,
+teammate review of the boundary, and matching PR CI remain required.
+
+## Ka Pui Cheung's DELETE Level 4 work
+
+Ka Pui owns dependency injection for DELETE, following event GET's Level 4 work:
+
+1. Select Google in `get_event_deleter`, inject `EventDeleter` into the route,
+   and test the HTTP contract with a controlled deleter (`8057588`).
+2. Document wiring, test boundaries, and verification.
+
+The controlled tests passed with socket connections and credential loading
+blocked. A real Google DELETE run through normal injection, another teammate's
+review of production wiring and test substitution, and matching PR CI remain
+required. See [DELETE Level 4 verification](DELETE_LEVEL4_VERIFICATION.md).
 
 ## Provider integration requirements
 

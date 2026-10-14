@@ -488,6 +488,64 @@ safe: if the first attempt succeeded, the retry returns `404`. Deletion uses
 `sendUpdates="none"`, so attendees are not emailed. Raw Google errors are never
 returned. See [DELETE Level 2 verification](docs/DELETE_LEVEL2_VERIFICATION.md).
 
+#### Level 3 event deletion provider boundary
+
+`EventDeleter` in `app/event_deletion_provider.py` defines the provider-independent
+deletion contract. Ka Pui Cheung owns this boundary for DELETE through Levels 1–5.
+
+| Operation | Input | Return value | External state |
+| --- | --- | --- | --- |
+| `delete_event(event_id)` | A provider-assigned event ID string, as returned by POST | Nothing | Deletes that one event from the configured calendar without notifying attendees |
+
+The interface uses only a string ID and exposes no SDK requests, credentials,
+or provider responses. Callers may assume that a normal return means the event
+is deleted and that no other event changed. They should not assume a particular
+ID format. The provider implementation is responsible for authorization, the
+provider call, and translating provider outcomes into the service errors below.
+
+- `EventDeletionNotFoundError`: no event has the ID, including one that was
+  already deleted; the route keeps the existing 404. A repeated delete reports
+  the event as missing.
+- `EventDeletionUnavailableError`: local authorization is unusable before any
+  provider call; the route keeps the existing 503.
+- `EventDeletionUnconfirmedError`: the provider call failed or its result was
+  lost; the route keeps the existing 502. The event may already be deleted, so
+  the implementation does not retry; a caller's retry is safe and returns 404
+  if the first attempt succeeded.
+
+`GoogleEventDeleter` in `app/google_delete_events.py` implements the interface.
+It delegates to the existing `delete_google_event` helper, which keeps
+`events.delete`, the `primary` calendar, `sendUpdates="none"`, and Google's
+404/410 handling, and converts known setup, SDK, and transport failures into
+the service errors above. The DELETE handler calls an `EventDeleter` and no
+longer inspects Google SDK exceptions. `GoogleEventNotFoundError` stays in the
+same module because PATCH still uses it. `tests/test_google_delete_events.py`
+checks the translation; `tests/test_delete_events.py` keeps the HTTP contract
+tests. See [DELETE Level 3 verification](docs/DELETE_LEVEL3_VERIFICATION.md).
+
+#### Level 4 event deletion provider injection
+
+`get_event_deleter()` in `app/event_deletion_dependencies.py` is the only place that
+selects `GoogleEventDeleter`; it returns it as an `EventDeleter`. FastAPI
+supplies it to the DELETE route through `Depends`, so the route neither
+constructs nor imports the concrete deleter. The dependency creates a
+lightweight deleter per request; authorization and SDK client creation happen
+during deletion. The real deleter needs the local `token.json` from the shared
+setup script. Existing responses are unchanged.
+
+`tests/test_delete_event_contract.py` overrides that dependency with a
+`ControlledEventDeleter` that holds a set of IDs. It checks 204 with an empty
+body, a repeated delete returning 404, an unknown ID, and the 503/502 responses,
+plus that normal requests select Google. Each test gets fresh deleter state and
+restores previous dependency overrides in `finally`. These tests use their own
+TestClient fixture without the shared Google SDK mocks and need no network
+access or credentials. `tests/test_delete_events.py` and
+`tests/test_google_delete_events.py` keep covering the Google implementation.
+
+Replacing the provider requires an `EventDeleter` implementation and a change to
+`get_event_deleter`; the route keeps the same contract. See
+[DELETE Level 4 verification](docs/DELETE_LEVEL4_VERIFICATION.md).
+
 ### Code map and request flow
 
 `app/main.py` owns the FastAPI routes.
@@ -533,10 +591,12 @@ service errors; the PATCH handler retains its 404, 503, and 502 responses.
 Controlled updater tests override the dependency without constructing Google
 clients.
 
-DELETE calls `delete_google_event` in `app/google_delete_events.py`, which
-reuses POST's `load_credentials` and calls `events.delete` on `primary` once,
-without retries. Google 404/410 raise `GoogleEventNotFoundError`; the handler
-maps that and other failures to the documented responses.
+DELETE calls `EventDeleter.delete_event`. `GoogleEventDeleter` in
+`app/google_delete_events.py` reuses POST's `load_credentials` and calls
+`events.delete` on `primary` once, without retries. It translates Google 404/410
+and other known failures into service errors, which the handler maps to the
+documented responses. FastAPI supplies the deleter through `get_event_deleter`
+in `app/event_deletion_dependencies.py`.
 
 ### Checks and testing
 

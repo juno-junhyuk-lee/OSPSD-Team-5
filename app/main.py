@@ -1,10 +1,6 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Response
-from google.auth.exceptions import TransportError
-from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
-from requests.exceptions import RequestException
 
 from app.calendar_dependencies import get_calendar_reader
 from app.calendar_provider import CalendarReader
@@ -13,6 +9,13 @@ from app.event_creation_provider import (
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
     EventCreator,
+)
+from app.event_deletion_dependencies import get_event_deleter
+from app.event_deletion_provider import (
+    EventDeleter,
+    EventDeletionNotFoundError,
+    EventDeletionUnavailableError,
+    EventDeletionUnconfirmedError,
 )
 from app.event_dependencies import get_event_reader
 from app.event_provider import (
@@ -29,8 +32,6 @@ from app.event_update_provider import (
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
 )
-from app.google_create_events import GoogleCalendarSetupError
-from app.google_delete_events import GoogleEventNotFoundError, delete_google_event
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
@@ -137,13 +138,16 @@ def update_event(
 
 
 @app.delete("/events/{event_id}", status_code=204)
-def delete_event(event_id: str) -> Response:
-    """Delete a Google event; repeating the request returns 404."""
+def delete_event(
+    event_id: str,
+    deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
+) -> Response:
+    """Delete an event; repeating the request returns 404."""
     try:
-        delete_google_event(event_id)
-    except GoogleEventNotFoundError:
+        deleter.delete_event(event_id)
+    except EventDeletionNotFoundError:
         raise HTTPException(status_code=404, detail="Event not found") from None
-    except GoogleCalendarSetupError:
+    except EventDeletionUnavailableError:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -151,13 +155,7 @@ def delete_event(event_id: str) -> Response:
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except (
-        HttpError,
-        TransportError,
-        HttpLib2Error,
-        RequestException,
-        OSError,
-    ):
+    except EventDeletionUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(
