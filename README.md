@@ -452,13 +452,17 @@ See [PATCH Level 3 verification](docs/PATCH_LEVEL3_VERIFICATION.md) and
 It takes one required string path parameter, `event_id` (a Google event ID, as
 returned by POST), and no query or body parameters.
 
-| Result | Status | Body | Retry? |
+| Result | Status | `error.code` | `retryable` |
 | --- | --- | --- | --- |
-| Deleted | `204 No Content` | empty | Not needed |
-| Unknown or already-deleted ID (Google 404 or 410) | `404` | `{"detail": "Event not found"}` | No |
-| Local authorization missing or unusable | `503` | `{"detail": "..."}` naming the auth script | After fixing setup |
-| Google rejected the call, failed, or the response was lost | `502` | `{"detail": "..."}` | Yes |
+| Deleted | `204 No Content` (empty body) | none | Not needed |
+| ID is empty, over 1024 characters, or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` |
+| Unknown or already-deleted ID (Google 404 or 410) | `404` | `not_found` | `false` |
+| Google refused access (403 that is not a rate limit) | `403` | `access_denied` | `false` |
+| Local authorization missing or unusable; no Google call made | `503` | `provider_unavailable` | `false`; fix setup with the auth script first |
+| Google failed, rate-limited, or the response was lost | `502` | `provider_error` | `true` |
 
+Failures use the shared [error format](#error-format). An invalid ID is
+rejected before any Google call.
 Deleting the same ID twice returns `204` then `404`. Retrying after a `502` is
 safe: if the first attempt succeeded, the retry returns `404`. Deletion uses
 `sendUpdates="none"`, so attendees are not emailed. Raw Google errors are never
@@ -521,6 +525,41 @@ access or credentials. `tests/test_delete_events.py` and
 Replacing the provider requires an `EventDeleter` implementation and a change to
 `get_event_deleter`; the route keeps the same contract. See
 [DELETE Level 4 verification](docs/DELETE_LEVEL4_VERIFICATION.md).
+
+### Error format
+
+Operations moved to Level 5 return failures in one shape, defined in
+`app/errors.py`:
+
+```json
+{"error": {"code": "not_found", "message": "Event not found.", "retryable": false}}
+```
+
+| `code` | Status | When | Retry? |
+| --- | --- | --- | --- |
+| `invalid_input` | `422` | The request is malformed (bad ID, body, or field) | No; fix the request |
+| `not_found` | `404` | The resource does not exist or was deleted | No |
+| `access_denied` | `403` | The provider refused access to the resource | No |
+| `provider_error` | `502` | The provider failed or its result is unknown | Per operation; see `retryable` |
+| `provider_unavailable` | `503` | The provider cannot be reached or authorization is not set up | Per operation; see `retryable` |
+
+`message` is a short service-written sentence; provider error text, IDs from
+provider responses, and credentials are never included. `retryable` tells the
+caller whether repeating the same request unchanged is safe and useful.
+
+To use it, an operation raises `ServiceError(code, message, operation=...,
+retryable=..., provider=...)`; the handler registered in `app/main.py` renders
+the response and logs one JSON line on the `calendar_service` logger:
+
+```json
+{"operation": "delete_event", "error": "not_found", "provider": true, "status": 404}
+```
+
+`provider` is true when the provider was called or caused the failure. 5xx
+failures log at ERROR, others at WARNING, without stack traces, request bodies,
+or tokens. The service has no request ID yet, so none is logged. DELETE uses
+this format now; the other operations still return `{"detail": ...}` until
+their owners move them to Level 5.
 
 ### Code map and request flow
 

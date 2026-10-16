@@ -10,6 +10,8 @@
 - `app/calendar_dependencies.py`: selects the calendar reader; calendar HTTP tests
   substitute it through FastAPI dependency overrides.
 
+- `app/errors.py`: Level 5 shared error format (`ServiceError`, `ErrorCode`),
+  its exception handler, and sanitized JSON failure logs. DELETE uses it.
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.

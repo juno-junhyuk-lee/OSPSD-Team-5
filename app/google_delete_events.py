@@ -7,6 +7,7 @@ from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
 from requests.exceptions import RequestException
 
 from app.event_deletion_provider import (
+    EventDeletionDeniedError,
     EventDeletionNotFoundError,
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
@@ -16,6 +17,23 @@ from app.google_create_events import GoogleCalendarSetupError, load_credentials
 
 class GoogleEventNotFoundError(LookupError):
     """Google has no event with this ID on primary, or it was already deleted."""
+
+
+# Google also answers 403 for quota limits; those are not permission denials.
+RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
+
+
+def is_permission_denied(error: HttpError) -> bool:
+    """Return whether Google refused access rather than rate-limiting."""
+    if error.resp.status != 403:
+        return False
+    details = error.error_details
+    reasons = (
+        {detail.get("reason") for detail in details if isinstance(detail, dict)}
+        if isinstance(details, list)
+        else set()
+    )
+    return not reasons & RATE_LIMIT_REASONS
 
 
 def delete_google_event(event_id: str) -> None:
@@ -43,8 +61,11 @@ class GoogleEventDeleter:
             raise EventDeletionNotFoundError from error
         except GoogleCalendarSetupError as error:
             raise EventDeletionUnavailableError from error
+        except HttpError as error:
+            if is_permission_denied(error):
+                raise EventDeletionDeniedError from error
+            raise EventDeletionUnconfirmedError from error
         except (
-            HttpError,
             TransportError,
             HttpLib2Error,
             RequestException,
