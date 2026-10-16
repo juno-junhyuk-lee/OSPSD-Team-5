@@ -10,6 +10,7 @@ from requests.exceptions import RequestException
 from app import google_delete_events
 from app.event_deletion_provider import (
     EventDeleter,
+    EventDeletionDeniedError,
     EventDeletionNotFoundError,
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
@@ -74,7 +75,10 @@ def test_unusable_authorization_is_unavailable(
 @pytest.mark.parametrize(
     "error",
     [
-        HttpError(Response({"status": "403"}), b'{"error": "denied"}'),
+        HttpError(
+            Response({"status": "403"}),
+            b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+        ),
         HttpError(Response({"status": "500"}), b""),
         TimeoutError("Provider may have deleted the event."),
         TransportError("Private transport details"),
@@ -90,6 +94,20 @@ def test_provider_failure_is_unconfirmed_without_retry(
     execute.side_effect = error
 
     with pytest.raises(EventDeletionUnconfirmedError) as raised:
+        deleter.delete_event("google-event-1")
+
+    assert raised.value.__cause__ is error
+    execute.assert_called_once_with(num_retries=0)
+
+
+def test_permission_refusal_is_denied(
+    deleter: EventDeleter, service: MagicMock
+) -> None:
+    error = HttpError(Response({"status": "403"}), b'{"error": "denied"}')
+    execute = service.events.return_value.delete.return_value.execute
+    execute.side_effect = error
+
+    with pytest.raises(EventDeletionDeniedError) as raised:
         deleter.delete_event("google-event-1")
 
     assert raised.value.__cause__ is error

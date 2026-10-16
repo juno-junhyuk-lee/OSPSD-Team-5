@@ -1,9 +1,11 @@
+import re
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 
 from app.calendar_dependencies import get_calendar_reader
 from app.calendar_provider import CalendarReader
+from app.errors import ErrorCode, ServiceError, service_error_handler
 from app.event_creation_dependencies import get_event_creator
 from app.event_creation_provider import (
     EventCreationUnavailableError,
@@ -13,6 +15,7 @@ from app.event_creation_provider import (
 from app.event_deletion_dependencies import get_event_deleter
 from app.event_deletion_provider import (
     EventDeleter,
+    EventDeletionDeniedError,
     EventDeletionNotFoundError,
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
@@ -35,6 +38,10 @@ from app.event_update_provider import (
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
 app = FastAPI(title="Calendar Service")
+app.add_exception_handler(ServiceError, service_error_handler)
+
+# Google event IDs, including recurring instances, use only these characters.
+EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,1024}")
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -143,24 +150,48 @@ def delete_event(
     deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
 ) -> Response:
     """Delete an event; repeating the request returns 404."""
+    if not EVENT_ID_PATTERN.fullmatch(event_id):
+        raise ServiceError(
+            ErrorCode.INVALID_INPUT,
+            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
+            operation="delete_event",
+            retryable=False,
+            provider=False,
+        )
     try:
         deleter.delete_event(event_id)
     except EventDeletionNotFoundError:
-        raise HTTPException(status_code=404, detail="Event not found") from None
+        raise ServiceError(
+            ErrorCode.NOT_FOUND,
+            "Event not found.",
+            operation="delete_event",
+            retryable=False,
+            provider=True,
+        ) from None
+    except EventDeletionDeniedError:
+        raise ServiceError(
+            ErrorCode.ACCESS_DENIED,
+            "Google Calendar denied access to this event.",
+            operation="delete_event",
+            retryable=False,
+            provider=True,
+        ) from None
     except EventDeletionUnavailableError:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Google Calendar authorization is unavailable. "
-                "Run scripts/google_calendar_auth.py."
-            ),
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Google Calendar authorization is unavailable. "
+            "Run scripts/google_calendar_auth.py.",
+            operation="delete_event",
+            retryable=False,
+            provider=False,
         ) from None
     except EventDeletionUnconfirmedError:
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                "Google Calendar deletion could not be confirmed. "
-                "Retrying is safe; it returns 404 if the event is already gone."
-            ),
+        raise ServiceError(
+            ErrorCode.PROVIDER_ERROR,
+            "Google Calendar deletion could not be confirmed. "
+            "Retrying is safe; it returns not_found if the event is already gone.",
+            operation="delete_event",
+            retryable=True,
+            provider=True,
         ) from None
     return Response(status_code=204)
