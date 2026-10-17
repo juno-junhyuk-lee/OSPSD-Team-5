@@ -88,11 +88,12 @@ PR CI remain required. Codex assisted with implementation, tests, and verificati
 ## Kristie Lee's event GET Level 5 work
 
 Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
-errors, tests, and documentation. Status: contract planning only; no Level 5
-GET implementation or verification is claimed. Reviewer: not yet assigned;
+errors, tests, and documentation. Provider translation and HTTP error/logging
+integration are implemented on this branch; real Google Level 5 verification,
+teammate review, and matching PR CI remain pending. Reviewer: not yet assigned;
 agree on a teammate reviewer before implementation. Codex assists with this
 plan and documentation. The planned contract is in the README's
-[Level 5 event retrieval section](../README.md#planned-level-5-event-retrieval-errors).
+[Level 5 event retrieval section](../README.md#level-5-event-retrieval-errors).
 The operation-specific status/retry policy and DELETE-compatible ID rule were
 confirmed by the student owner; this does not claim team-wide agreement.
 Have the team review these choices before merging.

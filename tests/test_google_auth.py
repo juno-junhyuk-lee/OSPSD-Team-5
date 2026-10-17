@@ -16,8 +16,9 @@ def test_missing_or_invalid_token_requires_authentication(
     if contents is not None:
         token.write_text(contents, encoding="utf-8")
 
-    with pytest.raises(CalendarAuthenticationError):
+    with pytest.raises(CalendarAuthenticationError) as raised:
         load_credentials(token)
+    assert raised.value.provider is False
 
 
 @pytest.fixture
@@ -73,8 +74,9 @@ def test_revoked_token_requires_authentication(
     credentials.refresh.side_effect = RefreshError("revoked")
     token = tmp_path / "token.json"
 
-    with pytest.raises(CalendarAuthenticationError):
+    with pytest.raises(CalendarAuthenticationError) as raised:
         load_credentials(token)
+    assert raised.value.provider is True
     assert not token.exists()
 
 

@@ -24,8 +24,10 @@ from app.event_dependencies import get_event_reader
 from app.event_provider import (
     CalendarAuthenticationError,
     CalendarProviderError,
+    EventAccessDeniedError,
     EventNotFoundError,
     EventReader,
+    EventReadUnavailableError,
     UnsupportedEventError,
 )
 from app.event_update_dependencies import get_event_updater
@@ -70,22 +72,64 @@ def get_event(
     reader: Annotated[EventReader, Depends(get_event_reader)],
 ) -> Event:
     """Retrieve one timed event from the authenticated primary Google Calendar."""
+    if not EVENT_ID_PATTERN.fullmatch(event_id):
+        raise ServiceError(
+            ErrorCode.INVALID_INPUT,
+            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
+            operation="get_event",
+            retryable=False,
+            provider=False,
+        )
     try:
         return reader.get_event(event_id)
-    except EventNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Event not found") from error
+    except EventNotFoundError:
+        raise ServiceError(
+            ErrorCode.NOT_FOUND,
+            "Event not found.",
+            operation="get_event",
+            retryable=False,
+            provider=True,
+        ) from None
     except CalendarAuthenticationError as error:
-        raise HTTPException(
-            status_code=503, detail="Calendar authentication required"
-        ) from error
-    except UnsupportedEventError as error:
-        raise HTTPException(
-            status_code=422, detail="Only timed events are supported"
-        ) from error
-    except CalendarProviderError as error:
-        raise HTTPException(
-            status_code=502, detail="Calendar provider request failed"
-        ) from error
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Calendar authentication required. Run scripts/google_calendar_auth.py.",
+            operation="get_event",
+            retryable=False,
+            provider=error.provider,
+        ) from None
+    except UnsupportedEventError:
+        raise ServiceError(
+            ErrorCode.INVALID_INPUT,
+            "Only timed events are supported.",
+            operation="get_event",
+            retryable=False,
+            provider=True,
+        ) from None
+    except EventAccessDeniedError:
+        raise ServiceError(
+            ErrorCode.ACCESS_DENIED,
+            "Calendar denied access to this event.",
+            operation="get_event",
+            retryable=False,
+            provider=True,
+        ) from None
+    except EventReadUnavailableError:
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Calendar provider temporarily unavailable. Retry later.",
+            operation="get_event",
+            retryable=True,
+            provider=True,
+        ) from None
+    except CalendarProviderError:
+        raise ServiceError(
+            ErrorCode.PROVIDER_ERROR,
+            "Calendar provider request failed.",
+            operation="get_event",
+            retryable=False,
+            provider=True,
+        ) from None
 
 
 @app.post("/events", response_model=Event, status_code=201)

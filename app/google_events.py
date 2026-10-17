@@ -74,7 +74,7 @@ class GoogleEventReader:
             if error.resp.status == 404:
                 raise EventNotFoundError from error
             if error.resp.status == 401:
-                raise CalendarAuthenticationError from error
+                raise CalendarAuthenticationError(provider=True) from error
             if error.resp.status in TEMPORARY_HTTP_STATUSES or (
                 error.resp.status == 403 and is_rate_limited(error)
             ):

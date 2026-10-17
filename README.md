@@ -76,26 +76,15 @@ events. These policies are covered by tests and require teammate review.
 The shared Event model does not add timezone or start/end ordering validation;
 POST validates its own input separately.
 
-| Condition | HTTP status | JSON detail |
-| --- | --- | --- |
-| Google returns 404 | 404 | `Event not found` |
-| Missing/invalid token, insufficient token scope, failed refresh, or Google HTTP 401 | 503 | `Calendar authentication required` |
-| All-day event | 422 | `Only timed events are supported` |
-| Other Google HTTP errors, handled transport failures, or malformed provider data | 502 | `Calendar provider request failed` |
+#### Level 5 event retrieval errors
 
-The API does not expose provider error messages or launch browser login during
-requests. For 503, rerun the authentication script. Error handling does not cover
-every SDK exception; retry, cancellation, and uncertain write policies are later work.
-
-#### Planned Level 5 event retrieval errors
-
-This is the planned GET contract for `feature/calendar-event-get-level5-errors`,
-not implemented behavior. The current error table above remains authoritative
-until implementation and verification are complete. Kristie owns this change;
-teammate review of the contract is still required before merging.
+This contract is implemented on `feature/calendar-event-get-level5-errors`.
+Real Google Level 5 verification, teammate review, and matching PR CI remain
+pending; implementation does not claim final release completion. Kristie owns
+this change. The service never starts browser authorization during a request.
 
 Successful reads retain the existing `200` response and four-field Event model.
-Failures will use the shared [error format](#error-format), for example:
+Failures use the shared [error format](#error-format), for example:
 
 ```json
 {"error": {"code": "not_found", "message": "Event not found.", "retryable": false}}
@@ -111,7 +100,7 @@ Failures will use the shared [error format](#error-format), for example:
 | Timeout, temporary provider outage, or rate limit | 503 | `provider_unavailable` | `true` | Retry later; this read does not change state |
 | Malformed provider data or another expected provider failure outside the categories above | 502 | `provider_error` | `false` | Investigate before repeating the request |
 
-The planned local ID rule is `[A-Za-z0-9_-]{1,1024}`, matching DELETE's
+The local ID rule is `[A-Za-z0-9_-]{1,1024}`, matching DELETE's
 validation policy. It permits recurring-instance IDs such as
 `abc123_20261016T150000Z`. Invalid IDs are rejected before calling the reader;
 valid syntax does not guarantee an event exists. An absent path segment does
@@ -124,7 +113,7 @@ the status, application code, service-written message, and retryability above.
 Unexpected programming errors must not be silently reclassified as expected
 provider failures.
 
-Each expected failure will raise the shared `ServiceError`, producing one
+Each expected failure raises the shared `ServiceError`, producing one
 sanitized log on `calendar_service` with `operation="get_event"`, `error`,
 `provider`, and `status`. Local ID rejection has `provider=false`; a failure
 from a provider call or provider response has `provider=true`. Authorization
@@ -138,8 +127,9 @@ shape, adds local ID validation and a distinct permission-denied response,
 and maps temporary failures to 503. Other operations and the app-wide FastAPI
 request-validation handler are outside this change; their owners coordinate
 those migrations separately. Controlled-provider HTTP tests, Google adapter
-translation tests, sanitized-log assertions, and a real Google success and
-missing-event check are required before calling this implemented.
+translation tests, and sanitized-log assertions cover the implementation.
+A real Google success and missing-event check must still be recorded before
+the operation is considered verified for release.
 
 #### Level 3 event provider boundary
 
@@ -613,8 +603,8 @@ the response and logs one JSON line on the `calendar_service` logger:
 
 `provider` is true when the provider was called or caused the failure. 5xx
 failures log at ERROR, others at WARNING, without stack traces, request bodies,
-or tokens. The service has no request ID yet, so none is logged. DELETE uses
-this format now; the other operations still return `{"detail": ...}` until
+or tokens. The service has no request ID yet, so none is logged. DELETE and
+event GET use this format now; the other operations still return `{"detail": ...}` until
 their owners move them to Level 5.
 
 ### Code map and request flow

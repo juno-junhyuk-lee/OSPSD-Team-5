@@ -28,6 +28,10 @@ class UnsupportedEventError(Exception):
 class CalendarAuthenticationError(Exception):
     """Authorization is unavailable, rejected, or requires renewal."""
 
+    def __init__(self, message: str = "", *, provider: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
+
 
 class EventReader(Protocol):
     """Read timed events from the authorized calendar."""

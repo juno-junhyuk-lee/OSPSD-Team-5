@@ -75,12 +75,31 @@ def test_all_day_event_is_rejected(client: TestClient, provider: Mock) -> None:
     response = client.get("/events/all-day")
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Only timed events are supported"}
+    assert response.json() == {
+        "error": {
+            "code": "invalid_input",
+            "message": "Only timed events are supported.",
+            "retryable": False,
+        }
+    }
 
 
-@pytest.mark.parametrize("status", [403, 429, 500, 503])
+@pytest.mark.parametrize(
+    ("status", "expected_status", "code", "retryable"),
+    [
+        (403, 403, "access_denied", False),
+        (429, 503, "provider_unavailable", True),
+        (500, 503, "provider_unavailable", True),
+        (503, 503, "provider_unavailable", True),
+    ],
+)
 def test_provider_failure_is_not_not_found(
-    client: TestClient, provider: Mock, status: int
+    client: TestClient,
+    provider: Mock,
+    status: int,
+    expected_status: int,
+    code: str,
+    retryable: bool,
 ) -> None:
     provider.side_effect = HttpError(
         Mock(status=status, reason="Provider failure"),
@@ -89,11 +108,15 @@ def test_provider_failure_is_not_not_found(
 
     response = client.get("/events/google-event")
 
-    assert response.status_code == 502
-    assert response.json() == {"detail": "Calendar provider request failed"}
+    assert response.status_code == expected_status
+    assert response.json()["error"]["code"] == code
+    assert response.json()["error"]["retryable"] is retryable
+    assert "Sensitive" not in response.text
 
 
-def test_google_401_requires_authentication(client: TestClient, provider: Mock) -> None:
+def test_google_401_requires_authentication(
+    client: TestClient, provider: Mock, caplog: pytest.LogCaptureFixture
+) -> None:
     provider.side_effect = HttpError(
         Mock(status=401, reason="Unauthorized"),
         b'{"error": {"message": "Sensitive provider message"}}',
@@ -102,19 +125,41 @@ def test_google_401_requires_authentication(client: TestClient, provider: Mock) 
     response = client.get("/events/google-event")
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "Calendar authentication required"}
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Calendar authentication required. Run scripts/google_calendar_auth.py.",
+            "retryable": False,
+        }
+    }
     assert "Sensitive" not in response.text
+    [record] = [
+        record for record in caplog.records if record.name == "calendar_service"
+    ]
+    assert json.loads(record.getMessage()) == {
+        "operation": "get_event",
+        "error": "provider_unavailable",
+        "provider": True,
+        "status": 503,
+    }
+    assert "Sensitive" not in caplog.text
 
 
-def test_network_failure_returns_bad_gateway(
+def test_network_failure_returns_service_unavailable(
     client: TestClient, provider: Mock
 ) -> None:
     provider.side_effect = TimeoutError("network timeout")
 
     response = client.get("/events/google-event")
 
-    assert response.status_code == 502
-    assert response.json() == {"detail": "Calendar provider request failed"}
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Calendar provider temporarily unavailable. Retry later.",
+            "retryable": True,
+        }
+    }
 
 
 @pytest.mark.parametrize(
@@ -138,7 +183,13 @@ def test_malformed_provider_data_returns_bad_gateway(
     response = client.get("/events/broken")
 
     assert response.status_code == 502
-    assert response.json() == {"detail": "Calendar provider request failed"}
+    assert response.json() == {
+        "error": {
+            "code": "provider_error",
+            "message": "Calendar provider request failed.",
+            "retryable": False,
+        }
+    }
 
 
 def test_authentication_required_returns_service_unavailable(
@@ -152,7 +203,13 @@ def test_authentication_required_returns_service_unavailable(
     response = client.get("/events/google-event")
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "Calendar authentication required"}
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Calendar authentication required. Run scripts/google_calendar_auth.py.",
+            "retryable": False,
+        }
+    }
 
 
 @pytest.mark.parametrize(
@@ -170,10 +227,10 @@ def test_google_client_is_closed_after_request(
         execute.side_effect = HttpError(
             Mock(status=status, reason="Failure"), b'{"error": {"message": "Failure"}}'
         )
-        expected_status = 404 if status == 404 else 502
+        expected_status = 404 if status == 404 else 503
     elif outcome == "timeout":
         execute.side_effect = TimeoutError("timeout")
-        expected_status = 502
+        expected_status = 503
     elif outcome == "malformed":
         execute.return_value = None
         expected_status = 502
@@ -256,6 +313,8 @@ def test_reader_translates_http_failures(
     assert type(raised.value) is expected
     assert raised.value.__cause__ is failure
     assert str(raised.value) == ""
+    if isinstance(raised.value, CalendarAuthenticationError):
+        assert raised.value.provider is True
     execute.assert_called_once_with()
     service.close.assert_called_once_with()
 
