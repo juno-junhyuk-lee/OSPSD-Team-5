@@ -440,7 +440,14 @@ response and POST's 403/502/503 responses.
 POST does not take an existing resource ID, so it does not add a missing-event
 error merely to mirror GET or DELETE. Controlled tests verify failure responses
 and logs, including that uncertain writes are never automatically retried.
-Real Google Level 5 verification remains a separate third batch.
+At implementation commit `ba8ebf3`, real Google verification passed for creation,
+matching reads, restart persistence, invalid input without a write, and cleanup.
+An isolated invalid-token request reached Google and returned 401, translated
+through the SDK authorization path to 503 / `provider_unavailable` with one safe
+provider=true log. No shared permissions or normal token were changed by that
+probe. See [POST Level 5 verification](docs/POST_LEVEL5_VERIFICATION.md) for
+evidence, test boundaries, and reproduction. Teammate review and PR CI remain
+required.
 
 ### Create and retrieve an event
 

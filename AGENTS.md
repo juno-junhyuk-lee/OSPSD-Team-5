@@ -96,6 +96,8 @@ See [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md) for the provid
 boundary, refactor checks, and teammate reproduction steps.
 See [POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) for normal wiring,
 controlled substitution, and real verification through dependency injection.
+See [POST Level 5 verification](docs/POST_LEVEL5_VERIFICATION.md) for shared errors,
+sanitized logs, real creation/cleanup, and an isolated real authorization failure.
 Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
 are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 
