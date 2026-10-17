@@ -6,7 +6,7 @@ from app.models import Event
 
 
 class EventNotFoundError(Exception):
-    """The requested event does not exist."""
+    """The requested event does not exist or is cancelled/deleted."""
 
 
 class CalendarProviderError(Exception):

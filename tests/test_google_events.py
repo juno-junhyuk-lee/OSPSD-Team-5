@@ -64,6 +64,51 @@ def test_untitled_event_returns_empty_title(client: TestClient, provider: Mock) 
     assert response.json()["title"] == ""
 
 
+@pytest.mark.parametrize(
+    "data",
+    [
+        {**timed_event(), "status": "cancelled"},
+        {"id": "google-event", "status": "cancelled"},
+    ],
+    ids=["full-event", "minimal-tombstone"],
+)
+def test_cancelled_event_returns_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    data: dict[str, object],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    service = Mock()
+    execute = service.events.return_value.get.return_value.execute
+    execute.return_value = data
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    response = client.get("/events/google-event")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
+    [record] = [
+        record for record in caplog.records if record.name == "calendar_service"
+    ]
+    assert json.loads(record.getMessage()) == {
+        "operation": "get_event",
+        "error": "not_found",
+        "provider": True,
+        "status": 404,
+    }
+    assert record.exc_info is None
+    assert "Provider meeting" not in response.text
+    assert "Provider meeting" not in caplog.text
+    execute.assert_called_once_with()
+    service.close.assert_called_once_with()
+
+
 def test_all_day_event_is_rejected(client: TestClient, provider: Mock) -> None:
     provider.return_value = {
         "id": "all-day",
@@ -351,6 +396,8 @@ def test_reader_translates_transport_failure(
     ("data", "expected"),
     [
         (None, CalendarProviderError),
+        ({**timed_event(), "status": "cancelled"}, EventNotFoundError),
+        ({"id": "google-event", "status": "cancelled"}, EventNotFoundError),
         ({"id": "broken"}, CalendarProviderError),
         ({"id": "broken", "start": {}, "end": {}}, CalendarProviderError),
         (

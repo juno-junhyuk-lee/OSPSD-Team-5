@@ -14,6 +14,10 @@ and local 422/invalid_input. Each failure logged exactly one sanitized line with
 the correct provider flag. No events were changed. This is implementation
 verification, not a server/curl demo, teammate execution, or final-tag verification.
 See [the full record and PowerShell guide](EVENT_GET_LEVEL5_VERIFICATION.md).
+The [cancelled-event review follow-up](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up)
+records the later fix on the working tree based on `997261f`: 216 tests and
+required checks passed, and reading an existing cancelled Google event returned
+404/not_found with one sanitized log. No live events were changed.
 Teammate review, matching PR CI, and final release verification remain pending.
 Earlier sections below describe their historical revisions and error contracts.
 

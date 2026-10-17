@@ -95,7 +95,7 @@ Failures use the shared [error format](#error-format), for example:
 | Condition | HTTP status | `error.code` | `retryable` | Caller action |
 | --- | --- | --- | --- | --- |
 | ID violates the local format below | 422 | `invalid_input` | `false` | Correct the ID |
-| Google reports that the event does not exist | 404 | `not_found` | `false` | Check the ID or choose another event |
+| Google returns 404 or an event with `status: cancelled` (including deleted events) | 404 | `not_found` | `false` | Check the ID or choose another event |
 | All-day event cannot be represented by the timed-event model | 422 | `invalid_input` | `false` | Choose a timed event |
 | Google refuses permission; excludes rate-limit responses | 403 | `access_denied` | `false` | Resolve access before another request |
 | Authorization is missing, invalid, insufficiently scoped, needs renewal, or is rejected by Google with HTTP 401 | 503 | `provider_unavailable` | `false` | Repair authorization with the authentication script |
@@ -107,6 +107,11 @@ validation policy. It permits recurring-instance IDs such as
 `abc123_20261016T150000Z`. Invalid IDs are rejected before calling the reader;
 valid syntax does not guarantee an event exists. An absent path segment does
 not match this route and is outside this operation's ID-validation contract.
+
+Cancelled/deleted events are rejected before translating title or time fields.
+This includes minimal cancellation records containing only an ID and status.
+After a successful DELETE, event GET returns 404 even if Google retains the
+event in Trash; the API does not expose a Trash or restore operation.
 
 `retryable` describes repeating the same request unchanged; it does not enable
 automatic retries. The SDK's raw exception type, response payload, and error

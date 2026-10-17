@@ -107,6 +107,14 @@ invalid input, including sanitized logs. No events changed. See
 This evidence covers the implementation revision, not a later documentation
 commit, human server/curl demonstration, PR CI, or final release tag.
 
+Review follow-up: kc5931 identified cancelled events returning 200 after DELETE
+in PR #30. The uncommitted fix based on `997261f` now rejects cancelled records
+before field translation. All 216 tests and required checks passed, and an
+existing cancelled Google event returned 404/not_found with one sanitized log
+through normal injection. No events were changed in the live check. See the
+[follow-up evidence](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up).
+Updated reviewer confirmation and matching PR CI remain pending.
+
 Work is split into four commits:
 
 1. Document the planned failure contract, compatibility changes, scope, and

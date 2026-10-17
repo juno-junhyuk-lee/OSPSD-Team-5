@@ -86,4 +86,6 @@ class GoogleEventReader:
             raise EventReadUnavailableError from error
         if not isinstance(data, dict):
             raise CalendarProviderError
+        if data.get("status") == "cancelled":
+            raise EventNotFoundError
         return translate_event(data)

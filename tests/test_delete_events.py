@@ -22,9 +22,17 @@ def test_delete_created_event(
 
     assert response.status_code == 204
     assert response.content == b""
-    # Google keeps cancelled events readable; our GET still returns them.
+    # Google retains the tombstone, but the public API treats it as missing.
     assert provider_events[event_id]["status"] == "cancelled"
-    assert client.get(f"/events/{event_id}").status_code == 200
+    retrieved = client.get(f"/events/{event_id}")
+    assert retrieved.status_code == 404
+    assert retrieved.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
 
 
 def test_delete_leaves_other_events(client: TestClient) -> None:

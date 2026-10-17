@@ -5,6 +5,10 @@ tests, documentation, and the executions recorded below. These results verify
 the local implementation; they do not establish teammate approval, PR CI,
 a published release, or a final-tag checkout.
 
+The original verification below applies to `9fad9af`. The later
+[cancelled-event review follow-up](#cancelled-event-review-follow-up) records
+the regression fix separately; earlier results are preserved as history.
+
 ## Revision and environment
 
 - Implementation: `9fad9af0de1bcf10279d2383ed3889cf494e7c37`.
@@ -93,6 +97,46 @@ authorization, and recurring-instance success were simulated in automated tests;
 they were not induced against Google during this run. This execution used
 TestClient rather than a separately running Uvicorn server or a human-observed
 curl demonstration.
+
+## Cancelled-event review follow-up
+
+On October 17, 2026, kc5931's
+[PR #30 review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30#pullrequestreview-5558912210)
+reported that event GET returned 200 after deletion. Google can retain a
+`status="cancelled"` record, while the public contract treats deleted resources
+as missing. The existing DELETE-to-GET test had explicitly expected 200.
+
+The follow-up rejects cancelled records in `GoogleEventReader.get_event` after
+checking for a dictionary but before translating fields. Both full event bodies
+and ID/status-only records therefore raise `EventNotFoundError`; the existing
+HTTP handler returns 404/not_found, retryable=false, with one provider=true log.
+DELETE implementation and the shared error handler were not changed.
+
+Verification was executed on the uncommitted follow-up working tree based on
+`997261f`, on Windows/Python 3.14.8. This does not claim a test of a future commit
+SHA or updated PR CI.
+
+- Before the implementation fix, the new HTTP cases failed with 200 for a full
+  cancelled event and 502 for a minimal cancellation record; the updated
+  DELETE-to-GET expectation also failed with 200. All three selected tests failed,
+  demonstrating that the regression checks detect the defect.
+- After the fix, all 216 tests passed, Ruff lint/format checks passed (53 files
+  formatted), strict mypy reported no issues in 35 source files, and
+  `git diff --check` passed. The existing TestClient warning remains.
+- New adapter cases verify that full and minimal cancelled responses raise
+  `EventNotFoundError`. HTTP cases verify exact 404 JSON, one sanitized log, and
+  client cleanup. The CRUD test retains the fake cancelled record but now
+  verifies that public GET returns 404 after DELETE.
+- A separate real Google run listed up to 100 events with `showDeleted=True`,
+  selected an already-cancelled event, and retrieved its ID through TestClient
+  using normal FastAPI injection with no overrides. It returned the exact
+  404/not_found/retryable=false response and one provider=true failure log.
+  No events were created, updated, or deleted in this verification.
+
+The post-fix live run checked an existing cancelled record; a new live
+POST/DELETE/GET sequence was not performed. That sequence is covered by the
+offline integration test. Updated teammate review and CI remain required after
+the owner commits and pushes the follow-up.
 
 ## Reproduce in PowerShell
 
