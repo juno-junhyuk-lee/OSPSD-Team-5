@@ -305,7 +305,7 @@ overwrite an existing event. The event can then be retrieved through
 
 Missing required fields, invalid field values, timezone-free timestamps, and
 an end time equal to or earlier than the start time return `422 Unprocessable
-Entity` using FastAPI's validation error response with a `detail` array.
+Entity` using the shared `invalid_input` error format with `retryable=false`.
 Rejected requests do not add an event or change existing events. Validation
 applies to creation inputs; it does not add guarantees to the existing GET
 operation or shared response model.
@@ -317,11 +317,13 @@ retrieves the provider event by the returned ID, including after a server restar
 The service does not keep a local event mirror. All-day events are outside this
 contract.
 
-Setup failure or rejected Google authorization returns 503 with a `detail`
-string directing the developer to the authorization script.
-Other provider HTTP/transport failure or an unusable response
-returns 502 with a `detail` string stating that creation could not be confirmed
-and to check the calendar before retrying. Neither failure falls back to local
+Setup failure or rejected Google authorization returns 503 with code
+`provider_unavailable` and a message directing the developer to the authorization
+script. Permission denial returns 403 with code `access_denied`.
+Other provider HTTP/transport failure or an unusable response returns 502 with
+code `provider_error` and a message stating that creation could not be confirmed
+and to check the calendar before retrying. All use the shared error format with
+`retryable=false`. No failure falls back to local
 creation. A 502 does not guarantee that Google created no event; do not blindly repeat a write with an uncertain result. Raw provider
 errors and credential contents are not included in these HTTP responses.
 
@@ -399,11 +401,11 @@ restart, and cleanup workflow through normal injection at `c54f52e`. Teammate
 review of both normal wiring and test substitution and matching PR CI remain
 pending.
 
-#### Level 5 event creation provider failures
+#### Level 5 event creation errors
 
-The first Level 5 change distinguishes three provider-independent outcomes:
+POST maps provider-independent errors to the shared HTTP format:
 
-| Service error | Meaning | Planned Level 5 response |
+| Service error | Meaning | HTTP response |
 | --- | --- | --- |
 | `EventCreationUnavailableError` | Local authorization is unusable, token refresh was rejected, or Google returned 401 | `503 / provider_unavailable`, not retryable until authorization is fixed |
 | `EventCreationDeniedError` | Google returned a permission-denied 403, excluding known quota/rate limits | `403 / access_denied`, not retryable |
@@ -416,13 +418,29 @@ refresh, or storage behavior for PATCH and DELETE. SDK details remain inside
 the Google adapter. Known 403 rate/quota failures remain provider failures,
 not permission denials. Google insertion still uses `num_retries=0`.
 
-This first change keeps the existing `detail` HTTP responses: authorization
-failures return 503; permission denials temporarily retain the existing broad
-502 response. The next change will map the new distinctions to `ServiceError`,
-use the shared error/log handler, and normalize request-validation failures.
-The response format and 403 mapping in the table are planned, not implemented
-HTTP behavior yet. POST does not take an existing resource ID, so it does not
-add a missing-event error merely to mirror GET or DELETE.
+Missing fields, invalid JSON, and invalid field values return 422 with
+`invalid_input`, the message "Invalid request. Check required fields, types,
+and values.", and `retryable=false`. Validation rejects these requests without
+calling the creator. The shared request-validation handler also covers PATCH;
+it does not change either operation's field validation rules.
+
+POST failures raise `ServiceError` and produce exactly one structured log via
+the shared handler, with `operation=create_event`. Local validation and setup
+failures log `provider=false`; remote authorization and provider outcomes log
+`provider=true`. Logs omit titles, event bodies, authorization headers, raw SDK
+errors, and stack traces. Successful creation produces no failure log.
+
+Compatibility: POST errors change from `detail` to `error`, and a permission
+denial now returns 403 instead of the earlier broad 502. Successful responses
+and validation rules are unchanged. FastAPI request-validation errors across
+the app now use the shared shape, including PATCH's 422 response; PATCH's other
+errors still use its earlier contract. Swagger documents the shared validation
+response and POST's 403/502/503 responses.
+
+POST does not take an existing resource ID, so it does not add a missing-event
+error merely to mirror GET or DELETE. Controlled tests verify failure responses
+and logs, including that uncertain writes are never automatically retried.
+Real Google Level 5 verification remains a separate third batch.
 
 ### Create and retrieve an event
 
@@ -460,7 +478,8 @@ Invoke-RestMethod -Uri "http://localhost:8000/events/$($event.id)"
 ```
 
 To check validation, use Swagger UI's `POST /events` operation and submit a
-body with `end_time` equal to `start_time`. Expect `422` with a `detail` array.
+body with `end_time` equal to `start_time`. Expect `422` with code `invalid_input`
+and `retryable=false` in the shared error format.
 The rejected request must not create an event. Restarting the server preserves
 Google events; event GET should still return 200 for the created ID. Delete only your own verification events afterward.
 
@@ -490,7 +509,7 @@ is unchanged. The title is stripped of surrounding whitespace. A following
 | --- | --- | --- | --- |
 | Updated | `200` | `Event` JSON | Yes |
 | Unknown, deleted, or cancelled ID (Google 404/410, or `events.get` status `cancelled` before patch) | `404` | `{"detail": "Event not found"}` | No |
-| Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | FastAPI `detail` array | No |
+| Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | Shared `invalid_input` error, `retryable=false` | No |
 | Local authorization missing or unusable | `503` | `detail` naming the auth script | No |
 | Google rejected the call, failed, or the response was unusable | `502` | update could not be confirmed | Uncertain — check calendar before retry |
 
@@ -638,9 +657,11 @@ the response and logs one JSON line on the `calendar_service` logger:
 
 `provider` is true when the provider was called or caused the failure. 5xx
 failures log at ERROR, others at WARNING, without stack traces, request bodies,
-or tokens. The service has no request ID yet, so none is logged. DELETE and
-event GET use this format now; the other operations still return `{"detail": ...}` until
-their owners move them to Level 5.
+or tokens. The service has no request ID yet, so none is logged. DELETE, event
+GET, and POST use this format, as do FastAPI request-validation failures. Other
+application errors still return `{"detail": ...}` until their owners migrate.
+Request-validation logs use the matched route's operation name and
+`provider=false`; they never serialize the validation exception's inputs or body.
 
 ### Code map and request flow
 
@@ -677,7 +698,8 @@ refreshes local event authorization, calls `events.insert` on `primary`, closes
 the client, and translates the Google response to `Event`. Invalid input is
 rejected before a write. Each creation request uses `num_retries=0`; an uncertain
 result must be investigated before retrying. The adapter translates known
-failures into service errors; the POST handler retains its 503 and 502 responses.
+failures into service errors; the POST handler maps them to the documented
+403/503/502 shared error responses and sanitized logs.
 Authorization helpers remain
 operation-specific at this level; the shared setup script obtains both scopes.
 

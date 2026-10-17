@@ -2,10 +2,17 @@ import re
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.exceptions import RequestValidationError
 
 from app.calendar_dependencies import get_calendar_reader
 from app.calendar_provider import CalendarReader
-from app.errors import ErrorCode, ServiceError, service_error_handler
+from app.errors import (
+    ErrorCode,
+    ErrorResponse,
+    ServiceError,
+    request_validation_handler,
+    service_error_handler,
+)
 from app.event_creation_dependencies import get_event_creator
 from app.event_creation_provider import (
     EventCreationDeniedError,
@@ -40,8 +47,12 @@ from app.event_update_provider import (
 )
 from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
 
-app = FastAPI(title="Calendar Service")
+app = FastAPI(
+    title="Calendar Service",
+    responses={422: {"model": ErrorResponse, "description": "Invalid request"}},
+)
 app.add_exception_handler(ServiceError, service_error_handler)
+app.add_exception_handler(RequestValidationError, request_validation_handler)
 
 # Google event IDs, including recurring instances, use only these characters.
 EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,1024}")
@@ -133,7 +144,16 @@ def get_event(
         ) from None
 
 
-@app.post("/events", response_model=Event, status_code=201)
+@app.post(
+    "/events",
+    response_model=Event,
+    status_code=201,
+    responses={
+        403: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 def create_event(
     request: CreateEventRequest,
     creator: Annotated[EventCreator, Depends(get_event_creator)],
@@ -141,21 +161,31 @@ def create_event(
     """Create a timed Google event and return its provider-assigned ID."""
     try:
         event = creator.create_event(request)
-    except EventCreationUnavailableError:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Google Calendar authorization is unavailable. "
-                "Run scripts/google_calendar_auth.py."
-            ),
+    except EventCreationUnavailableError as error:
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Google Calendar authorization is unavailable. "
+            "Run scripts/google_calendar_auth.py.",
+            operation="create_event",
+            retryable=False,
+            provider=error.provider,
         ) from None
-    except EventCreationDeniedError, EventCreationUnconfirmedError:
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                "Google Calendar creation could not be confirmed. "
-                "Check the calendar before retrying."
-            ),
+    except EventCreationDeniedError:
+        raise ServiceError(
+            ErrorCode.ACCESS_DENIED,
+            "Google Calendar denied permission to create this event.",
+            operation="create_event",
+            retryable=False,
+            provider=True,
+        ) from None
+    except EventCreationUnconfirmedError:
+        raise ServiceError(
+            ErrorCode.PROVIDER_ERROR,
+            "Google Calendar creation could not be confirmed. "
+            "Check the calendar before retrying.",
+            operation="create_event",
+            retryable=False,
+            provider=True,
         ) from None
     return event
 

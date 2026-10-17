@@ -84,7 +84,8 @@ def test_missing_field_preserves_state(
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json()["error"]["code"] == "invalid_input"
+    assert response.json()["error"]["retryable"] is False
     assert provider_events == before
     google_service.events.return_value.insert.assert_not_called()
 
@@ -122,7 +123,8 @@ def test_invalid_field_preserves_state(
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json()["error"]["code"] == "invalid_input"
+    assert response.json()["error"]["retryable"] is False
     assert provider_events == before
     google_service.events.return_value.insert.assert_not_called()
 
@@ -154,10 +156,12 @@ def test_missing_authorization_returns_503_without_provider_write(
 
     assert response.status_code == 503
     assert response.json() == {
-        "detail": (
-            "Google Calendar authorization is unavailable. "
-            "Run scripts/google_calendar_auth.py."
-        )
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Google Calendar authorization is unavailable. "
+            "Run scripts/google_calendar_auth.py.",
+            "retryable": False,
+        }
     }
     assert provider_events == before
     google_service.events.return_value.insert.assert_not_called()
@@ -166,7 +170,7 @@ def test_missing_authorization_returns_503_without_provider_write(
 @pytest.mark.parametrize(
     "error",
     [
-        HttpError(Response({"status": "403"}), b'{"error": "private details"}'),
+        HttpError(Response({"status": "429"}), b'{"error": "private details"}'),
         TimeoutError("Private transport details"),
         TransportError("Private transport details"),
         HttpLib2Error("Private HTTP details"),
@@ -189,10 +193,12 @@ def test_provider_failure_returns_502_without_retry(
 
     assert response.status_code == 502
     assert response.json() == {
-        "detail": (
-            "Google Calendar creation could not be confirmed. "
-            "Check the calendar before retrying."
-        )
+        "error": {
+            "code": "provider_error",
+            "message": "Google Calendar creation could not be confirmed. "
+            "Check the calendar before retrying.",
+            "retryable": False,
+        }
     }
     assert provider_events == before
     execute.assert_called_once_with(num_retries=0)
@@ -212,6 +218,36 @@ def test_unusable_google_result_returns_502(
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 502
+    assert provider_events == before
+    execute.assert_called_once_with(num_retries=0)
+
+
+@pytest.mark.parametrize(
+    ("google_status", "status", "code"),
+    [(401, 503, "provider_unavailable"), (403, 403, "access_denied")],
+)
+def test_google_rejection_uses_the_public_error_contract(
+    client: TestClient,
+    event_payload: dict[str, object],
+    google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
+    google_status: int,
+    status: int,
+    code: str,
+) -> None:
+    before = deepcopy(provider_events)
+    execute = google_service.events.return_value.insert.return_value.execute
+    execute.side_effect = HttpError(
+        Response({"status": str(google_status)}),
+        b'{"error": {"message": "Private authorization details"}}',
+    )
+
+    response = client.post("/events", json=event_payload)
+
+    assert response.status_code == status
+    assert response.json()["error"]["code"] == code
+    assert response.json()["error"]["retryable"] is False
+    assert "Private" not in response.text
     assert provider_events == before
     execute.assert_called_once_with(num_retries=0)
 
@@ -240,7 +276,8 @@ def test_accepted_write_with_lost_response_is_not_retried(
     response = client.post("/events", json=event_payload)
 
     assert response.status_code == 502
-    assert "Check the calendar before retrying" in response.json()["detail"]
+    assert "Check the calendar before retrying" in response.json()["error"]["message"]
+    assert response.json()["error"]["retryable"] is False
     assert accepted == ["google-accepted-event"]
     assert client.get("/events/google-accepted-event").status_code == 200
     execute.assert_called_once_with(num_retries=0)

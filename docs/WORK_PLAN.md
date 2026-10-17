@@ -15,7 +15,7 @@ individual operation ownership.
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
 | Kristie Lee | `GET /events/{event_id}` | Level 5 implementation at `9fad9af` passes offline and real Google checks; see Level 5 verification guide; teammate review and matching PR CI pending | Level 5 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
-| Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
+| Jim Lo | `POST /events` | Levels 3–4 merged in PRs #19/#20; Level 5 provider classification committed at `b4c721e`; shared HTTP errors/validation pass local checks; real Level 5 verification pending | Level 5 teammate review and matching PR CI pending |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
@@ -392,7 +392,7 @@ the shared error handler and event GET Level 5. Split the work into:
 3. Verify real Google success and a practical provider failure, run required
    checks, and record reproducible evidence and cleanup.
 
-The first batch adds a distinct permission error and provider-involvement flag
+The first batch (`b4c721e`) adds a distinct permission error and provider-involvement flag
 for authorization errors. Rejected refreshes and remote 401s are distinguished
 from local setup problems. Known 403 quota/rate-limit responses remain provider
 failures. Existing 502 handling temporarily accepts the new permission error;
@@ -409,6 +409,23 @@ permission denial versus all three known 403 quota/rate reasons, remote 401,
 refresh rejection, local setup failures, unconfirmed writes, client cleanup,
 and propagation of unexpected programming errors. No real Google calls were
 made for this batch.
+
+Batch two maps creation failures to shared 403/503/502 errors and one sanitized
+log, always with retryable=false. The app-wide request-validation handler returns
+422/invalid_input without exposing inputs, bodies, headers, or raw exceptions.
+It uses the matched route name for logging; POST and PATCH invalid-body tests
+verify the shape and that no provider operation is called. PATCH's non-validation
+behavior is unchanged. Shared response models document validation and POST
+failure responses in OpenAPI. This shared 422 compatibility change must be
+communicated to the PATCH owner during PR review.
+
+Second-batch local checks on Python 3.14.8 with the locked dependency environment:
+239 tests passed with the existing Starlette TestClient deprecation warning;
+Ruff lint/format, strict mypy (36 source files), and diff checks passed. Tests
+check exact public errors, one sanitized failure log, remote versus local
+authorization, invalid input without provider operations, Google 401/403
+translation, and accepted writes with lost responses without retries. No real
+Google calls were made; real Level 5 verification remains in batch three.
 
 ## Ka Pui Cheung's DELETE Level 3 work
 
