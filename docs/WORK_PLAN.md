@@ -13,7 +13,7 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
+| Kristie Lee | `GET /events/{event_id}` | Level 5 implementation at `9fad9af` passes offline and real Google checks; see Level 5 verification guide; teammate review and matching PR CI pending | Level 5 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
@@ -89,14 +89,23 @@ PR CI remain required. Codex assisted with implementation, tests, and verificati
 
 Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
 errors, tests, and documentation. Provider translation and HTTP error/logging
-integration are implemented on this branch; real Google Level 5 verification,
-teammate review, and matching PR CI remain pending. Reviewer: not yet assigned;
-agree on a teammate reviewer before implementation. Codex assists with this
-plan and documentation. The planned contract is in the README's
+integration are implemented on this branch. Local checks and real Google Level 5
+verification passed at `9fad9af`; teammate review and matching PR CI remain
+pending. Reviewer: not yet assigned; assign one for PR review. Codex assisted
+with implementation, tests, documentation, and verification. The contract is in the README's
 [Level 5 event retrieval section](../README.md#level-5-event-retrieval-errors).
 The operation-specific status/retry policy and DELETE-compatible ID rule were
 confirmed by the student owner; this does not claim team-wide agreement.
 Have the team review these choices before merging.
+
+On October 17, 2026, all 212 tests and required local checks passed. The 18
+controlled-reader cases also passed with external connections and real
+credentials/provider creation blocked. Real TestClient requests with normal
+injection verified Google success, a Google missing-event failure, and local
+invalid input, including sanitized logs. No events changed. See
+[Level 5 verification and reproduction](EVENT_GET_LEVEL5_VERIFICATION.md).
+This evidence covers the implementation revision, not a later documentation
+commit, human server/curl demonstration, PR CI, or final release tag.
 
 Work is split into four commits:
 
@@ -115,7 +124,7 @@ Acceptance requires:
 
 - Preserve `200` and the existing four-field Event, timed-event restriction,
   empty-title policy, dependency injection, and provider client cleanup.
-- Implement every row of the planned error table, including distinct access
+- Implement every row of the error table, including distinct access
   denial, retryable temporary failures, and non-retryable invalid provider data.
 - Reject invalid ID syntax without calling the reader; accept recurring-instance
   syntax and distinguish a valid but nonexistent ID from invalid input.
