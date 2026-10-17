@@ -79,7 +79,7 @@ POST validates its own input separately.
 | Condition | HTTP status | JSON detail |
 | --- | --- | --- |
 | Google returns 404 | 404 | `Event not found` |
-| Missing/invalid token, insufficient token scope, or failed refresh | 503 | `Calendar authentication required` |
+| Missing/invalid token, insufficient token scope, failed refresh, or Google HTTP 401 | 503 | `Calendar authentication required` |
 | All-day event | 422 | `Only timed events are supported` |
 | Other Google HTTP errors, handled transport failures, or malformed provider data | 502 | `Calendar provider request failed` |
 
@@ -107,7 +107,7 @@ Failures will use the shared [error format](#error-format), for example:
 | Google reports that the event does not exist | 404 | `not_found` | `false` | Check the ID or choose another event |
 | All-day event cannot be represented by the timed-event model | 422 | `invalid_input` | `false` | Choose a timed event |
 | Google refuses permission; excludes rate-limit responses | 403 | `access_denied` | `false` | Resolve access before another request |
-| Authorization is missing, invalid, insufficiently scoped, or needs renewal | 503 | `provider_unavailable` | `false` | Repair authorization with the authentication script |
+| Authorization is missing, invalid, insufficiently scoped, needs renewal, or is rejected by Google with HTTP 401 | 503 | `provider_unavailable` | `false` | Repair authorization with the authentication script |
 | Timeout, temporary provider outage, or rate limit | 503 | `provider_unavailable` | `true` | Retry later; this read does not change state |
 | Malformed provider data or another expected provider failure outside the categories above | 502 | `provider_error` | `false` | Investigate before repeating the request |
 
