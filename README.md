@@ -87,6 +87,60 @@ The API does not expose provider error messages or launch browser login during
 requests. For 503, rerun the authentication script. Error handling does not cover
 every SDK exception; retry, cancellation, and uncertain write policies are later work.
 
+#### Planned Level 5 event retrieval errors
+
+This is the planned GET contract for `feature/calendar-event-get-level5-errors`,
+not implemented behavior. The current error table above remains authoritative
+until implementation and verification are complete. Kristie owns this change;
+teammate review of the contract is still required before merging.
+
+Successful reads retain the existing `200` response and four-field Event model.
+Failures will use the shared [error format](#error-format), for example:
+
+```json
+{"error": {"code": "not_found", "message": "Event not found.", "retryable": false}}
+```
+
+| Condition | HTTP status | `error.code` | `retryable` | Caller action |
+| --- | --- | --- | --- | --- |
+| ID violates the local format below | 422 | `invalid_input` | `false` | Correct the ID |
+| Google reports that the event does not exist | 404 | `not_found` | `false` | Check the ID or choose another event |
+| All-day event cannot be represented by the timed-event model | 422 | `invalid_input` | `false` | Choose a timed event |
+| Google refuses permission; excludes rate-limit responses | 403 | `access_denied` | `false` | Resolve access before another request |
+| Authorization is missing, invalid, insufficiently scoped, or needs renewal | 503 | `provider_unavailable` | `false` | Repair authorization with the authentication script |
+| Timeout, temporary provider outage, or rate limit | 503 | `provider_unavailable` | `true` | Retry later; this read does not change state |
+| Malformed provider data or another expected provider failure outside the categories above | 502 | `provider_error` | `false` | Investigate before repeating the request |
+
+The planned local ID rule is `[A-Za-z0-9_-]{1,1024}`, matching DELETE's
+validation policy. It permits recurring-instance IDs such as
+`abc123_20261016T150000Z`. Invalid IDs are rejected before calling the reader;
+valid syntax does not guarantee an event exists. An absent path segment does
+not match this route and is outside this operation's ID-validation contract.
+
+`retryable` describes repeating the same request unchanged; it does not enable
+automatic retries. The SDK's raw exception type, response payload, and error
+text remain internal to the provider implementation. The public contract is
+the status, application code, service-written message, and retryability above.
+Unexpected programming errors must not be silently reclassified as expected
+provider failures.
+
+Each expected failure will raise the shared `ServiceError`, producing one
+sanitized log on `calendar_service` with `operation="get_event"`, `error`,
+`provider`, and `status`. Local ID rejection has `provider=false`; a failure
+from a provider call or provider response has `provider=true`. Authorization
+failures use the shared definition (the provider was called or caused the
+failure), distinguishing local setup failure from a failed remote refresh.
+No tokens, credentials, authorization headers, request/response bodies, or
+raw exception messages are logged. No request ID is added in this change.
+
+This intentionally changes GET errors from `{"detail": ...}` to the shared
+shape, adds local ID validation and a distinct permission-denied response,
+and maps temporary failures to 503. Other operations and the app-wide FastAPI
+request-validation handler are outside this change; their owners coordinate
+those migrations separately. Controlled-provider HTTP tests, Google adapter
+translation tests, sanitized-log assertions, and a real Google success and
+missing-event check are required before calling this implemented.
+
 #### Level 3 event provider boundary
 
 `EventReader` in `app/event_provider.py` defines

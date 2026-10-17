@@ -85,6 +85,57 @@ ID. See [verification evidence](VERIFICATION.md#event-get-level-4-verification).
 Another teammate's review of production wiring and test substitution and matching
 PR CI remain required. Codex assisted with implementation, tests, and verification.
 
+## Kristie Lee's event GET Level 5 work
+
+Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
+errors, tests, and documentation. Status: contract planning only; no Level 5
+GET implementation or verification is claimed. Reviewer: not yet assigned;
+agree on a teammate reviewer before implementation. Codex assists with this
+plan and documentation. The planned contract is in the README's
+[Level 5 event retrieval section](../README.md#planned-level-5-event-retrieval-errors).
+The operation-specific status/retry policy and DELETE-compatible ID rule were
+confirmed by the student owner; this does not claim team-wide agreement.
+Have the team review these choices before merging.
+
+Work is split into four commits:
+
+1. Document the planned failure contract, compatibility changes, scope, and
+   acceptance criteria. Keep the current behavior clearly distinguished.
+2. Add provider-independent permission and temporary-failure distinctions,
+   translate Google failures inside `GoogleEventReader`, and test the adapter.
+   Do not treat rate-limit 403s as permission denials or hide programming errors.
+3. Validate IDs before calling the reader and map expected failures to the
+   existing `ServiceError` handler. Update controlled-reader HTTP tests and
+   affected regression expectations, including one sanitized log per failure.
+4. Record complete checks and real Google verification, update the README to
+   describe implemented behavior, and request teammate review and matching CI.
+
+Acceptance requires:
+
+- Preserve `200` and the existing four-field Event, timed-event restriction,
+  empty-title policy, dependency injection, and provider client cleanup.
+- Implement every row of the planned error table, including distinct access
+  denial, retryable temporary failures, and non-retryable invalid provider data.
+- Reject invalid ID syntax without calling the reader; accept recurring-instance
+  syntax and distinguish a valid but nonexistent ID from invalid input.
+- Keep SDK types and raw errors behind the provider boundary. Use fixed public
+  messages and the common logger without duplicate logs or sensitive content.
+- Cover success, invalid input, missing resource, access denial, unavailable
+  authorization, temporary provider failure, malformed data, and unsupported
+  events with deterministic offline tests. Restore dependency overrides.
+- Run required README checks on the final implementation revision. Verify a real
+  timed-event read and a syntactically valid missing ID through normal injection;
+  record responses, sanitized logs, revision, and any unverified cases honestly.
+- Obtain another teammate's review of the contract, translation, HTTP behavior,
+  tests, and docs, with CI evidence matching the revision to be merged.
+
+The shared handler from PR #28 supplies the logging requested by the sister-team
+[review comment](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/27#discussion_r4278070800).
+No separate route/provider failure logger is planned. App-wide FastAPI request
+validation and other owners' operations are separate team tasks, not silently
+included here. Final release, fresh-tag verification, demonstration, and private
+reflection remain milestone tasks beyond this operation PR.
+
 ## Juno Lee's calendar GET Level 4 work
 
 Juno owns the implementation; The deliverable is FastAPI
