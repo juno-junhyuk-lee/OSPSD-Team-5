@@ -6,13 +6,14 @@
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 - `app/calendar_provider.py`: typed calendar metadata interface; Google SDK details
-  stay in `GoogleCalendarReader` in `app/google_calendar.py`.
+  stay in `GoogleCalendarReader` in `app/google_calendar.py`. Metadata failures
+  use its service exceptions; calendar GET maps them to shared `ServiceError`.
 - `app/calendar_dependencies.py`: selects the calendar reader; calendar HTTP tests
   substitute it through FastAPI dependency overrides.
 
 - `app/errors.py`: Level 5 shared error format (`ServiceError`, `ErrorCode`),
   response schema, service/request-validation handlers, and sanitized failure
-  logs. DELETE, event GET, and POST use it.
+  logs. DELETE, both GETs, and POST use it.
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.

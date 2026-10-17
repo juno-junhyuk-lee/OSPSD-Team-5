@@ -215,7 +215,8 @@ Success returns `200 OK` with exactly three string fields:
 Only `primary` is supported. Its ID is a service lookup alias and remains
 `primary` in the response; callers must not interpret it as a Google account ID.
 The timezone is an IANA timezone name. Other IDs return `404 Not Found` with
-`{"detail": "Calendar not found"}` before any Google request.
+`{"error":{"code":"not_found","message":"Calendar not found.","retryable":false}}`
+before any Google request.
 This operation does not list calendars or events and does not alter event routes.
 
 #### Level 3 calendar provider boundary
@@ -229,9 +230,8 @@ and a timezone. No Google SDK types or payload fields appear in the interface.
 `GoogleCalendarReader` in `app/google_calendar.py` implements that contract. It
 owns token loading, the Google request, and translation from `summary` and
 `timeZone` into the public model. The route depends on the typed `CalendarReader`
-boundary and retains its existing 404, 503 authorization, and 502 provider-error
-responses. Existing `OSError`/`ValueError` and `RuntimeError` handling is preserved;
-consistent domain failure semantics belong to Level 5.
+boundary. Level 5 replaces generic exception handling with the calendar-specific
+service errors documented below; SDK exceptions remain inside the adapter.
 
 This boundary covers Juno's calendar metadata operation; event GET uses its
 own `EventReader` boundary described above. Codex assisted
@@ -257,6 +257,48 @@ Replacing the calendar provider requires another implementation of `CalendarRead
 and a change to the dependency's selection; the route contract remains the same.
 Local and real-provider evidence is recorded in `docs/VERIFICATION.md`. Teammate
 review of production wiring and test substitution remains required for Level 4.
+
+#### Level 5 calendar metadata errors
+
+Calendar GET uses the shared [error format](#error-format) and one sanitized
+failure log with `operation="get_calendar"`. Success still returns exactly
+`id`, `title`, and `time_zone`; only `primary` is supported.
+
+| Failure | Code | Status | Retryable |
+| --- | --- | --- | --- |
+| Unsupported calendar ID, or Google reports the calendar missing | `not_found` | 404 | false |
+| Missing/invalid token, rejected authorization, or failed renewal | `provider_unavailable` | 503 | false; authorize again first |
+| Google refuses permission | `access_denied` | 403 | false |
+| Timeout, transport failure, HTTP 408/429/500/502/503/504, or quota/rate-limit 403 | `provider_unavailable` | 503 | true; wait before retrying |
+| Invalid metadata or another handled provider failure | `provider_error` | 502 | false |
+
+Messages are fixed service-written text. For example:
+
+```json
+{"error":{"code":"access_denied","message":"Calendar access denied.","retryable":false}}
+```
+
+`CalendarReader` documents metadata-specific service exceptions in
+`app/calendar_provider.py`. `GoogleCalendarReader` translates Google failures;
+the route maps those service exceptions to `ServiceError`. Local authorization
+and unsupported-ID failures log `provider=false`; remote authorization and
+provider failures log `provider=true`. Expected failures have no stack trace,
+provider message, calendar ID, or request body in their log.
+
+The compatibility changes are the new error envelope, distinct 403 permission
+denials, and 503 temporary failures that previously returned 502 or escaped as
+500. Missing-calendar 404 and authorization-setup 503 statuses are preserved.
+This endpoint has no body or additional ID syntax constraint: unsupported
+string IDs remain 404. It does not introduce an operation-specific 422 case;
+app-wide request validation remains a separate team concern.
+
+`tests/test_calendars.py` checks responses and logs through an isolated controlled
+reader. `tests/test_google_calendar.py` checks SDK failure translation, metadata,
+client cleanup, and disabled retries. Unexpected programming errors propagate
+rather than being mislabeled as provider failures. Reads make one metadata
+request without automatic retries; credential renewal may add an auth request.
+See [calendar Level 5 verification](docs/CALENDAR_GET_LEVEL5_VERIFICATION.md)
+for check results, real-provider verification, and remaining review requirements.
 
 ### Event creation contract
 
@@ -664,9 +706,9 @@ the response and logs one JSON line on the `calendar_service` logger:
 
 `provider` is true when the provider was called or caused the failure. 5xx
 failures log at ERROR, others at WARNING, without stack traces, request bodies,
-or tokens. The service has no request ID yet, so none is logged. DELETE, event
-GET, and POST use this format, as do FastAPI request-validation failures. Other
-application errors still return `{"detail": ...}` until their owners migrate.
+or tokens. The service has no request ID yet, so none is logged. DELETE, both
+GETs, and POST use this format, as do FastAPI request-validation failures.
+PATCH's other application errors still return `{"detail": ...}` until migration.
 Request-validation logs use the matched route's operation name and
 `provider=false`; they never serialize the validation exception's inputs or body.
 
@@ -775,12 +817,10 @@ real-provider reproduction steps, and historical Level 1 verification.
 It maps `summary` to `title` and `timeZone` to `time_zone`, retaining
 `primary` as the response ID. The Google client closes after use.
 
-Token-file loading errors produce 503 with
-`{"detail": "Google authorization unavailable"}`.
-Handled Google HTTP/authentication errors and incomplete metadata produce
-502 with `{"detail": "Calendar provider unavailable"}`.
-Detailed failure handling, failure tests, and structured logging remain
-future work; some unhandled failures may return 500.
+The original Level 2 error responses have been replaced by the
+[Level 5 calendar metadata errors](#level-5-calendar-metadata-errors).
+Token setup failures return 503, permission denials 403, temporary failures 503,
+and malformed provider metadata 502, all with the shared envelope and logging.
 
 Calendar metadata requires
 `https://www.googleapis.com/auth/calendar.calendars.readonly`.
@@ -794,7 +834,7 @@ return 404. This read-only verification requires no event cleanup.
 
 Juno verified reauthorization and real HTTP retrieval.
 A second teammate must reproduce calendar retrieval.
-Run all local checks and verify CI after resolving these conflicts.
+Run all local checks and verify CI for the revision under review.
 
 ### Shared Google Calendar authentication
 

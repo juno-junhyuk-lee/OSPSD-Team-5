@@ -140,36 +140,47 @@ from app.main import app
 observed = []
 original_request = httplib2.Http.request
 
+
 def observe(self, uri, method="GET", *args, **kwargs):
     result = original_request(self, uri, method, *args, **kwargs)
     if "/calendar/v3/calendars/primary/events" in str(uri):
         observed.append((method, int(result[0].status)))
     return result
 
+
 title = f"POST Level 5 rejected probe {uuid4().hex}"
 assert not app.dependency_overrides
 with TemporaryDirectory() as directory:
     token = Path(directory) / "invalid-token.json"
-    token.write_text(json.dumps({
-        "token": "deliberately-invalid-post-level5-probe",
-        "refresh_token": None,
-        "client_id": "unused",
-        "client_secret": "unused",
-        "scopes": ["https://www.googleapis.com/auth/calendar.events"],
-        "expiry": (datetime.now(timezone.utc) + timedelta(hours=1))
-            .strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }), encoding="utf-8")
+    token.write_text(
+        json.dumps(
+            {
+                "token": "deliberately-invalid-post-level5-probe",
+                "refresh_token": None,
+                "client_id": "unused",
+                "client_secret": "unused",
+                "scopes": ["https://www.googleapis.com/auth/calendar.events"],
+                "expiry": (datetime.now(timezone.utc) + timedelta(hours=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
     with (
         patch.object(google_create_events, "TOKEN_PATH", token),
         patch.object(httplib2.Http, "request", observe),
         TestClient(app) as client,
     ):
         assert google_create_events.load_credentials().valid
-        response = client.post("/events", json={
-            "title": title,
-            "start_time": "2026-10-22T10:00:00-04:00",
-            "end_time": "2026-10-22T11:00:00-04:00",
-        })
+        response = client.post(
+            "/events",
+            json={
+                "title": title,
+                "start_time": "2026-10-22T10:00:00-04:00",
+                "end_time": "2026-10-22T11:00:00-04:00",
+            },
+        )
 assert observed == [("POST", 401)]
 assert response.status_code == 503
 assert response.json()["error"]["code"] == "provider_unavailable"
@@ -180,6 +191,28 @@ print(title, response.status_code, response.json())
 Check the service log for one `create_event` / `provider_unavailable` line with
 provider=true and status=503. The instrumentation only observes actual responses;
 do not replace SDK results or exceptions and call that a real-provider check.
+
+## Integration with calendar GET Level 5
+
+On October 17, 2026, at 17:45 EDT, the uncommitted merge of POST head `2b8af4b`
+with main `a6b6fa3` (PR #31) passed 277 tests, Ruff lint/format, strict mypy,
+and diff checks. Import and documentation conflicts were resolved by preserving
+calendar metadata errors and POST's schema/validation handler. The Python
+reproduction block above was formatted to satisfy the repository's format check.
+
+The merged working tree also passed a fresh live Uvicorn run: POST 201, HTTP GET
+200 matching the POST response, independent Google reads, invalid input without
+a write, persistence across restart, and HTTP DELETE 204 cleanup. Calendar GET
+returned 200 with metadata matching an independent read; an unsupported calendar
+returned 404/not_found with one provider=false log. The isolated invalid-token
+POST again reached Google, received one 401, and became 503/provider_unavailable
+with retryable=false and one provider=true log. Normal credentials were unchanged
+by that probe. All servers stopped, and independent Google retrieval confirmed
+the test event was cancelled; HTTP GET then returned 404.
+
+This run created only `Jim POST Level 5 verification 316d9def527b`, ID
+`3fbsncep4926aqa16itn07oqt8`, with the same time instants as the earlier run.
+It verifies the pending merged working tree, not a new commit or release tag.
 
 ## Remaining verification
 
