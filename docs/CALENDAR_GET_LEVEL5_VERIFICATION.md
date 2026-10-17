@@ -1,6 +1,6 @@
 # Calendar GET Level 5 verification
 
-Owner: Juno Lee. Reviewers: all teammates.
+Owner: Juno Lee. Reviewer: One of the Team
 Branch: `feature/calendar-get-level5-errors`.
 Codex assisted with implementation, tests, documentation, and verification.
 

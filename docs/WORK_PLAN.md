@@ -12,7 +12,7 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Juno Lee | `GET /calendars/{calendar_id}` | Level 5 implemented locally; verification and remaining work in calendar Level 5 guide | All teammates |
+| Juno Lee | `GET /calendars/{calendar_id}` | Level 5 implemented locally; verification and remaining work in calendar Level 5 guide | Level 5 reviewer to be agreed |
 | Kristie Lee | `GET /events/{event_id}` | Level 5 implementation at `9fad9af` passes offline and real Google checks; see Level 5 verification guide; teammate review and matching PR CI pending | Level 5 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
@@ -443,7 +443,7 @@ covering shipped work, changed decisions, blockers, and next steps.
 
 ## Juno Lee's calendar GET Level 5 work
 
-Owner: Juno Lee. Reviewers: all teammates, as requested by Juno.
+Owner: Juno Lee. Reviewer: Level 5 reviewer to be agreed.
 Branch: `feature/calendar-get-level5-errors`.
 
 Scope: calendar metadata failure translation, shared `ServiceError` responses,
