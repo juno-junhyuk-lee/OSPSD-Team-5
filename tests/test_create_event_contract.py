@@ -1,3 +1,5 @@
+import json
+import logging
 from collections.abc import Iterator
 from datetime import datetime
 
@@ -6,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.event_creation_dependencies import get_event_creator
 from app.event_creation_provider import (
+    EventCreationDeniedError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
     EventCreator,
@@ -61,7 +64,10 @@ def payload() -> dict[str, object]:
 
 
 def test_create_event_contract(
-    client: TestClient, creator: ControlledEventCreator, payload: dict[str, object]
+    client: TestClient,
+    creator: ControlledEventCreator,
+    payload: dict[str, object],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     response = client.post("/events", json=payload)
 
@@ -77,6 +83,9 @@ def test_create_event_contract(
     assert request.title == "Team Meeting"
     assert request.start_time == datetime.fromisoformat("2026-10-13T10:00:00-04:00")
     assert request.end_time == datetime.fromisoformat("2026-10-13T11:00:00-04:00")
+    assert not [
+        record for record in caplog.records if record.name == "calendar_service"
+    ]
 
 
 def test_repeated_creation_uses_returned_ids(
@@ -103,7 +112,13 @@ def test_missing_field_does_not_call_creator(
     response = client.post("/events", json=payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json() == {
+        "error": {
+            "code": "invalid_input",
+            "message": "Invalid request. Check required fields, types, and values.",
+            "retryable": False,
+        }
+    }
     assert creator.requests == []
 
 
@@ -131,7 +146,8 @@ def test_invalid_input_does_not_call_creator(
     response = client.post("/events", json=payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json()["error"]["code"] == "invalid_input"
+    assert response.json()["error"]["retryable"] is False
     assert creator.requests == []
 
 
@@ -153,19 +169,38 @@ def test_time_order_compares_instants(
 
 
 @pytest.mark.parametrize(
-    ("error", "status", "detail"),
+    ("error", "status", "code", "message", "provider"),
     [
         (
             EventCreationUnavailableError("private authorization"),
             503,
+            "provider_unavailable",
             "Google Calendar authorization is unavailable. "
             "Run scripts/google_calendar_auth.py.",
+            False,
+        ),
+        (
+            EventCreationUnavailableError("private refresh", provider=True),
+            503,
+            "provider_unavailable",
+            "Google Calendar authorization is unavailable. "
+            "Run scripts/google_calendar_auth.py.",
+            True,
+        ),
+        (
+            EventCreationDeniedError("private refusal"),
+            403,
+            "access_denied",
+            "Google Calendar denied permission to create this event.",
+            True,
         ),
         (
             EventCreationUnconfirmedError("private provider"),
             502,
+            "provider_error",
             "Google Calendar creation could not be confirmed. "
             "Check the calendar before retrying.",
+            True,
         ),
     ],
 )
@@ -175,12 +210,28 @@ def test_creation_failure_contract(
     payload: dict[str, object],
     error: Exception,
     status: int,
-    detail: str,
+    code: str,
+    message: str,
+    provider: bool,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     creator.error = error
 
-    response = client.post("/events", json=payload)
+    with caplog.at_level(logging.WARNING, logger="calendar_service"):
+        response = client.post("/events", json=payload)
 
     assert response.status_code == status
-    assert response.json() == {"detail": detail}
+    assert response.json() == {
+        "error": {"code": code, "message": message, "retryable": False}
+    }
     assert len(creator.requests) == 1
+    [record] = [r for r in caplog.records if r.name == "calendar_service"]
+    assert json.loads(record.getMessage()) == {
+        "operation": "create_event",
+        "error": code,
+        "provider": provider,
+        "status": status,
+    }
+    assert record.levelno == (logging.ERROR if status >= 500 else logging.WARNING)
+    assert record.exc_info is None
+    assert "private" not in response.text + caplog.text

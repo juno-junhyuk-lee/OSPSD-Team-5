@@ -76,7 +76,8 @@ def test_missing_field_preserves_state(
     response = client.patch(f"/events/{event_id}", json=payload)
 
     assert response.status_code == 422
-    assert isinstance(response.json()["detail"], list)
+    assert response.json()["error"]["code"] == "invalid_input"
+    assert response.json()["error"]["retryable"] is False
     assert provider_events == before
 
 

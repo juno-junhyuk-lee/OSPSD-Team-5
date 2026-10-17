@@ -13,6 +13,7 @@ from pydantic import AwareDatetime, BaseModel, Field, ValidationError
 from requests.exceptions import RequestException
 
 from app.event_creation_provider import (
+    EventCreationDeniedError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
 )
@@ -24,6 +25,13 @@ TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
 
 class GoogleCalendarSetupError(RuntimeError):
     """Local authorization needs attention before creating an event."""
+
+    def __init__(self, message: str, *, provider: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
+
+
+RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
 
 
 class _GoogleEventTime(BaseModel):
@@ -61,11 +69,13 @@ def load_credentials() -> Credentials:
             credentials.refresh(Request())
         except RefreshError as error:
             raise GoogleCalendarSetupError(
-                "Run scripts/google_calendar_auth.py to renew local authorization."
+                "Run scripts/google_calendar_auth.py to renew local authorization.",
+                provider=True,
             ) from error
         if not credentials.valid or not credentials.has_scopes(SCOPES):
             raise GoogleCalendarSetupError(
-                "Refreshed authorization lacks valid calendar.events access."
+                "Refreshed authorization lacks valid calendar.events access.",
+                provider=True,
             )
         TOKEN_PATH.write_text(credentials.to_json(), encoding="utf-8")
     return credentials
@@ -108,9 +118,27 @@ class GoogleEventCreator:
         try:
             return create_google_event(request)
         except GoogleCalendarSetupError as error:
-            raise EventCreationUnavailableError from error
+            raise EventCreationUnavailableError(provider=error.provider) from error
+        except RefreshError as error:
+            raise EventCreationUnavailableError(provider=True) from error
+        except HttpError as error:
+            if error.resp.status == 401:
+                raise EventCreationUnavailableError(provider=True) from error
+            if error.resp.status == 403:
+                details = error.error_details
+                reasons = (
+                    {
+                        detail.get("reason")
+                        for detail in details
+                        if isinstance(detail, dict)
+                    }
+                    if isinstance(details, list)
+                    else set()
+                )
+                if not reasons & RATE_LIMIT_REASONS:
+                    raise EventCreationDeniedError from error
+            raise EventCreationUnconfirmedError from error
         except (
-            HttpError,
             TransportError,
             HttpLib2Error,
             RequestException,

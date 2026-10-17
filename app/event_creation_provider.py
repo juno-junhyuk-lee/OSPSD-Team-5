@@ -6,7 +6,15 @@ from app.models import CreateEventRequest, Event
 
 
 class EventCreationUnavailableError(Exception):
-    """Local authorization is unavailable; no provider write was attempted."""
+    """Authorization is unavailable or rejected; creation was not authorized."""
+
+    def __init__(self, message: str = "", *, provider: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
+
+
+class EventCreationDeniedError(Exception):
+    """The provider refused permission to create the event."""
 
 
 class EventCreationUnconfirmedError(Exception):
@@ -21,8 +29,10 @@ class EventCreator(Protocol):
 
         Return the generated id, normalized title, and the supplied time instants.
         Each successful call creates a distinct event; creation is not idempotent.
-        Raise EventCreationUnavailableError before a write if authorization is
-        unusable, or EventCreationUnconfirmedError when the result is uncertain.
+        Raise EventCreationUnavailableError if authorization is unusable or
+        rejected; its provider flag records remote authorization involvement.
+        Raise EventCreationDeniedError when the provider refuses permission,
+        or EventCreationUnconfirmedError when the result is uncertain.
         Do not automatically retry an uncertain write.
         """
         ...

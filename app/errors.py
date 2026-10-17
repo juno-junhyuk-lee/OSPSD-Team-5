@@ -5,7 +5,9 @@ import logging
 from enum import StrEnum
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 logger = logging.getLogger("calendar_service")
 
@@ -18,6 +20,16 @@ class ErrorCode(StrEnum):
     ACCESS_DENIED = "access_denied"
     PROVIDER_ERROR = "provider_error"
     PROVIDER_UNAVAILABLE = "provider_unavailable"
+
+
+class ErrorDetails(BaseModel):
+    code: ErrorCode
+    message: str
+    retryable: bool
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetails
 
 
 STATUS_BY_CODE = {
@@ -83,4 +95,20 @@ def service_error_handler(_request: Request, error: Exception) -> JSONResponse:
                 "retryable": error.retryable,
             }
         },
+    )
+
+
+def request_validation_handler(request: Request, _error: Exception) -> JSONResponse:
+    """Reject invalid requests without exposing validation inputs or bodies."""
+    assert isinstance(_error, RequestValidationError)
+    operation = getattr(request.scope.get("route"), "name", "request_validation")
+    return service_error_handler(
+        request,
+        ServiceError(
+            ErrorCode.INVALID_INPUT,
+            "Invalid request. Check required fields, types, and values.",
+            operation=operation,
+            retryable=False,
+            provider=False,
+        ),
     )
