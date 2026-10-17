@@ -40,6 +40,8 @@ uv run uvicorn app.main:app --reload
 Keep the server running while making requests in another terminal. Stop it with
 Ctrl+C. Swagger UI: http://localhost:8000/docs
 
+Endpoints that call Google need a local `token.json`. Create it first with [Shared Google Calendar authentication](#shared-google-calendar-authentication); reviewers outside the team should follow [External reviewers](#external-reviewers). The offline tests need neither.
+
 ### Event retrieval contract
 
 `GET /events/{event_id}` reads one timed event from the authenticated test
@@ -702,6 +704,12 @@ in the browser and approve event access within five minutes. The script stores
 `token.json` locally, refreshes usable expired tokens, and requests authorization
 again if a token is revoked or lacks the agreed scope. Each teammate generates
 their own local token. Never commit either JSON file or print its contents.
+
+#### External reviewers
+
+Reviewers outside the team do not use the shared account or its password. Contact the team privately and send the Google account email you want to test with. We add that email to the app's test users and send you `credentials.json` privately. Save it in the repository root, run the authentication script above, and sign in with your own account.
+
+The service then reads and writes that account's primary calendar, so use an account meant for testing and delete any events you create. While the app is in Testing, Google expires its authorization after seven days; run the script again to reauthorize.
 
 The verification request lists up to ten events from `primary` without changing
 state. Copy a returned API event ID to verify that specific event:
