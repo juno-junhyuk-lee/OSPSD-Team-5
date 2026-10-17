@@ -13,7 +13,7 @@ individual operation ownership.
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
 | Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
+| Kristie Lee | `GET /events/{event_id}` | Level 5 implementation at `9fad9af` passes offline and real Google checks; see Level 5 verification guide; teammate review and matching PR CI pending | Level 5 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
 | Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
@@ -84,6 +84,75 @@ through normal injection returned 200 for the existing event and 404 for an abse
 ID. See [verification evidence](VERIFICATION.md#event-get-level-4-verification).
 Another teammate's review of production wiring and test substitution and matching
 PR CI remain required. Codex assisted with implementation, tests, and verification.
+
+## Kristie Lee's event GET Level 5 work
+
+Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
+errors, tests, and documentation. Provider translation and HTTP error/logging
+integration are implemented on this branch. Local checks and real Google Level 5
+verification passed at `9fad9af`; teammate review and matching PR CI remain
+pending. Reviewer: not yet assigned; assign one for PR review. Codex assisted
+with implementation, tests, documentation, and verification. The contract is in the README's
+[Level 5 event retrieval section](../README.md#level-5-event-retrieval-errors).
+The operation-specific status/retry policy and DELETE-compatible ID rule were
+confirmed by the student owner; this does not claim team-wide agreement.
+Have the team review these choices before merging.
+
+On October 17, 2026, all 212 tests and required local checks passed. The 18
+controlled-reader cases also passed with external connections and real
+credentials/provider creation blocked. Real TestClient requests with normal
+injection verified Google success, a Google missing-event failure, and local
+invalid input, including sanitized logs. No events changed. See
+[Level 5 verification and reproduction](EVENT_GET_LEVEL5_VERIFICATION.md).
+This evidence covers the implementation revision, not a later documentation
+commit, human server/curl demonstration, PR CI, or final release tag.
+
+Review follow-up: kc5931 identified cancelled events returning 200 after DELETE
+in PR #30. The uncommitted fix based on `997261f` now rejects cancelled records
+before field translation. All 216 tests and required checks passed, and an
+existing cancelled Google event returned 404/not_found with one sanitized log
+through normal injection. No events were changed in the live check. See the
+[follow-up evidence](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up).
+Updated reviewer confirmation and matching PR CI remain pending.
+
+Work is split into four commits:
+
+1. Document the planned failure contract, compatibility changes, scope, and
+   acceptance criteria. Keep the current behavior clearly distinguished.
+2. Add provider-independent permission and temporary-failure distinctions,
+   translate Google failures inside `GoogleEventReader`, and test the adapter.
+   Do not treat rate-limit 403s as permission denials or hide programming errors.
+3. Validate IDs before calling the reader and map expected failures to the
+   existing `ServiceError` handler. Update controlled-reader HTTP tests and
+   affected regression expectations, including one sanitized log per failure.
+4. Record complete checks and real Google verification, update the README to
+   describe implemented behavior, and request teammate review and matching CI.
+
+Acceptance requires:
+
+- Preserve `200` and the existing four-field Event, timed-event restriction,
+  empty-title policy, dependency injection, and provider client cleanup.
+- Implement every row of the error table, including distinct access
+  denial, retryable temporary failures, and non-retryable invalid provider data.
+- Reject invalid ID syntax without calling the reader; accept recurring-instance
+  syntax and distinguish a valid but nonexistent ID from invalid input.
+- Keep SDK types and raw errors behind the provider boundary. Use fixed public
+  messages and the common logger without duplicate logs or sensitive content.
+- Cover success, invalid input, missing resource, access denial, unavailable
+  authorization, temporary provider failure, malformed data, and unsupported
+  events with deterministic offline tests. Restore dependency overrides.
+- Run required README checks on the final implementation revision. Verify a real
+  timed-event read and a syntactically valid missing ID through normal injection;
+  record responses, sanitized logs, revision, and any unverified cases honestly.
+- Obtain another teammate's review of the contract, translation, HTTP behavior,
+  tests, and docs, with CI evidence matching the revision to be merged.
+
+The shared handler from PR #28 supplies the logging requested by the sister-team
+[review comment](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/27#discussion_r4278070800).
+No separate route/provider failure logger is planned. App-wide FastAPI request
+validation and other owners' operations are separate team tasks, not silently
+included here. Final release, fresh-tag verification, demonstration, and private
+reflection remain milestone tasks beyond this operation PR.
 
 ## Juno Lee's calendar GET Level 4 work
 

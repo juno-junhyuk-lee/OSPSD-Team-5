@@ -1,11 +1,24 @@
+import json
 from typing import cast
 from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
+from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
 
-from app.event_provider import CalendarAuthenticationError, EventReader
+from app.event_provider import (
+    CalendarAuthenticationError,
+    CalendarProviderError,
+    EventAccessDeniedError,
+    EventNotFoundError,
+    EventReader,
+    EventReadUnavailableError,
+    UnsupportedEventError,
+)
 from app.google_events import GoogleEventReader
 
 
@@ -51,6 +64,51 @@ def test_untitled_event_returns_empty_title(client: TestClient, provider: Mock) 
     assert response.json()["title"] == ""
 
 
+@pytest.mark.parametrize(
+    "data",
+    [
+        {**timed_event(), "status": "cancelled"},
+        {"id": "google-event", "status": "cancelled"},
+    ],
+    ids=["full-event", "minimal-tombstone"],
+)
+def test_cancelled_event_returns_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    data: dict[str, object],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    service = Mock()
+    execute = service.events.return_value.get.return_value.execute
+    execute.return_value = data
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    response = client.get("/events/google-event")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
+    [record] = [
+        record for record in caplog.records if record.name == "calendar_service"
+    ]
+    assert json.loads(record.getMessage()) == {
+        "operation": "get_event",
+        "error": "not_found",
+        "provider": True,
+        "status": 404,
+    }
+    assert record.exc_info is None
+    assert "Provider meeting" not in response.text
+    assert "Provider meeting" not in caplog.text
+    execute.assert_called_once_with()
+    service.close.assert_called_once_with()
+
+
 def test_all_day_event_is_rejected(client: TestClient, provider: Mock) -> None:
     provider.return_value = {
         "id": "all-day",
@@ -62,12 +120,31 @@ def test_all_day_event_is_rejected(client: TestClient, provider: Mock) -> None:
     response = client.get("/events/all-day")
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Only timed events are supported"}
+    assert response.json() == {
+        "error": {
+            "code": "invalid_input",
+            "message": "Only timed events are supported.",
+            "retryable": False,
+        }
+    }
 
 
-@pytest.mark.parametrize("status", [401, 403, 429, 500, 503])
+@pytest.mark.parametrize(
+    ("status", "expected_status", "code", "retryable"),
+    [
+        (403, 403, "access_denied", False),
+        (429, 503, "provider_unavailable", True),
+        (500, 503, "provider_unavailable", True),
+        (503, 503, "provider_unavailable", True),
+    ],
+)
 def test_provider_failure_is_not_not_found(
-    client: TestClient, provider: Mock, status: int
+    client: TestClient,
+    provider: Mock,
+    status: int,
+    expected_status: int,
+    code: str,
+    retryable: bool,
 ) -> None:
     provider.side_effect = HttpError(
         Mock(status=status, reason="Provider failure"),
@@ -76,19 +153,58 @@ def test_provider_failure_is_not_not_found(
 
     response = client.get("/events/google-event")
 
-    assert response.status_code == 502
-    assert response.json() == {"detail": "Calendar provider request failed"}
+    assert response.status_code == expected_status
+    assert response.json()["error"]["code"] == code
+    assert response.json()["error"]["retryable"] is retryable
+    assert "Sensitive" not in response.text
 
 
-def test_network_failure_returns_bad_gateway(
+def test_google_401_requires_authentication(
+    client: TestClient, provider: Mock, caplog: pytest.LogCaptureFixture
+) -> None:
+    provider.side_effect = HttpError(
+        Mock(status=401, reason="Unauthorized"),
+        b'{"error": {"message": "Sensitive provider message"}}',
+    )
+
+    response = client.get("/events/google-event")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Calendar authentication required. Run scripts/google_calendar_auth.py.",
+            "retryable": False,
+        }
+    }
+    assert "Sensitive" not in response.text
+    [record] = [
+        record for record in caplog.records if record.name == "calendar_service"
+    ]
+    assert json.loads(record.getMessage()) == {
+        "operation": "get_event",
+        "error": "provider_unavailable",
+        "provider": True,
+        "status": 503,
+    }
+    assert "Sensitive" not in caplog.text
+
+
+def test_network_failure_returns_service_unavailable(
     client: TestClient, provider: Mock
 ) -> None:
     provider.side_effect = TimeoutError("network timeout")
 
     response = client.get("/events/google-event")
 
-    assert response.status_code == 502
-    assert response.json() == {"detail": "Calendar provider request failed"}
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Calendar provider temporarily unavailable. Retry later.",
+            "retryable": True,
+        }
+    }
 
 
 @pytest.mark.parametrize(
@@ -112,7 +228,13 @@ def test_malformed_provider_data_returns_bad_gateway(
     response = client.get("/events/broken")
 
     assert response.status_code == 502
-    assert response.json() == {"detail": "Calendar provider request failed"}
+    assert response.json() == {
+        "error": {
+            "code": "provider_error",
+            "message": "Calendar provider request failed.",
+            "retryable": False,
+        }
+    }
 
 
 def test_authentication_required_returns_service_unavailable(
@@ -126,7 +248,13 @@ def test_authentication_required_returns_service_unavailable(
     response = client.get("/events/google-event")
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "Calendar authentication required"}
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "Calendar authentication required. Run scripts/google_calendar_auth.py.",
+            "retryable": False,
+        }
+    }
 
 
 @pytest.mark.parametrize(
@@ -144,10 +272,10 @@ def test_google_client_is_closed_after_request(
         execute.side_effect = HttpError(
             Mock(status=status, reason="Failure"), b'{"error": {"message": "Failure"}}'
         )
-        expected_status = 404 if status == 404 else 502
+        expected_status = 404 if status == 404 else 503
     elif outcome == "timeout":
         execute.side_effect = TimeoutError("timeout")
-        expected_status = 502
+        expected_status = 503
     elif outcome == "malformed":
         execute.return_value = None
         expected_status = 502
@@ -185,4 +313,147 @@ def test_event_reader_translates_requested_event(
     service.events.return_value.get.assert_called_once_with(
         calendarId="primary", eventId="google-event"
     )
+    service.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("status", "reason", "expected"),
+    [
+        (401, "authError", CalendarAuthenticationError),
+        (404, "notFound", EventNotFoundError),
+        (403, "forbidden", EventAccessDeniedError),
+        (403, "rateLimitExceeded", EventReadUnavailableError),
+        (403, "userRateLimitExceeded", EventReadUnavailableError),
+        (403, "quotaExceeded", EventReadUnavailableError),
+        (408, "timeout", EventReadUnavailableError),
+        (429, "rateLimitExceeded", EventReadUnavailableError),
+        (500, "backendError", EventReadUnavailableError),
+        (502, "badGateway", EventReadUnavailableError),
+        (503, "unavailable", EventReadUnavailableError),
+        (504, "timeout", EventReadUnavailableError),
+        (400, "badRequest", CalendarProviderError),
+        (409, "conflict", CalendarProviderError),
+    ],
+)
+def test_reader_translates_http_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    status: int,
+    reason: str,
+    expected: type[Exception],
+) -> None:
+    service = Mock()
+    failure = HttpError(
+        Mock(status=status, reason="Sensitive provider reason"),
+        json.dumps(
+            {"error": {"message": "Sensitive message", "errors": [{"reason": reason}]}}
+        ).encode(),
+    )
+    execute = service.events.return_value.get.return_value.execute
+    execute.side_effect = failure
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    with pytest.raises(expected) as raised:
+        GoogleEventReader().get_event("google-event")
+
+    assert type(raised.value) is expected
+    assert raised.value.__cause__ is failure
+    assert str(raised.value) == ""
+    if isinstance(raised.value, CalendarAuthenticationError):
+        assert raised.value.provider is True
+    execute.assert_called_once_with()
+    service.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        TimeoutError("Sensitive timeout"),
+        ConnectionError("Sensitive connection"),
+        TransportError("Sensitive transport"),
+        HttpLib2Error("Sensitive HTTP transport"),
+        RequestsTimeout("Sensitive requests timeout"),
+        RequestsConnectionError("Sensitive requests connection"),
+    ],
+)
+def test_reader_translates_transport_failure(
+    monkeypatch: pytest.MonkeyPatch, failure: Exception
+) -> None:
+    service = Mock()
+    execute = service.events.return_value.get.return_value.execute
+    execute.side_effect = failure
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    with pytest.raises(EventReadUnavailableError) as raised:
+        GoogleEventReader().get_event("google-event")
+
+    assert raised.value.__cause__ is failure
+    assert str(raised.value) == ""
+    execute.assert_called_once_with()
+    service.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (None, CalendarProviderError),
+        ({**timed_event(), "status": "cancelled"}, EventNotFoundError),
+        ({"id": "google-event", "status": "cancelled"}, EventNotFoundError),
+        ({"id": "broken"}, CalendarProviderError),
+        ({"id": "broken", "start": {}, "end": {}}, CalendarProviderError),
+        (
+            {
+                "id": "broken",
+                "start": {"dateTime": "invalid"},
+                "end": {"dateTime": "2026-10-05T11:00:00Z"},
+            },
+            CalendarProviderError,
+        ),
+        (
+            {
+                "id": "all-day",
+                "start": {"date": "2026-10-05"},
+                "end": {"date": "2026-10-06"},
+            },
+            UnsupportedEventError,
+        ),
+    ],
+)
+def test_reader_distinguishes_invalid_and_unsupported_data(
+    monkeypatch: pytest.MonkeyPatch, data: object, expected: type[Exception]
+) -> None:
+    service = Mock()
+    service.events.return_value.get.return_value.execute.return_value = data
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    with pytest.raises(expected) as raised:
+        GoogleEventReader().get_event("google-event")
+
+    assert type(raised.value) is expected
+    service.close.assert_called_once_with()
+
+
+def test_reader_preserves_authorization_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    failure = CalendarAuthenticationError()
+    monkeypatch.setattr("app.google_events.calendar_client", Mock(side_effect=failure))
+
+    with pytest.raises(CalendarAuthenticationError) as raised:
+        GoogleEventReader().get_event("google-event")
+
+    assert raised.value is failure
+
+
+def test_reader_does_not_hide_programming_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = Mock()
+    failure = TypeError("Unexpected programming error")
+    service.events.return_value.get.return_value.execute.side_effect = failure
+    monkeypatch.setattr("app.google_events.calendar_client", lambda: service)
+
+    with pytest.raises(TypeError) as raised:
+        GoogleEventReader().get_event("google-event")
+
+    assert raised.value is failure
     service.close.assert_called_once_with()

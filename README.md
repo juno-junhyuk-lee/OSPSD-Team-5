@@ -76,16 +76,67 @@ events. These policies are covered by tests and require teammate review.
 The shared Event model does not add timezone or start/end ordering validation;
 POST validates its own input separately.
 
-| Condition | HTTP status | JSON detail |
-| --- | --- | --- |
-| Google returns 404 | 404 | `Event not found` |
-| Missing/invalid token, insufficient token scope, or failed refresh | 503 | `Calendar authentication required` |
-| All-day event | 422 | `Only timed events are supported` |
-| Other Google HTTP errors, handled transport failures, or malformed provider data | 502 | `Calendar provider request failed` |
+#### Level 5 event retrieval errors
 
-The API does not expose provider error messages or launch browser login during
-requests. For 503, rerun the authentication script. Error handling does not cover
-every SDK exception; retry, cancellation, and uncertain write policies are later work.
+This contract is implemented on `feature/calendar-event-get-level5-errors`.
+Local checks and real Google success/failure verification passed at `9fad9af`;
+see [Level 5 verification and reproduction](docs/EVENT_GET_LEVEL5_VERIFICATION.md).
+Teammate review and matching PR CI remain pending; this does not claim final
+release completion. Kristie owns this change. The service never starts browser
+authorization during a request.
+
+Successful reads retain the existing `200` response and four-field Event model.
+Failures use the shared [error format](#error-format), for example:
+
+```json
+{"error": {"code": "not_found", "message": "Event not found.", "retryable": false}}
+```
+
+| Condition | HTTP status | `error.code` | `retryable` | Caller action |
+| --- | --- | --- | --- | --- |
+| ID violates the local format below | 422 | `invalid_input` | `false` | Correct the ID |
+| Google returns 404 or an event with `status: cancelled` (including deleted events) | 404 | `not_found` | `false` | Check the ID or choose another event |
+| All-day event cannot be represented by the timed-event model | 422 | `invalid_input` | `false` | Choose a timed event |
+| Google refuses permission; excludes rate-limit responses | 403 | `access_denied` | `false` | Resolve access before another request |
+| Authorization is missing, invalid, insufficiently scoped, needs renewal, or is rejected by Google with HTTP 401 | 503 | `provider_unavailable` | `false` | Repair authorization with the authentication script |
+| Timeout, temporary provider outage, or rate limit | 503 | `provider_unavailable` | `true` | Retry later; this read does not change state |
+| Malformed provider data or another expected provider failure outside the categories above | 502 | `provider_error` | `false` | Investigate before repeating the request |
+
+The local ID rule is `[A-Za-z0-9_-]{1,1024}`, matching DELETE's
+validation policy. It permits recurring-instance IDs such as
+`abc123_20261016T150000Z`. Invalid IDs are rejected before calling the reader;
+valid syntax does not guarantee an event exists. An absent path segment does
+not match this route and is outside this operation's ID-validation contract.
+
+Cancelled/deleted events are rejected before translating title or time fields.
+This includes minimal cancellation records containing only an ID and status.
+After a successful DELETE, event GET returns 404 even if Google retains the
+event in Trash; the API does not expose a Trash or restore operation.
+
+`retryable` describes repeating the same request unchanged; it does not enable
+automatic retries. The SDK's raw exception type, response payload, and error
+text remain internal to the provider implementation. The public contract is
+the status, application code, service-written message, and retryability above.
+Unexpected programming errors must not be silently reclassified as expected
+provider failures.
+
+Each expected failure raises the shared `ServiceError`, producing one
+sanitized log on `calendar_service` with `operation="get_event"`, `error`,
+`provider`, and `status`. Local ID rejection has `provider=false`; a failure
+from a provider call or provider response has `provider=true`. Authorization
+failures use the shared definition (the provider was called or caused the
+failure), distinguishing local setup failure from a failed remote refresh.
+No tokens, credentials, authorization headers, request/response bodies, or
+raw exception messages are logged. No request ID is added in this change.
+
+This intentionally changes GET errors from `{"detail": ...}` to the shared
+shape, adds local ID validation and a distinct permission-denied response,
+and maps temporary failures to 503. Other operations and the app-wide FastAPI
+request-validation handler are outside this change; their owners coordinate
+those migrations separately. Controlled-provider HTTP tests, Google adapter
+translation tests, and sanitized-log assertions cover the implementation.
+Real Google success, missing-event, and local-invalid-input checks are recorded
+in the verification guide; teammate and final-release verification remain separate.
 
 #### Level 3 event provider boundary
 
@@ -94,14 +145,15 @@ every SDK exception; retry, cancellation, and uncertain write policies are later
 calendar without changing events. The input is a provider-assigned event ID;
 the output is the service's four-field `Event` model, with an empty title when
 no title is supplied. The interface exposes no Google SDK types or payloads.
-The same module declares the existing missing-event, unsupported-event,
-authentication, and provider errors; their HTTP meanings remain unchanged.
+The same module declares missing-event, unsupported-event, authentication, and
+provider errors. Level 5 adds permission and temporary-failure distinctions;
+their current HTTP meanings are in the error table above.
 
 `GoogleEventReader` in `app/google_events.py` implements the contract. It uses
 `app/google_auth.py` for local authorization and client construction, owns the
 Google request and response translation, and closes the client on success or
 failure. The event GET route calls the typed `EventReader` boundary and maps
-service errors to the existing 404, 422, 503, and 502 responses.
+service errors to the documented 403, 404, 422, 503, and 502 responses.
 
 The Level 3 boundary was merged in PR #17. Codex assisted with implementation,
 tests, and documentation. POST uses a provider-independent interface with fixed
@@ -115,11 +167,12 @@ and returns it as an `EventReader`. FastAPI supplies it to the event GET route
 through `Depends`; the route does not construct or import the concrete reader.
 The dependency creates a lightweight reader per request. Authorization and SDK
 client creation occur during retrieval, and the Google implementation closes
-the client after use. Existing success and error responses remain unchanged.
+the client after use. Level 4 preserved the earlier responses; Level 5 changes
+the error contract as described above while preserving the success response.
 
 `tests/test_events.py` overrides that dependency with a `ControlledEventReader`
 using its own TestClient fixture, without the shared Google SDK mocks. It checks
-success, missing events, 422/503/502 errors, and request ID forwarding. Each test
+success, missing events, 403/422/503/502 errors, and event ID forwarding. Each test
 gets fresh reader state and restores previous dependency overrides in `finally`.
 Google translation, authentication, cleanup, and CRUD tests keep their existing
 provider fixtures; the controlled reader does not reproduce Google's behavior.
@@ -559,8 +612,8 @@ the response and logs one JSON line on the `calendar_service` logger:
 
 `provider` is true when the provider was called or caused the failure. 5xx
 failures log at ERROR, others at WARNING, without stack traces, request bodies,
-or tokens. The service has no request ID yet, so none is logged. DELETE uses
-this format now; the other operations still return `{"detail": ...}` until
+or tokens. The service has no request ID yet, so none is logged. DELETE and
+event GET use this format now; the other operations still return `{"detail": ...}` until
 their owners move them to Level 5.
 
 ### Code map and request flow
@@ -573,12 +626,17 @@ returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
 FastAPI supplies the calendar reader through `get_calendar_reader` in
 `app/calendar_dependencies.py`.
 
-Event GET calls the `EventReader` interface, implemented by
+Event GET validates the ID before calling the `EventReader` interface, implemented by
 `GoogleEventReader.get_event` in `app/google_events.py`. It requests Google's
 `events.get` on `primary` and translates the result to `Event`.
 FastAPI supplies the reader through `get_event_reader` in `app/event_dependencies.py`.
 `app/google_auth.py` loads and refreshes the local token for event retrieval.
 Neither GET operation starts browser authorization during a request.
+
+Event GET translates expected service errors to `ServiceError`; the registered
+handler in `app/errors.py` renders the common error body and one sanitized log.
+SDK exceptions stay inside `GoogleEventReader`; local versus remote authorization
+failure is carried as provider-independent metadata for logging.
 
 The synchronous handlers keep blocking SDK work off the async event loop.
 Each request constructs its own authorized client. Both GET operations use

@@ -1,5 +1,26 @@
 # Verification and integration notes
 
+## Event GET Level 5 verification
+
+On October 17, 2026, implementation `9fad9af` passed locked environment setup,
+Ruff lint/format, strict mypy, all 212 tests, and diff checks on Windows with
+Python 3.14.8. A separate controlled-reader run passed all 18 cases with external
+connections, real credential loading, and real Google client creation blocked.
+The existing TestClient deprecation warning remains.
+
+Real Google reads through normal FastAPI injection and TestClient verified 200
+with four public fields matching an independent Google read, real 404/not_found,
+and local 422/invalid_input. Each failure logged exactly one sanitized line with
+the correct provider flag. No events were changed. This is implementation
+verification, not a server/curl demo, teammate execution, or final-tag verification.
+See [the full record and PowerShell guide](EVENT_GET_LEVEL5_VERIFICATION.md).
+The [cancelled-event review follow-up](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up)
+records the later fix on the working tree based on `997261f`: 216 tests and
+required checks passed, and reading an existing cancelled Google event returned
+404/not_found with one sanitized log. No live events were changed.
+Teammate review, matching PR CI, and final release verification remain pending.
+Earlier sections below describe their historical revisions and error contracts.
+
 ## POST Level 4 verification
 
 Implementation commit `c54f52e` was verified on October 12, 2026, in Jim's macOS
