@@ -4,7 +4,14 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Response
 
 from app.calendar_dependencies import get_calendar_reader
-from app.calendar_provider import CalendarReader
+from app.calendar_provider import (
+    CalendarMetadataAccessDeniedError,
+    CalendarMetadataAuthenticationError,
+    CalendarMetadataNotFoundError,
+    CalendarMetadataProviderError,
+    CalendarMetadataUnavailableError,
+    CalendarReader,
+)
 from app.errors import ErrorCode, ServiceError, service_error_handler
 from app.event_creation_dependencies import get_event_creator
 from app.event_creation_provider import (
@@ -53,17 +60,55 @@ def get_calendar(
 ) -> Calendar:
     """Retrieve the authenticated user's primary calendar metadata."""
     if calendar_id != "primary":
-        raise HTTPException(status_code=404, detail="Calendar not found")
+        raise ServiceError(
+            ErrorCode.NOT_FOUND,
+            "Calendar not found.",
+            operation="get_calendar",
+            retryable=False,
+            provider=False,
+        )
     try:
         return reader.get_primary_calendar()
-    except (OSError, ValueError) as error:
-        raise HTTPException(
-            status_code=503, detail="Google authorization unavailable"
-        ) from error
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=502, detail="Calendar provider unavailable"
-        ) from error
+    except CalendarMetadataNotFoundError:
+        raise ServiceError(
+            ErrorCode.NOT_FOUND,
+            "Calendar not found.",
+            operation="get_calendar",
+            retryable=False,
+            provider=True,
+        ) from None
+    except CalendarMetadataAuthenticationError as error:
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Calendar authentication required. Run scripts/google_calendar_auth.py.",
+            operation="get_calendar",
+            retryable=False,
+            provider=error.provider,
+        ) from None
+    except CalendarMetadataAccessDeniedError:
+        raise ServiceError(
+            ErrorCode.ACCESS_DENIED,
+            "Calendar access denied.",
+            operation="get_calendar",
+            retryable=False,
+            provider=True,
+        ) from None
+    except CalendarMetadataUnavailableError:
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Calendar provider temporarily unavailable.",
+            operation="get_calendar",
+            retryable=True,
+            provider=True,
+        ) from None
+    except CalendarMetadataProviderError:
+        raise ServiceError(
+            ErrorCode.PROVIDER_ERROR,
+            "Calendar provider request failed.",
+            operation="get_calendar",
+            retryable=False,
+            provider=True,
+        ) from None
 
 
 @app.get("/events/{event_id}", response_model=Event)
