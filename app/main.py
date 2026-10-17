@@ -8,6 +8,7 @@ from app.calendar_provider import CalendarReader
 from app.errors import ErrorCode, ServiceError, service_error_handler
 from app.event_creation_dependencies import get_event_creator
 from app.event_creation_provider import (
+    EventCreationDeniedError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
     EventCreator,
@@ -148,7 +149,7 @@ def create_event(
                 "Run scripts/google_calendar_auth.py."
             ),
         ) from None
-    except EventCreationUnconfirmedError:
+    except EventCreationDeniedError, EventCreationUnconfirmedError:
         raise HTTPException(
             status_code=502,
             detail=(

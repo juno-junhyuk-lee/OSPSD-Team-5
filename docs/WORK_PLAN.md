@@ -380,6 +380,36 @@ restart persistence, other GET checks, and cleanup. See
 review both normal wiring and test substitution; matching PR CI and release
 verification remain required.
 
+## Jim Lo's POST Level 5 work
+
+Branch: `feature/calendar-post-level5-errors`, from main at `ef1afe8`, including
+the shared error handler and event GET Level 5. Split the work into:
+
+1. Classify creation authorization, permission-denied, and unconfirmed outcomes
+   behind `EventCreator`; test Google translation and document the contract.
+2. Map POST to `ServiceError` and the shared logger, normalize FastAPI request
+   validation, and update controlled-provider and affected HTTP tests/docs.
+3. Verify real Google success and a practical provider failure, run required
+   checks, and record reproducible evidence and cleanup.
+
+The first batch adds a distinct permission error and provider-involvement flag
+for authorization errors. Rejected refreshes and remote 401s are distinguished
+from local setup problems. Known 403 quota/rate-limit responses remain provider
+failures. Existing 502 handling temporarily accepts the new permission error;
+the shared HTTP format, 403 mapping, and failure logging belong to batch two.
+No automatic insertion retry, local fallback, new dependencies, or credential
+files are added. Shared credential loading behavior stays compatible with PATCH
+and DELETE. Fast checks do not establish real Google behavior; that verification
+remains in batch three.
+
+First-batch local checks on Python 3.14.8 with the locked dependency environment:
+226 tests passed with the existing Starlette TestClient deprecation warning;
+Ruff lint/format, strict mypy, and diff checks passed. Provider tests cover
+permission denial versus all three known 403 quota/rate reasons, remote 401,
+refresh rejection, local setup failures, unconfirmed writes, client cleanup,
+and propagation of unexpected programming errors. No real Google calls were
+made for this batch.
+
 ## Ka Pui Cheung's DELETE Level 3 work
 
 Ka Pui owns `EventDeleter` and its Google implementation, following the

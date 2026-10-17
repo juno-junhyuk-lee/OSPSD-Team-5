@@ -317,8 +317,9 @@ retrieves the provider event by the returned ID, including after a server restar
 The service does not keep a local event mirror. All-day events are outside this
 contract.
 
-Setup failure returns 503 with a `detail` string directing the developer to the
-authorization script. Provider HTTP/transport failure or an unusable response
+Setup failure or rejected Google authorization returns 503 with a `detail`
+string directing the developer to the authorization script.
+Other provider HTTP/transport failure or an unusable response
 returns 502 with a `detail` string stating that creation could not be confirmed
 and to check the calendar before retrying. Neither failure falls back to local
 creation. A 502 does not guarantee that Google created no event; do not blindly repeat a write with an uncertain result. Raw provider
@@ -349,7 +350,7 @@ mapping inside `app/google_create_events.py`. Callers rely on the returned ID,
 not on a particular ID format. Repeating a successful request creates another
 event; this contract does not provide idempotency.
 
-The two service errors describe the existing POST failure behavior:
+At Level 3, two service errors described POST failure behavior:
 
 - `EventCreationUnavailableError`: local authorization is unusable before any
   provider write; the route preserves the existing 503 response.
@@ -361,7 +362,7 @@ The two service errors describe the existing POST failure behavior:
 `GoogleEventCreator` in `app/google_create_events.py` implements the interface.
 It delegates insertion and translation to the existing `create_google_event`
 helper and converts its known setup, SDK, transport, and response-validation
-failures into the two service errors above. The POST handler calls an
+failures into the service errors above. The POST handler calls an
 `EventCreator` and handles those errors without inspecting Google SDK exceptions.
 At implementation commit `8741c90`, Level 3 selected Google in `app/main.py`.
 Current provider injection is described below. The shared `load_credentials`
@@ -397,6 +398,31 @@ tests, blocked-network/credential controlled tests, and a real create/read,
 restart, and cleanup workflow through normal injection at `c54f52e`. Teammate
 review of both normal wiring and test substitution and matching PR CI remain
 pending.
+
+#### Level 5 event creation provider failures
+
+The first Level 5 change distinguishes three provider-independent outcomes:
+
+| Service error | Meaning | Planned Level 5 response |
+| --- | --- | --- |
+| `EventCreationUnavailableError` | Local authorization is unusable, token refresh was rejected, or Google returned 401 | `503 / provider_unavailable`, not retryable until authorization is fixed |
+| `EventCreationDeniedError` | Google returned a permission-denied 403, excluding known quota/rate limits | `403 / access_denied`, not retryable |
+| `EventCreationUnconfirmedError` | Other Google HTTP failures, transport failures, or unusable provider data prevent confirmation | `502 / provider_error`, not retryable without checking the calendar |
+
+The authorization error's `provider` flag is false for local setup failures and
+true for rejected refreshes, unusable refreshed credentials, or remote 401s.
+The shared setup exception adds this flag without changing credential loading,
+refresh, or storage behavior for PATCH and DELETE. SDK details remain inside
+the Google adapter. Known 403 rate/quota failures remain provider failures,
+not permission denials. Google insertion still uses `num_retries=0`.
+
+This first change keeps the existing `detail` HTTP responses: authorization
+failures return 503; permission denials temporarily retain the existing broad
+502 response. The next change will map the new distinctions to `ServiceError`,
+use the shared error/log handler, and normalize request-validation failures.
+The response format and 403 mapping in the table are planned, not implemented
+HTTP behavior yet. POST does not take an existing resource ID, so it does not
+add a missing-event error merely to mirror GET or DELETE.
 
 ### Create and retrieve an event
 
