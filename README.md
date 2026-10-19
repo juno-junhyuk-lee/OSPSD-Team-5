@@ -687,6 +687,8 @@ Replacing the provider requires an `EventDeleter` implementation and a change to
 `get_event_deleter`; the route keeps the same contract. See
 [DELETE Level 4 verification](docs/DELETE_LEVEL4_VERIFICATION.md).
 
+See [DELETE Level 5 verification](docs/DELETE_LEVEL5_VERIFICATION.md) for real Google results, the operation's cost, and why the service uses one shared error format.
+
 ### Error format
 
 Operations moved to Level 5 return failures in one shape, defined in

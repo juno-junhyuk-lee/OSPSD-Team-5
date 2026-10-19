@@ -44,7 +44,7 @@ rate-limit, and cancelled-event cases.
 | Date | Verifier | Revision | Result |
 | --- | --- | --- | --- |
 | _pending_ | Niriti Pahadi | | POST → PATCH → GET; invalid body 422; cancelled/deleted ID 404 |
-| _pending_ | second teammate | | |
+| 2026-10-18 | Ka Pui Cheung | `6dc7861` (PR #33 head) | POST → PATCH 200 → GET shows the change; end before start 422 `invalid_input`; `bad id!` 422 with no Google call; unknown ID 404; PATCH after DELETE 404. Each failure logged one sanitized line. Repeated on `main` `2fc8c4c`; see [DELETE Level 5 verification](DELETE_LEVEL5_VERIFICATION.md). |
 
 ## Reproduce the live checks
 
