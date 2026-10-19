@@ -13,7 +13,7 @@
 
 - `app/errors.py`: Level 5 shared error format (`ServiceError`, `ErrorCode`),
   response schema, service/request-validation handlers, and sanitized failure
-  logs. DELETE, both GETs, and POST use it.
+  logs. DELETE, both GETs, POST, and PATCH use it.
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
@@ -80,10 +80,10 @@ Google calls, translation, and known failure handling stay in `GoogleEventCreato
 The POST handler maps permission, authorization, and unconfirmed creation errors
 to shared 403/503/502 responses with retryable=false. Use the shared handler for
 one sanitized failure log; do not add route/adapter logging or expose raw input.
-FastAPI request validation uses the shared 422 shape, including PATCH's body
-errors. Other PATCH errors remain under its existing contract until migration.
-Preserve the shared `load_credentials` helper used by PATCH and DELETE while
-refactoring creation. `app/event_creation_dependencies.py` selects Google and
+FastAPI request validation uses the shared 422 shape for POST and PATCH body
+errors. PATCH application failures use the shared `ServiceError` format with
+operation `update_event`. Preserve the shared `load_credentials` helper used by
+PATCH and DELETE while refactoring creation. `app/event_creation_dependencies.py` selects Google and
 supplies the creator through `Depends`; POST does not construct the concrete
 provider. Controlled creator HTTP tests override that dependency, use fresh
 creator state, and restore prior overrides in `finally`. Keep Google provider

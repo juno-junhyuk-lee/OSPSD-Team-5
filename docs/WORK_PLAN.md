@@ -16,7 +16,7 @@ individual operation ownership.
 | Kristie Lee | `GET /events/{event_id}` | Level 5 implementation at `9fad9af` passes offline and real Google checks; see Level 5 verification guide; teammate review and matching PR CI pending | Level 5 reviewer to be agreed |
 | Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
 | Jim Lo | `POST /events` | Levels 3–4 merged in PRs #19/#20; Level 5 implementation at `ba8ebf3` passes offline and real Google checks; see POST Level 5 verification | Level 5 teammate review and matching PR CI pending |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–4 merged (PRs #13/#21/#22); Level 5 shared errors on `feature/calendar-patch-level5-errors` | Level 5 reviewer to be agreed |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 
@@ -38,7 +38,18 @@ owns dependency injection for event PATCH:
 2. Test the HTTP contract with a controlled updater and dependency overrides.
 3. Document wiring and verification evidence.
 
-The public PATCH contract is unchanged.
+Level 4 was merged in PR #22. The public PATCH success contract is unchanged.
+
+## Niriti Pahadi's event PATCH Level 5 work
+
+Branch: `feature/calendar-patch-level5-errors`. Niriti owns Level 5 for PATCH:
+
+1. Add `EventUpdateDeniedError` and provider-aware unavailable errors.
+2. Classify Google 401/403/404/410 and transport failures in `GoogleEventUpdater`.
+3. Map PATCH through shared `ServiceError` (including event-ID validation).
+4. Update offline contract/provider tests and document verification.
+
+See [PATCH Level 5 verification](PATCH_LEVEL5_VERIFICATION.md).
 
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
