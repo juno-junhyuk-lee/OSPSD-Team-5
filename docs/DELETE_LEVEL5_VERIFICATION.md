@@ -15,6 +15,8 @@ Full workflow on `2fc8c4c`, run from a fresh clone after `uv sync --frozen`, Ruf
 
 | Step | Expected | Actual |
 | --- | --- | --- |
+| GET `/calendars/primary` | 200 with id, title, time zone | 200 |
+| GET another calendar ID | 404 `not_found`, no Google call | 404, `provider: false` |
 | POST a timed event | 201 with Google's ID | 201 |
 | GET it | 200, same four fields | 200 |
 | PATCH title and end | 200 with new fields | 200 |
@@ -25,7 +27,7 @@ Full workflow on `2fc8c4c`, run from a fresh clone after `uv sync --frozen`, Ruf
 | GET `bad id!` | 422 `invalid_input`, no Google call | 422, `provider: false` |
 | GET an all-day event | 422 `invalid_input` | 422; the event was then deleted (204) |
 
-Calendar GET returned 403 `access_denied` in this run because the local token predates the `calendar.calendars.readonly` scope. The README requires reauthorizing such tokens; this is a local setup issue, not a DELETE result.
+A first run returned 403 `access_denied` for calendar GET because the local token predated the `calendar.calendars.readonly` scope. After reauthorizing with `scripts/google_calendar_auth.py`, as the README requires for such tokens, the whole table above passed on the same revision.
 
 Not exercised live: the 403 `access_denied`, 502 and 503 paths. Offline tests in `tests/test_google_delete_events.py`, `tests/test_delete_events.py` and `tests/test_delete_event_contract.py` cover them.
 
