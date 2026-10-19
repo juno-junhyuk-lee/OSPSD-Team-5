@@ -1,7 +1,7 @@
 import re
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.exceptions import RequestValidationError
 
 from app.calendar_dependencies import get_calendar_reader
@@ -47,6 +47,7 @@ from app.event_provider import (
 )
 from app.event_update_dependencies import get_event_updater
 from app.event_update_provider import (
+    EventUpdateDeniedError,
     EventUpdateNotFoundError,
     EventUpdater,
     EventUpdateUnavailableError,
@@ -235,32 +236,65 @@ def create_event(
     return event
 
 
-@app.patch("/events/{event_id}", response_model=Event)
+@app.patch(
+    "/events/{event_id}",
+    response_model=Event,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 def update_event(
     event_id: str,
     request: UpdateEventRequest,
     updater: Annotated[EventUpdater, Depends(get_event_updater)],
 ) -> Event:
     """Update a timed Google event and return the refreshed Event fields."""
+    if not EVENT_ID_PATTERN.fullmatch(event_id):
+        raise ServiceError(
+            ErrorCode.INVALID_INPUT,
+            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
+            operation="update_event",
+            retryable=False,
+            provider=False,
+        )
     try:
         return updater.update_event(event_id, request)
     except EventUpdateNotFoundError:
-        raise HTTPException(status_code=404, detail="Event not found") from None
-    except EventUpdateUnavailableError:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Google Calendar authorization is unavailable. "
-                "Run scripts/google_calendar_auth.py."
-            ),
+        raise ServiceError(
+            ErrorCode.NOT_FOUND,
+            "Event not found.",
+            operation="update_event",
+            retryable=False,
+            provider=True,
+        ) from None
+    except EventUpdateDeniedError:
+        raise ServiceError(
+            ErrorCode.ACCESS_DENIED,
+            "Google Calendar denied permission to update this event.",
+            operation="update_event",
+            retryable=False,
+            provider=True,
+        ) from None
+    except EventUpdateUnavailableError as error:
+        raise ServiceError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Google Calendar authorization is unavailable. "
+            "Run scripts/google_calendar_auth.py.",
+            operation="update_event",
+            retryable=False,
+            provider=error.provider,
         ) from None
     except EventUpdateUnconfirmedError:
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                "Google Calendar update could not be confirmed. "
-                "Check the calendar before retrying."
-            ),
+        raise ServiceError(
+            ErrorCode.PROVIDER_ERROR,
+            "Google Calendar update could not be confirmed. "
+            "Check the calendar before retrying.",
+            operation="update_event",
+            retryable=False,
+            provider=True,
         ) from None
 
 

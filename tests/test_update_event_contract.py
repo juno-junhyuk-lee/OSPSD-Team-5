@@ -1,3 +1,5 @@
+import json
+import logging
 from collections.abc import Iterator
 from datetime import datetime
 
@@ -6,11 +8,13 @@ from fastapi.testclient import TestClient
 
 from app.event_update_dependencies import get_event_updater
 from app.event_update_provider import (
+    EventUpdateDeniedError,
     EventUpdateNotFoundError,
     EventUpdater,
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
 )
+from app.google_update_events import GoogleEventUpdater
 from app.main import app
 from app.models import Event, UpdateEventRequest
 
@@ -61,6 +65,10 @@ def payload() -> dict[str, object]:
     }
 
 
+def test_normal_requests_use_google() -> None:
+    assert isinstance(get_event_updater(), GoogleEventUpdater)
+
+
 def test_update_event_contract(
     client: TestClient, updater: ControlledEventUpdater, payload: dict[str, object]
 ) -> None:
@@ -79,6 +87,17 @@ def test_update_event_contract(
     assert request.title == "Updated Meeting"
     assert request.start_time == datetime.fromisoformat("2026-10-13T11:00:00-04:00")
     assert request.end_time == datetime.fromisoformat("2026-10-13T12:00:00-04:00")
+
+
+def test_success_does_not_log_failure(
+    client: TestClient,
+    payload: dict[str, object],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="calendar_service"):
+        assert client.patch("/events/test-event", json=payload).status_code == 200
+
+    assert not [r for r in caplog.records if r.name == "calendar_service"]
 
 
 @pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
@@ -110,24 +129,30 @@ def test_equal_times_does_not_call_updater(
 
 
 @pytest.mark.parametrize(
-    ("error", "status", "detail"),
+    ("error", "status", "code", "retryable", "provider"),
     [
-        (
-            EventUpdateNotFoundError("private missing"),
-            404,
-            "Event not found",
-        ),
+        (EventUpdateNotFoundError("private missing"), 404, "not_found", False, True),
+        (EventUpdateDeniedError("private refusal"), 403, "access_denied", False, True),
         (
             EventUpdateUnavailableError("private authorization"),
             503,
-            "Google Calendar authorization is unavailable. "
-            "Run scripts/google_calendar_auth.py.",
+            "provider_unavailable",
+            False,
+            False,
+        ),
+        (
+            EventUpdateUnavailableError("private remote auth", provider=True),
+            503,
+            "provider_unavailable",
+            False,
+            True,
         ),
         (
             EventUpdateUnconfirmedError("private provider"),
             502,
-            "Google Calendar update could not be confirmed. "
-            "Check the calendar before retrying.",
+            "provider_error",
+            False,
+            True,
         ),
     ],
 )
@@ -135,14 +160,55 @@ def test_update_failure_contract(
     client: TestClient,
     updater: ControlledEventUpdater,
     payload: dict[str, object],
+    caplog: pytest.LogCaptureFixture,
     error: Exception,
     status: int,
-    detail: str,
+    code: str,
+    retryable: bool,
+    provider: bool,
 ) -> None:
     updater.error = error
 
-    response = client.patch("/events/test-event", json=payload)
+    with caplog.at_level(logging.WARNING, logger="calendar_service"):
+        response = client.patch("/events/test-event", json=payload)
 
+    body = response.json()
     assert response.status_code == status
-    assert response.json() == {"detail": detail}
+    assert set(body) == {"error"}
+    assert set(body["error"]) == {"code", "message", "retryable"}
+    assert body["error"]["code"] == code
+    assert body["error"]["retryable"] is retryable
+    assert "private" not in response.text
     assert len(updater.calls) == 1
+    [record] = [r for r in caplog.records if r.name == "calendar_service"]
+    assert json.loads(record.getMessage()) == {
+        "operation": "update_event",
+        "error": code,
+        "provider": provider,
+        "status": status,
+    }
+    assert "private" not in caplog.text
+
+
+@pytest.mark.parametrize("event_id", ["bad%20id", "x" * 1025, "semi;colon", "dot.ted"])
+def test_invalid_event_id_is_rejected_before_provider(
+    client: TestClient,
+    updater: ControlledEventUpdater,
+    event_id: str,
+    payload: dict[str, object],
+) -> None:
+    response = client.patch(f"/events/{event_id}", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_input"
+    assert response.json()["error"]["retryable"] is False
+    assert updater.calls == []
+
+
+def test_recurring_instance_id_is_accepted(
+    client: TestClient, updater: ControlledEventUpdater, payload: dict[str, object]
+) -> None:
+    response = client.patch("/events/abc123_20261016T150000Z", json=payload)
+
+    assert response.status_code == 200
+    assert updater.calls[0][0] == "abc123_20261016T150000Z"

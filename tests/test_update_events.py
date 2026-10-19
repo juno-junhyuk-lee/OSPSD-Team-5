@@ -58,7 +58,13 @@ def test_update_unknown_event_preserves_state(
     response = client.patch("/events/missing-event", json=UPDATE)
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Event not found"}
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
     assert provider_events == before
 
 
@@ -129,7 +135,13 @@ def test_gone_google_event_returns_not_found(
     response = client.patch("/events/test-event", json=UPDATE)
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Event not found"}
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
 
 
 def test_patch_after_delete_does_not_call_patch(
@@ -144,30 +156,51 @@ def test_patch_after_delete_does_not_call_patch(
     response = client.patch(f"/events/{event_id}", json=UPDATE)
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Event not found"}
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
     google_service.events.return_value.patch.assert_not_called()
 
 
 @pytest.mark.parametrize(
-    "failure",
+    ("failure", "status", "code"),
     [
-        HttpError(Mock(status=403, reason="Forbidden"), b'{"error": "secret detail"}'),
-        HttpError(Mock(status=500, reason="Server Error"), b""),
-        TimeoutError("network timeout"),
+        (
+            HttpError(
+                Mock(status=403, reason="Forbidden"),
+                b'{"error": "secret detail"}',
+            ),
+            403,
+            "access_denied",
+        ),
+        (
+            HttpError(Mock(status=500, reason="Server Error"), b""),
+            502,
+            "provider_error",
+        ),
+        (TimeoutError("network timeout"), 502, "provider_error"),
     ],
 )
-def test_provider_failure_returns_bad_gateway(
+def test_provider_failure_returns_classified_error(
     client: TestClient,
     google_service: MagicMock,
     provider_events: dict[str, dict[str, object]],
     failure: Exception,
+    status: int,
+    code: str,
 ) -> None:
     execute = google_service.events.return_value.patch.return_value.execute
     execute.side_effect = failure
 
     response = client.patch("/events/test-event", json=UPDATE)
 
-    assert response.status_code == 502
+    assert response.status_code == status
+    assert response.json()["error"]["code"] == code
+    assert response.json()["error"]["retryable"] is False
     assert "secret" not in response.text
     assert "test-event" in provider_events
 
@@ -183,4 +216,6 @@ def test_missing_authorization_returns_unavailable(
         response = client.patch("/events/test-event", json=UPDATE)
 
     assert response.status_code == 503
+    assert response.json()["error"]["code"] == "provider_unavailable"
+    assert response.json()["error"]["retryable"] is False
     google_service.events.return_value.patch.assert_not_called()

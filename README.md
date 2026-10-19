@@ -475,9 +475,8 @@ errors, and stack traces. Successful creation produces no failure log.
 Compatibility: POST errors change from `detail` to `error`, and a permission
 denial now returns 403 instead of the earlier broad 502. Successful responses
 and validation rules are unchanged. FastAPI request-validation errors across
-the app now use the shared shape, including PATCH's 422 response; PATCH's other
-errors still use its earlier contract. Swagger documents the shared validation
-response and POST's 403/502/503 responses.
+the app now use the shared shape, including PATCH. Swagger documents the shared
+validation response and operation 403/404/502/503 responses.
 
 POST does not take an existing resource ID, so it does not add a missing-event
 error merely to mirror GET or DELETE. Controlled tests verify failure responses
@@ -554,18 +553,21 @@ Success returns `200 OK` with the existing four-field `Event` response. The `id`
 is unchanged. The title is stripped of surrounding whitespace. A following
 `GET /events/{event_id}` returns the same JSON.
 
-| Result | Status | Body | State change? |
-| --- | --- | --- | --- |
-| Updated | `200` | `Event` JSON | Yes |
-| Unknown, deleted, or cancelled ID (Google 404/410, or `events.get` status `cancelled` before patch) | `404` | `{"detail": "Event not found"}` | No |
-| Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | Shared `invalid_input` error, `retryable=false` | No |
-| Local authorization missing or unusable | `503` | `detail` naming the auth script | No |
-| Google rejected the call, failed, or the response was unusable | `502` | update could not be confirmed | Uncertain — check calendar before retry |
+| Result | Status | `error.code` | `retryable` | State change? |
+| --- | --- | --- | --- | --- |
+| Updated | `200` | none | Not needed | Yes |
+| ID is empty, over 1024 characters, or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` | No |
+| Unknown, deleted, or cancelled ID (Google 404/410, or `events.get` status `cancelled` before patch) | `404` | `not_found` | `false` | No |
+| Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | `invalid_input` | `false` | No |
+| Google refused access (403 that is not a rate limit) | `403` | `access_denied` | `false` | No |
+| Local authorization missing or unusable, or remote authorization rejected | `503` | `provider_unavailable` | `false` | No |
+| Google failed, rate-limited, or the response was unusable | `502` | `provider_error` | `false`; check calendar before retry | Uncertain |
 
-Partial/optional fields, all-day events, and changing `id` are outside this
-contract. Offline tests cover success with GET match, unknown ID, validation
-without state changes, provider failures, and missing authorization. Real
-Google verification evidence is in
+Failures use the shared [error format](#error-format). An invalid ID is
+rejected before any Google call. Partial/optional fields, all-day events, and
+changing `id` are outside this contract. Offline tests cover success with GET
+match, unknown ID, validation without state changes, provider failures, and
+missing authorization. Real Google verification evidence is in
 [PATCH Level 2 verification](docs/PATCH_LEVEL2_VERIFICATION.md).
 
 #### Level 3 event update provider boundary
@@ -580,19 +582,29 @@ update contract. Niriti Pahadi owns this boundary for PATCH through Levels 1–5
 The interface uses service models and exposes no SDK requests, credentials, or
 provider response types. `GoogleEventUpdater` in `app/google_update_events.py`
 keeps `events.get`/`events.patch`, cancelled-status checks, and Google field
-mapping behind that contract. The PATCH handler calls an `EventUpdater` and maps
-service errors to the existing 404, 503, and 502 responses. Fixed Google
-selection is supplied by FastAPI through `get_event_updater` in
-`app/event_update_dependencies.py` (Level 4).
-
-| Service error | HTTP mapping |
-| --- | --- |
-| `EventUpdateNotFoundError` | `404` Event not found |
-| `EventUpdateUnavailableError` | `503` authorization unavailable |
-| `EventUpdateUnconfirmedError` | `502` update could not be confirmed |
+mapping behind that contract. FastAPI supplies the updater through
+`get_event_updater` in `app/event_update_dependencies.py` (Level 4).
 
 See [PATCH Level 3 verification](docs/PATCH_LEVEL3_VERIFICATION.md) and
 [PATCH Level 4 verification](docs/PATCH_LEVEL4_VERIFICATION.md).
+
+#### Level 5 event update errors
+
+Niriti Pahadi owns PATCH Level 5. The Google adapter classifies authorization,
+permission, not-found, and unconfirmed failures into update service errors. The
+PATCH route maps them through the shared `ServiceError` handler:
+
+| Service error | HTTP | Code | Retryable |
+| --- | --- | --- | --- |
+| Invalid event ID or body | `422` | `invalid_input` | `false` |
+| `EventUpdateNotFoundError` | `404` | `not_found` | `false` |
+| `EventUpdateDeniedError` | `403` | `access_denied` | `false` |
+| `EventUpdateUnavailableError` | `503` | `provider_unavailable` | `false` |
+| `EventUpdateUnconfirmedError` | `502` | `provider_error` | `false` |
+
+One sanitized failure log is written per failure. Uncertain updates are never
+automatically retried. See
+[PATCH Level 5 verification](docs/PATCH_LEVEL5_VERIFICATION.md).
 
 ### Event deletion contract
 
@@ -707,9 +719,8 @@ the response and logs one JSON line on the `calendar_service` logger:
 `provider` is true when the provider was called or caused the failure. 5xx
 failures log at ERROR, others at WARNING, without stack traces, request bodies,
 or tokens. The service has no request ID yet, so none is logged. DELETE, both
-GETs, and POST use this format, as do FastAPI request-validation failures.
-PATCH's other application errors still return `{"detail": ...}` until migration.
-Request-validation logs use the matched route's operation name and
+GETs, POST, and PATCH use this format, as do FastAPI request-validation
+failures. Request-validation logs use the matched route's operation name and
 `provider=false`; they never serialize the validation exception's inputs or body.
 
 ### Code map and request flow
@@ -759,7 +770,7 @@ PATCH validates and normalizes `UpdateEventRequest`, then calls
 `load_credentials`, checks cancelled status with `events.get`, calls
 `events.patch` on `primary` once without retries, and translates the response
 to `Event`. The adapter maps missing/cancelled events and other failures into
-service errors; the PATCH handler retains its 404, 503, and 502 responses.
+service errors; the PATCH handler maps them through shared `ServiceError`.
 Controlled updater tests override the dependency without constructing Google
 clients.
 
