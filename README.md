@@ -267,7 +267,7 @@ failure log with `operation="get_calendar"`. Success still returns exactly
 | Failure | Code | Status | Retryable |
 | --- | --- | --- | --- |
 | Unsupported calendar ID, or Google reports the calendar missing | `not_found` | 404 | false |
-| Missing/invalid token, rejected authorization, or failed renewal | `provider_unavailable` | 503 | false; authorize again first |
+| Missing/invalid token, token without `calendar.calendars.readonly`, rejected authorization, or failed renewal | `provider_unavailable` | 503 | false; authorize again first |
 | Google refuses permission | `access_denied` | 403 | false |
 | Timeout, transport failure, HTTP 408/429/500/502/503/504, or quota/rate-limit 403 | `provider_unavailable` | 503 | true; wait before retrying |
 | Invalid metadata or another handled provider failure | `provider_error` | 502 | false |

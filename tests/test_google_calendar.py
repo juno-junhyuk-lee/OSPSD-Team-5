@@ -30,7 +30,7 @@ def service(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     }
     monkeypatch.setattr(
         "app.google_calendar.Credentials.from_authorized_user_file",
-        lambda path: object(),
+        lambda path: MagicMock(),
     )
     build = MagicMock()
     build.return_value.__enter__.return_value = sdk
@@ -158,3 +158,23 @@ def test_programming_error_is_not_relabelled(service: MagicMock) -> None:
     with pytest.raises(TypeError, match="bug"):
         GoogleCalendarReader().get_primary_calendar()
     assert_client_closed(service)
+
+
+def test_token_without_calendar_scope_needs_authorization(
+    service: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    credentials = MagicMock()
+    credentials.has_scopes.return_value = False
+    monkeypatch.setattr(
+        "app.google_calendar.Credentials.from_authorized_user_file",
+        lambda path: credentials,
+    )
+
+    with pytest.raises(CalendarMetadataAuthenticationError) as raised:
+        GoogleCalendarReader().get_primary_calendar()
+
+    assert raised.value.provider is False
+    credentials.has_scopes.assert_called_once_with(
+        ["https://www.googleapis.com/auth/calendar.calendars.readonly"]
+    )
+    service.client_builder.assert_not_called()

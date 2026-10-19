@@ -18,6 +18,7 @@ from app.calendar_provider import (
 from app.models import Calendar
 
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
+SCOPES = ["https://www.googleapis.com/auth/calendar.calendars.readonly"]
 RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
 TEMPORARY_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
 
@@ -29,6 +30,8 @@ class GoogleCalendarReader:
             credentials = Credentials.from_authorized_user_file(str(TOKEN_PATH))
         except (OSError, ValueError, GoogleAuthError) as error:
             raise CalendarMetadataAuthenticationError from error
+        if not credentials.has_scopes(SCOPES):
+            raise CalendarMetadataAuthenticationError
         try:
             with build("calendar", "v3", credentials=credentials) as service:
                 data = (
