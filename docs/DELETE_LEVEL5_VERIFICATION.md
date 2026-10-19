@@ -33,7 +33,7 @@ Not exercised live: the 403 `access_denied`, 502 and 503 paths. Offline tests in
 
 ## Operation cost
 
-DELETE makes one provider request, `events.delete`, with `num_retries=0`, plus at most one token refresh when the saved token has expired. It never lists or searches the calendar, so its cost does not grow with the number of events. Local work is the ID check, which is linear in the ID length and capped at 1024 characters. A delete-by-title or delete-by-time design would have to list the calendar first, so its cost would grow with the number of matching events and pages.
+DELETE makes one application-level `events.delete` call per request, and `num_retries=0` stops the SDK from retrying it. With valid credentials, that call is one HTTP request; an expired saved token adds one refresh first. `num_retries=0` does not turn off the auth library's own 401 handling: when Google answers 401, the credentials are refreshed and the request is replayed, up to `DEFAULT_MAX_REFRESH_ATTEMPTS = 2` times in `google.auth.transport`. So one call can send up to three HTTP requests and two refreshes. It never lists or searches the calendar, so its cost does not grow with the number of events. Local work is the ID check, which is linear in the ID length and capped at 1024 characters. A delete-by-title or delete-by-time design would have to list the calendar first, so its cost would grow with the number of matching events and pages.
 
 ## Design decision: one shared error format
 
