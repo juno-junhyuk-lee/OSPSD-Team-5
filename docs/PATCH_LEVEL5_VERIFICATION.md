@@ -2,8 +2,14 @@
 
 Niriti Pahadi owns `PATCH /events/{event_id}`. This record covers Level 5 shared
 errors, Google failure classification, and sanitized logging on
-`feature/calendar-patch-level5-errors`. It does not verify a release tag, PR CI,
-or another teammate's checkout until those rows are filled.
+`feature/calendar-patch-level5-errors`. It does not verify a final release tag.
+Ka Pui's recorded real run below is separate from the owner's unfilled row.
+
+Subsequent completion: Ka Pui [re-tested and approved PR #33](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/33#pullrequestreview-5565972640)
+at `6dc7861` (289 tests and real PATCH checks).
+[Matching checks passed](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/39183346699/job/117840571060),
+and the PR merged. Final-tag verification is tracked separately in PR #35;
+Niriti's pending execution row is not filled by this review evidence.
 
 ## Contract and checks
 
@@ -56,5 +62,5 @@ rate-limit, and cancelled-event cases.
 4. DELETE the event, then PATCH the same ID; expect 404 / `not_found`.
 5. Delete only your verification event if still present, and stop the server.
 
-Another teammate must review the classification, shared error wiring, tests, and
-docs. Matching PR CI remains required after push.
+Ka Pui's review and matching checks completed for PR #33, as linked above.
+Final-tag verification remains separate from those operation-level results.

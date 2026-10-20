@@ -1,5 +1,12 @@
 # POST Level 5 verification
 
+Subsequent completion: Ka Pui [re-tested and approved PR #32](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/32#pullrequestreview-5560450930)
+at `c671279` (277 tests and real creation/validation checks).
+[Matching checks passed](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/39072703265/job/117513424120),
+and the PR merged. Original working-tree revisions and results below are
+preserved; their pending-review statements are historical. Final-tag verification
+and release status are tracked separately in PR #35.
+
 Jim Lo owns `POST /events`. This record verifies implementation commit
 `ba8ebf3b3a144149b66a2c0831847d8873b187d4` on
 `feature/calendar-post-level5-errors`, including provider classification from

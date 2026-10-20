@@ -1,5 +1,24 @@
 # Verification and integration notes
 
+## Current evidence index
+
+| Scope | Detailed evidence | Completion reference |
+| --- | --- | --- |
+| Calendar GET Level 5 | [Calendar record](CALENDAR_GET_LEVEL5_VERIFICATION.md) | [PR #31](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/31), reviewed by Jim Lo |
+| Event GET Level 5 | [Event record](EVENT_GET_LEVEL5_VERIFICATION.md) | [PR #30](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30), re-reviewed by Ka Pui after the cancelled-event fix |
+| POST Level 5 and shared request validation | [POST record](POST_LEVEL5_VERIFICATION.md) | [PR #32](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/32), reviewed by Ka Pui |
+| PATCH Level 5 | [PATCH record](PATCH_LEVEL5_VERIFICATION.md) | [PR #33](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/33), reviewed by Ka Pui |
+| DELETE Level 5 and integrated workflow at `2fc8c4c` | [DELETE record](DELETE_LEVEL5_VERIFICATION.md) | PR #28 implementation; [PR #34](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/34) evidence |
+| Design decision, operation cost, teammate extension, process observation | [Final evidence](FINAL_RELEASE_EVIDENCE.md) | [Submission PR #35](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/35) |
+
+The dated records below preserve the original SHA, environment, test counts,
+responses, and limitations. Their pending-review statements describe the time
+of those runs; use the references above for later completion. Old reproduction
+steps target their recorded revision; use the README for the current contract.
+Operation approval, integration checks, and fresh-checkout verification of the
+final tag are distinct. Track final-tag verification, Release publication, and
+demonstration status in PR #35; the earlier checks do not establish them.
+
 ## Event GET Level 5 verification
 
 On October 17, 2026, implementation `9fad9af` passed locked environment setup,
@@ -18,8 +37,9 @@ The [cancelled-event review follow-up](EVENT_GET_LEVEL5_VERIFICATION.md#cancelle
 records the later fix on the working tree based on `997261f`: 216 tests and
 required checks passed, and reading an existing cancelled Google event returned
 404/not_found with one sanitized log. No live events were changed.
-Teammate review, matching PR CI, and final release verification remain pending.
-Earlier sections below describe their historical revisions and error contracts.
+Subsequently, Ka Pui re-tested and approved `ecca548`, and matching checks passed
+before PR #30 merged. See the event record for links. Final-tag verification is
+separate. The remaining sections describe historical revisions and contracts.
 
 ## POST Level 4 verification
 

@@ -20,6 +20,13 @@ individual operation ownership.
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 
+The operation table is the current implementation/review status. Detailed work
+sections below retain development history: pending tasks and uncommitted runs
+refer to the stage described, not a new verification of later commits. Use the
+[verification index](VERIFICATION.md#current-evidence-index) for later evidence.
+Final-tag verification, Release publication, and demonstration are tracked in
+[submission PR #35](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/35).
+
 ## Niriti Pahadi's event PATCH Level 3 work
 
 Branch: `feature/calendar-patch-level3-interface`. Niriti owns the event update
@@ -101,9 +108,10 @@ PR CI remain required. Codex assisted with implementation, tests, and verificati
 Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
 errors, tests, and documentation. Provider translation and HTTP error/logging
 integration are implemented on this branch. Local checks and real Google Level 5
-verification passed at `9fad9af`; teammate review and matching PR CI remain
-pending. Reviewer: not yet assigned; assign one for PR review. Codex assisted
-with implementation, tests, documentation, and verification. The contract is in the README's
+verification passed at `9fad9af`. Subsequent cancelled-event changes at `ecca548`
+were re-tested and approved by Ka Pui, with passing checks, before PR #30 merged.
+Codex assisted with implementation, tests, documentation, and verification.
+The contract is in the README's
 [Level 5 event retrieval section](../README.md#level-5-event-retrieval-errors).
 The operation-specific status/retry policy and DELETE-compatible ID rule were
 confirmed by the student owner; this does not claim team-wide agreement.
@@ -124,7 +132,8 @@ before field translation. All 216 tests and required checks passed, and an
 existing cancelled Google event returned 404/not_found with one sanitized log
 through normal injection. No events were changed in the live check. See the
 [follow-up evidence](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up).
-Updated reviewer confirmation and matching PR CI remain pending.
+The working-tree results above were later followed by the committed fix and
+[Ka Pui's approval](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30#pullrequestreview-5559065935).
 
 Work is split into four commits:
 
@@ -501,8 +510,8 @@ and fast tests.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
 GitHub Actions. Both GET Level 2 PRs are merged. POST Level 2 teammate execution
-and review are recorded in PR #10; the combined branch still needs its reviewed
-merge commit and updated PR checks. Historical test counts refer to the revisions
+and review are recorded in merged PR #10. Historical test counts refer to the
+revisions
 where they were recorded, not the combined suite.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 

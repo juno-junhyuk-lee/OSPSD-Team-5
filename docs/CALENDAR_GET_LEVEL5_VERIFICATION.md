@@ -1,6 +1,12 @@
 # Calendar GET Level 5 verification
 
-Owner: Juno Lee. Reviewer: One of the Team
+Subsequent completion: Jim Lo [reviewed and approved PR #31](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/31#pullrequestreview-5560238109)
+at `10a5f69`, including independent real Google checks.
+[Matching checks passed](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/39071176608/job/117508950099),
+and the PR merged. The working-tree runs and pending-review statements below
+are historical; final-tag verification is separate and tracked in PR #35.
+
+Owner: Juno Lee. Reviewer: Jim Lo (PR #31).
 Branch: `feature/calendar-get-level5-errors`.
 Codex assisted with implementation, tests, documentation, and verification.
 
@@ -9,7 +15,7 @@ Codex assisted with implementation, tests, documentation, and verification.
 `GET /calendars/primary` keeps its three-field success response. Other string
 calendar IDs keep returning 404 before a provider read. The operation does not
 accept a body or impose another ID syntax rule; it has no operation-specific
-422 case. App-wide request validation remains a separate team concern.
+422 case. App-wide request validation was subsequently added in PR #32.
 
 The [README contract](../README.md#level-5-calendar-metadata-errors) defines every
 error category, status, response shape, and retry policy. The adapter raises
@@ -106,5 +112,5 @@ Real permission denials, quota exhaustion, and outages were simulated offline;
 they were not induced against Google. The live check used TestClient rather
 than a separate server/curl demonstration. Teammate review, matching PR CI,
 final release-tag verification, and the team demonstration remain required.
-The shared logging suggestion is addressed for calendar GET; POST's owner must
-finish the original POST review line independently.
+The shared logging suggestion is addressed for calendar GET. POST subsequently
+adopted the shared handler in merged PR #32, addressing the original POST review line.
