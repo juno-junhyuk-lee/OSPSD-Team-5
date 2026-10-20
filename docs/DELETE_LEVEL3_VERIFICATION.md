@@ -31,9 +31,6 @@ not-found statuses made three tests fail; restoring it made them pass.
 Repeat the [DELETE Level 2 walkthrough](DELETE_LEVEL2_VERIFICATION.md) at this
 commit. The expected results are unchanged.
 
-| Date | Verifier | Revision | Result |
-| --- | --- | --- | --- |
-| _pending_ | Ka Pui Cheung | `89fb596` | |
-| _pending_ | second teammate | | |
-
-Teammate review of the boundary and matching PR CI are also pending.
+No live run was recorded in this Level 3 table. Later completed real-provider
+results are in [DELETE Level 5 verification](DELETE_LEVEL5_VERIFICATION.md);
+they do not establish a live run at the earlier `89fb596` revision.

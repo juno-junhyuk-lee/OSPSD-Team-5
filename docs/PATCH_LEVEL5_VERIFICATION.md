@@ -3,13 +3,12 @@
 Niriti Pahadi owns `PATCH /events/{event_id}`. This record covers Level 5 shared
 errors, Google failure classification, and sanitized logging on
 `feature/calendar-patch-level5-errors`. It does not verify a final release tag.
-Ka Pui's recorded real run below is separate from the owner's unfilled row.
 
 Subsequent completion: Ka Pui [re-tested and approved PR #33](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/33#pullrequestreview-5565972640)
 at `6dc7861` (289 tests and real PATCH checks).
 [Matching checks passed](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/39183346699/job/117840571060),
 and the PR merged. Final-tag verification is tracked separately in PR #35;
-Niriti's pending execution row is not filled by this review evidence.
+only the executions actually recorded below are claimed.
 
 ## Contract and checks
 
@@ -49,7 +48,6 @@ rate-limit, and cancelled-event cases.
 
 | Date | Verifier | Revision | Result |
 | --- | --- | --- | --- |
-| _pending_ | Niriti Pahadi | | POST → PATCH → GET; invalid body 422; cancelled/deleted ID 404 |
 | 2026-10-18 | Ka Pui Cheung | `6dc7861` (PR #33 head) | POST → PATCH 200 → GET shows the change; end before start 422 `invalid_input`; `bad id!` 422 with no Google call; unknown ID 404; PATCH after DELETE 404. Each failure logged one sanitized line. Repeated on `main` `2fc8c4c`; see [DELETE Level 5 verification](DELETE_LEVEL5_VERIFICATION.md). |
 
 ## Reproduce the live checks
