@@ -48,4 +48,3 @@ DELETE; restore the file afterwards.
 | --- | --- | --- | --- |
 | 2026-10-05 | Ka Pui Cheung | `993b27b` + uncommitted DELETE patch | POST `201`; event confirmed in Google; DELETE `204` (empty body); repeat DELETE `404`; unknown ID `404`; GET mirror then `404`; Google `events.get` returns `status: cancelled` and `events.list` no longer shows it |
 | 2026-10-05 | Ka Pui Cheung | rebased onto `1670d55` (PR #10) | POST `201`; DELETE `204`; repeat DELETE `404`; unknown ID `404`. `GET /events/{id}` afterwards still returns `200`, because event GET does not treat Google's `cancelled` status as missing (outside this PR) |
-| _pending_ | second teammate | | |

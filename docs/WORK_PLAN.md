@@ -20,6 +20,13 @@ individual operation ownership.
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 
+The operation table is the current implementation/review status. Detailed work
+sections below retain development history: pending tasks and uncommitted runs
+refer to the stage described, not a new verification of later commits. Use the
+[verification index](VERIFICATION.md#current-evidence-index) for later evidence.
+Final-tag verification, Release publication, and demonstration are tracked in
+[submission PR #35](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/35).
+
 ## Niriti Pahadi's event PATCH Level 3 work
 
 Branch: `feature/calendar-patch-level3-interface`. Niriti owns the event update
@@ -101,9 +108,10 @@ PR CI remain required. Codex assisted with implementation, tests, and verificati
 Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
 errors, tests, and documentation. Provider translation and HTTP error/logging
 integration are implemented on this branch. Local checks and real Google Level 5
-verification passed at `9fad9af`; teammate review and matching PR CI remain
-pending. Reviewer: not yet assigned; assign one for PR review. Codex assisted
-with implementation, tests, documentation, and verification. The contract is in the README's
+verification passed at `9fad9af`. Subsequent cancelled-event changes at `ecca548`
+were re-tested and approved by Ka Pui, with passing checks, before PR #30 merged.
+Codex assisted with implementation, tests, documentation, and verification.
+The contract is in the README's
 [Level 5 event retrieval section](../README.md#level-5-event-retrieval-errors).
 The operation-specific status/retry policy and DELETE-compatible ID rule were
 confirmed by the student owner; this does not claim team-wide agreement.
@@ -124,7 +132,8 @@ before field translation. All 216 tests and required checks passed, and an
 existing cancelled Google event returned 404/not_found with one sanitized log
 through normal injection. No events were changed in the live check. See the
 [follow-up evidence](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up).
-Updated reviewer confirmation and matching PR CI remain pending.
+The working-tree results above were later followed by the committed fix and
+[Ka Pui's approval](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30#pullrequestreview-5559065935).
 
 Work is split into four commits:
 
@@ -393,69 +402,28 @@ verification remain required.
 
 ## Jim Lo's POST Level 5 work
 
-Branch: `feature/calendar-post-level5-errors`, from main at `ef1afe8`, including
-the shared error handler and event GET Level 5. Split the work into:
+Jim owns POST Level 5, developed on `feature/calendar-post-level5-errors` from
+main `ef1afe8`. PR #32 merged provider failure classification, shared
+403/503/502 responses and sanitized logging, and app-wide 422 request validation.
+Uncertain writes remain non-retryable, with no local fallback. Shared validation
+covers POST and PATCH bodies without exposing their input in errors or logs.
 
-1. Classify creation authorization, permission-denied, and unconfirmed outcomes
-   behind `EventCreator`; test Google translation and document the contract.
-2. Map POST to `ServiceError` and the shared logger, normalize FastAPI request
-   validation, and update controlled-provider and affected HTTP tests/docs.
-3. Verify real Google success and a practical provider failure, run required
-   checks, and record reproducible evidence and cleanup.
+Historical checks on Python 3.14.8 with locked dependencies:
 
-The first batch (`b4c721e`) adds a distinct permission error and provider-involvement flag
-for authorization errors. Rejected refreshes and remote 401s are distinguished
-from local setup problems. Known 403 quota/rate-limit responses remain provider
-failures. Existing 502 handling temporarily accepts the new permission error;
-the shared HTTP format, 403 mapping, and failure logging belong to batch two.
-No automatic insertion retry, local fallback, new dependencies, or credential
-files are added. Shared credential loading behavior stays compatible with PATCH
-and DELETE. Fast checks do not establish real Google behavior; that verification
-remains in batch three.
+| Stage/revision | Recorded checks |
+| --- | --- |
+| Provider classification, `b4c721e` | 226 tests, Ruff lint/format, strict mypy, diff checks; no live Google calls |
+| Shared HTTP/validation stage | 239 tests, Ruff lint/format, strict mypy (36 source files), diff checks; no live Google calls |
+| Real verification, `ba8ebf3`, October 17, 2026 | 239 tests with external connections blocked; required checks passed; live POST/read/restart/cleanup and isolated Google 401 verification |
+| Working merge of POST `2b8af4b` and main `a6b6fa3` (PR #31) | 277 tests and required checks; repeated live POST/read/restart/cleanup, calendar metadata, and isolated 401 verification |
 
-First-batch local checks on Python 3.14.8 with the locked dependency environment:
-226 tests passed with the existing Starlette TestClient deprecation warning;
-Ruff lint/format, strict mypy, and diff checks passed. Provider tests cover
-permission denial versus all three known 403 quota/rate reasons, remote 401,
-refresh rejection, local setup failures, unconfirmed writes, client cleanup,
-and propagation of unexpected programming errors. No real Google calls were
-made for this batch.
-
-Batch two maps creation failures to shared 403/503/502 errors and one sanitized
-log, always with retryable=false. The app-wide request-validation handler returns
-422/invalid_input without exposing inputs, bodies, headers, or raw exceptions.
-It uses the matched route name for logging; POST and PATCH invalid-body tests
-verify the shape and that no provider operation is called. PATCH's non-validation
-behavior is unchanged. Shared response models document validation and POST
-failure responses in OpenAPI. This shared 422 compatibility change must be
-communicated to the PATCH owner during PR review.
-
-Second-batch local checks on Python 3.14.8 with the locked dependency environment:
-239 tests passed with the existing Starlette TestClient deprecation warning;
-Ruff lint/format, strict mypy (36 source files), and diff checks passed. Tests
-check exact public errors, one sanitized failure log, remote versus local
-authorization, invalid input without provider operations, Google 401/403
-translation, and accepted writes with lost responses without retries. No real
-Google calls were made; real Level 5 verification remains in batch three.
-
-Batch three verifies `ba8ebf3` on October 17, 2026: 239 tests also passed with
-external connections blocked; Ruff lint/format, strict mypy, and diff checks
-passed. A live Uvicorn run verified POST 201, matching HTTP and independent
-Google reads, invalid input without a write, restart persistence, and cleanup.
-An isolated failure server observed an actual Google POST/401 using temporary
-invalid credentials, returned 503/provider_unavailable/retryable=false, and logged
-provider=true once. No shared permissions or normal token were changed by that
-probe. Test events were cleaned up and all servers stopped. See
-[POST Level 5 verification](POST_LEVEL5_VERIFICATION.md) for the SDK refresh-path
-detail, limits, and teammate reproduction. PR review/CI and release verification
-remain pending. Codex assisted with implementation, tests, and verification.
-
-Integration check: merging main `a6b6fa3` (calendar GET Level 5, PR #31) into
-POST head `2b8af4b` required import and documentation conflict resolution.
-The pending merged working tree passes 277 tests and required local checks.
-Fresh live Google verification passed POST/read/restart/cleanup, calendar
-metadata success and unsupported-ID handling, and the isolated real 401 POST
-failure. See the integration section of the POST Level 5 verification guide.
+The existing TestClient warning remained. The real 401 became
+503/provider_unavailable/retryable=false with one provider=true log. Shared
+permissions and normal credentials were unchanged; verification events were
+cleaned up and servers stopped. See [POST Level 5 verification](POST_LEVEL5_VERIFICATION.md)
+for detailed results, limits, reproduction, Ka Pui's approval, and passing CI.
+Codex assisted with implementation, tests, documentation, and verification.
+Final-tag verification is separate from these operation and integration runs.
 
 ## Ka Pui Cheung's DELETE Level 3 work
 
@@ -501,8 +469,8 @@ and fast tests.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
 GitHub Actions. Both GET Level 2 PRs are merged. POST Level 2 teammate execution
-and review are recorded in PR #10; the combined branch still needs its reviewed
-merge commit and updated PR checks. Historical test counts refer to the revisions
+and review are recorded in merged PR #10. Historical test counts refer to the
+revisions
 where they were recorded, not the combined suite.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 

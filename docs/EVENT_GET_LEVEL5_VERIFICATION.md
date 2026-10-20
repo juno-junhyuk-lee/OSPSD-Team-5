@@ -5,6 +5,13 @@ tests, documentation, and the executions recorded below. These results verify
 the local implementation; they do not establish teammate approval, PR CI,
 a published release, or a final-tag checkout.
 
+Subsequent completion: Ka Pui re-tested `ecca548` (216 tests and real Google
+checks) and [approved PR #30](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30#pullrequestreview-5559065935).
+[Checks for that revision passed](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/39053098327/job/117455503961),
+and the PR merged. Pending-review statements below describe the original runs;
+their revisions and results are unchanged. Final-tag and release status are
+tracked separately in [PR #35](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/35).
+
 The original verification below applies to `9fad9af`. The later
 [cancelled-event review follow-up](#cancelled-event-review-follow-up) records
 the regression fix separately; earlier results are preserved as history.
@@ -235,9 +242,9 @@ Ctrl+C. No event cleanup is required for these GET-only steps.
 - After the owner commits/pushes the documentation, link this evidence and CI for
   the exact PR revision. Record later runs against their actual SHA; do not label
   this implementation-SHA run as a test of a later commit or release tag.
-- Team-wide request-validation migration, other operations, final release/tag
-  verification, demonstration participation, and private reflection remain
-  separate milestone responsibilities.
+- The shared request-validation migration subsequently merged in PR #32.
+  Final release/tag verification, demonstration participation, and private
+  reflection are separate milestone responsibilities.
 
 The sibling-team logging suggestion is addressed for event GET by routing
 expected failures through the existing shared handler; no additional provider

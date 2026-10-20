@@ -29,9 +29,6 @@ Start the server normally (no overrides) and repeat the
 Expected results are unchanged: `204`, then `404` on repeat, and `404` for an
 unknown ID.
 
-| Date | Verifier | Revision | Result |
-| --- | --- | --- | --- |
-| _pending_ | Ka Pui Cheung | `8057588` | |
-| _pending_ | second teammate | | |
-
-Another teammate must review both the real wiring and the test substitution.
+No live run was recorded in this Level 4 table. Later completed real-provider
+results are in [DELETE Level 5 verification](DELETE_LEVEL5_VERIFICATION.md);
+they do not establish a live run at the earlier `8057588` revision.

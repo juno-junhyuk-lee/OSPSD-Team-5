@@ -56,14 +56,12 @@
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
-Use the README setup and commands. Each member owns one distinct, useful public
-operation through Levels 1–5, including its tests and documentation. Keep Level 1
-operations small and backed by local data. Jim Lo owns `POST /events`; its
-implemented Level 1 creation contract is in the README. Preserve existing
-GET behavior when adding POST. Creation tests must isolate fake provider state.
-Preserve each operation's public contract for Level 2 and translate Google
-fields before returning them. Do not commit credentials or add unnecessary layers.
-Fast tests must run without internet or Google credentials.
+Use the README setup and commands. Each member owns one distinct public
+operation through Levels 1–5, including its tests and documentation. Preserve
+public contracts, keep Google calls behind the provider boundary, and translate
+provider fields before returning them. Creation tests must isolate fake provider
+state. Do not commit credentials or add unnecessary layers. Fast tests must run
+without internet or Google credentials.
 
 Kristie owns event GET. It uses the shared account's primary Google Calendar;
 run scripts/google_calendar_auth.py before serving requests. Never start browser
