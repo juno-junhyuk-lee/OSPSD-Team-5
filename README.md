@@ -40,6 +40,9 @@ uv run uvicorn app.main:app --reload
 Keep the server running while making requests in another terminal. Stop it with
 Ctrl+C. Swagger UI: http://localhost:8000/docs
 
+For a step-by-step Create → Read → Update → Delete walkthrough with example
+requests, responses, and shared error handling, see [TUTORIAL.md](TUTORIAL.md).
+
 Endpoints that call Google need a local `token.json`. Create it first with [Shared Google Calendar authentication](#shared-google-calendar-authentication); reviewers outside the team should follow [External reviewers](#external-reviewers). The offline tests need neither.
 
 ### Event retrieval contract
