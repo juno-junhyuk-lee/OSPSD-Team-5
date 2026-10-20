@@ -12,11 +12,11 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Juno Lee | `GET /calendars/{calendar_id}` | Level 5 implemented locally; verification and remaining work in calendar Level 5 guide | Level 5 reviewer to be agreed |
-| Kristie Lee | `GET /events/{event_id}` | Level 5 implementation at `9fad9af` passes offline and real Google checks; see Level 5 verification guide; teammate review and matching PR CI pending | Level 5 reviewer to be agreed |
-| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
-| Jim Lo | `POST /events` | Levels 3–4 merged in PRs #19/#20; Level 5 implementation at `ba8ebf3` passes offline and real Google checks; see POST Level 5 verification | Level 5 teammate review and matching PR CI pending |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–4 merged (PRs #13/#21/#22); Level 5 shared errors on `feature/calendar-patch-level5-errors` | Level 5 reviewer to be agreed |
+| Juno Lee | `GET /calendars/{calendar_id}` | Levels 1–5 merged; Level 5 in #31; scope check extended by Ka Pui for the final release | Jim Lo (#31) |
+| Kristie Lee | `GET /events/{event_id}` | Levels 1–5 merged; Level 5 in #30, including the cancelled-event fix | Ka Pui Cheung (#30) |
+| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–5 merged (#11, #23, #24, #28); Level 5 record in #34 | Jim Lo (#28) |
+| Jim Lo | `POST /events` | Levels 1–5 merged; Level 5 and the shared request-validation handler in #32 | Ka Pui Cheung (#32) |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–5 merged (#13, #21, #22, #33) | Ka Pui Cheung (#33) |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
 
@@ -520,7 +520,7 @@ covering shipped work, changed decisions, blockers, and next steps.
 
 ## Juno Lee's calendar GET Level 5 work
 
-Owner: Juno Lee. Reviewer: Level 5 reviewer to be agreed.
+Owner: Juno Lee. Reviewer: Jim Lo (#31).
 Branch: `feature/calendar-get-level5-errors`.
 
 Scope: calendar metadata failure translation, shared `ServiceError` responses,

@@ -2,7 +2,7 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## Calendar service — Milestone 1
+## Calendar service
 
 Juno Lee owns `GET /calendars/{calendar_id}`, Kristie Lee owns
 `GET /events/{event_id}`, Jim Lo owns `POST /events`, Ka Pui Cheung owns
@@ -891,20 +891,11 @@ The setup script authorizes the account and verifies event access.
 Both calendar-details GET and event GET use local authorization to call Google.
 The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
 
-
-### Level 2 integration status
-
-PRs #8 and #9 are merged. POST Level 2 is under review in
-[PR #10](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/10).
-Juno and Ka Pui recorded real POST verification and approved its earlier revision.
-The combined implementation must pass local checks and updated PR CI before
-merging. [POST verification](docs/POST_LEVEL2_VERIFICATION.md) records the current
-create/read workflow separately from earlier local-mirror evidence.
-
 ## Contributor documentation
 
 - [AGENTS.md](AGENTS.md): code map, contributor instructions, and review/release rules.
 - [Work plan](docs/WORK_PLAN.md): owners, progress, and milestone responsibilities.
+- [Final release evidence](docs/FINAL_RELEASE_EVIDENCE.md): event GET's cost, the calendar GET extension, and a process observation.
 
 ## Team Members
 
