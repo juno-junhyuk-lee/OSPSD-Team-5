@@ -22,7 +22,7 @@ This page covers the final-release items not tied to one operation's Level 5 rec
 
 So the request costs O(n) time and O(n) peak memory, even though the response it returns is bounded by the title length.
 
-**Provider calls.** One `events.get` call per request. An expired token adds one refresh first, and a Google 401 makes the auth library refresh and replay the request up to `DEFAULT_MAX_REFRESH_ATTEMPTS = 2` times, so the worst case is three HTTP requests. The count does not depend on *n*.
+**Provider calls.** The normal path makes one Calendar API `events.get` request. On Google 401 responses, the auth library can refresh and replay it up to `DEFAULT_MAX_REFRESH_ATTEMPTS = 2` times, for up to three Calendar API attempts on that path. OAuth refresh requests are separate HTTP requests; an expired token may also require refresh before the first Calendar request. Three is therefore not a bound on all HTTP traffic. These counts do not grow with *n*.
 
 **Measurement.** On 2026-10-19, against the shared account, we created timed events with descriptions of 0, 1000 and 8000 characters, read each one, and deleted it. "Parse" is `json.loads` plus `translate_event` on the returned dict, averaged over 1000 runs.
 
@@ -32,7 +32,7 @@ So the request costs O(n) time and O(n) peak memory, even though the response it
 | 1000 chars | 1773 B | 256 B | 65 µs | 6.6 KB |
 | 8000 chars | 8773 B | 256 B | 83 µs | 20.6 KB |
 
-The full response grows linearly with the description; network time dominates the parse time at these sizes.
+The full response grows with the description. The table measures response size and local parsing costs; it does not isolate network latency.
 
 **Assumptions.** One event per request; Google's lookup by ID is treated as constant from our side, since we cannot see its implementation; the description is the only large field (attendees and attachments grow *n* the same way).
 

@@ -72,18 +72,19 @@ curl -i http://localhost:8000/events/lf797iogm23bfjn97ogpfocl80
 
 An absent provider title is represented as an empty string. All-day events use
 Google date fields and are rejected because this public model represents timed
-events. These policies are covered by tests and require teammate review.
+events. These policies are covered by tests; event GET was reviewed and merged
+in [PR #30](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30).
 The shared Event model does not add timezone or start/end ordering validation;
 POST validates its own input separately.
 
 #### Level 5 event retrieval errors
 
-This contract is implemented on `feature/calendar-event-get-level5-errors`.
+This contract was merged in [PR #30](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30).
 Local checks and real Google success/failure verification passed at `9fad9af`;
 see [Level 5 verification and reproduction](docs/EVENT_GET_LEVEL5_VERIFICATION.md).
-Teammate review and matching PR CI remain pending; this does not claim final
-release completion. Kristie owns this change. The service never starts browser
-authorization during a request.
+The cancelled-event fix at `ecca548` passed teammate re-verification and PR CI
+before merging. Final release-tag verification is separate. Kristie owns this
+change. The service never starts browser authorization during a request.
 
 Successful reads retain the existing `200` response and four-field Event model.
 Failures use the shared [error format](#error-format), for example:
@@ -131,12 +132,12 @@ raw exception messages are logged. No request ID is added in this change.
 
 This intentionally changes GET errors from `{"detail": ...}` to the shared
 shape, adds local ID validation and a distinct permission-denied response,
-and maps temporary failures to 503. Other operations and the app-wide FastAPI
-request-validation handler are outside this change; their owners coordinate
-those migrations separately. Controlled-provider HTTP tests, Google adapter
+and maps temporary failures to 503. Other operation migrations were separate
+PRs; [PR #32](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/32) added the
+app-wide request-validation handler. Controlled-provider HTTP tests, Google adapter
 translation tests, and sanitized-log assertions cover the implementation.
 Real Google success, missing-event, and local-invalid-input checks are recorded
-in the verification guide; teammate and final-release verification remain separate.
+in the verification guide; final release-tag verification remains separate.
 
 #### Level 3 event provider boundary
 
@@ -181,8 +182,8 @@ Replacing the provider requires an `EventReader` implementation and a change to
 `get_event_reader`; the route continues using the same contract.
 [Verification notes](docs/VERIFICATION.md#event-get-level-4-verification) record
 local checks, blocked-network contract tests, and real Google retrieval.
-Another teammate must review both normal wiring and test substitution, and
-matching PR CI remains required. Codex assisted with implementation and verification.
+Level 4 was merged in [PR #18](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/18).
+Codex assisted with implementation and verification.
 
 ### Calendar details contract
 
@@ -255,8 +256,8 @@ overrides afterward. Google translation tests remain separate.
 
 Replacing the calendar provider requires another implementation of `CalendarReader`
 and a change to the dependency's selection; the route contract remains the same.
-Local and real-provider evidence is recorded in `docs/VERIFICATION.md`. Teammate
-review of production wiring and test substitution remains required for Level 4.
+Local and real-provider evidence is recorded in `docs/VERIFICATION.md`.
+Level 4 was merged in [PR #16](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/16).
 
 #### Level 5 calendar metadata errors
 
@@ -290,7 +291,7 @@ denials, and 503 temporary failures that previously returned 502 or escaped as
 500. Missing-calendar 404 and authorization-setup 503 statuses are preserved.
 This endpoint has no body or additional ID syntax constraint: unsupported
 string IDs remain 404. It does not introduce an operation-specific 422 case;
-app-wide request validation remains a separate team concern.
+app-wide request validation is handled by the shared handler added in PR #32.
 
 `tests/test_calendars.py` checks responses and logs through an isolated controlled
 reader. `tests/test_google_calendar.py` checks SDK failure translation, metadata,
@@ -298,7 +299,8 @@ client cleanup, and disabled retries. Unexpected programming errors propagate
 rather than being mislabeled as provider failures. Reads make one metadata
 request without automatic retries; credential renewal may add an auth request.
 See [calendar Level 5 verification](docs/CALENDAR_GET_LEVEL5_VERIFICATION.md)
-for check results, real-provider verification, and remaining review requirements.
+for check results and real-provider verification. Calendar Level 5 was reviewed
+and merged in [PR #31](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/31).
 
 ### Event creation contract
 
@@ -413,7 +415,8 @@ Current provider injection is described below. The shared `load_credentials`
 helper remains unchanged for
 PATCH and DELETE. [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md)
 records offline checks, real create/read, restart persistence, and cleanup for
-implementation commit `8741c90`. Teammate review and matching PR CI remain pending.
+implementation commit `8741c90`. Level 3 was subsequently reviewed and merged
+in [PR #19](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/19).
 
 #### Level 4 event creation provider injection
 
@@ -439,9 +442,8 @@ Replacing the provider requires another `EventCreator` implementation and a
 change to the factory's selection, while the handler keeps the same contract.
 [POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) records 130 passing
 tests, blocked-network/credential controlled tests, and a real create/read,
-restart, and cleanup workflow through normal injection at `c54f52e`. Teammate
-review of both normal wiring and test substitution and matching PR CI remain
-pending.
+restart, and cleanup workflow through normal injection at `c54f52e`. Level 4 was
+subsequently reviewed and merged in [PR #20](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/20).
 
 #### Level 5 event creation errors
 
@@ -487,8 +489,8 @@ An isolated invalid-token request reached Google and returned 401, translated
 through the SDK authorization path to 503 / `provider_unavailable` with one safe
 provider=true log. No shared permissions or normal token were changed by that
 probe. See [POST Level 5 verification](docs/POST_LEVEL5_VERIFICATION.md) for
-evidence, test boundaries, and reproduction. Teammate review and PR CI remain
-required.
+evidence, test boundaries, and reproduction. POST Level 5 was reviewed and
+merged in [PR #32](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/32).
 
 ### Create and retrieve an event
 
@@ -556,7 +558,7 @@ is unchanged. The title is stripped of surrounding whitespace. A following
 | Result | Status | `error.code` | `retryable` | State change? |
 | --- | --- | --- | --- | --- |
 | Updated | `200` | none | Not needed | Yes |
-| ID is empty, over 1024 characters, or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` | No |
+| ID is over 1024 characters or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` | No |
 | Unknown, deleted, or cancelled ID (Google 404/410, or `events.get` status `cancelled` before patch) | `404` | `not_found` | `false` | No |
 | Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | `invalid_input` | `false` | No |
 | Google refused access (403 that is not a rate limit) | `403` | `access_denied` | `false` | No |
@@ -569,6 +571,10 @@ changing `id` are outside this contract. Offline tests cover success with GET
 match, unknown ID, validation without state changes, provider failures, and
 missing authorization. Real Google verification evidence is in
 [PATCH Level 2 verification](docs/PATCH_LEVEL2_VERIFICATION.md).
+
+For PATCH and DELETE, an omitted ID does not match `/events/{event_id}` and
+does not reach ID validation. `/events/` redirects with 307 to `/events`, where
+these methods return 405; this is not an `invalid_input` 422 response.
 
 #### Level 3 event update provider boundary
 
@@ -616,7 +622,7 @@ returned by POST), and no query or body parameters.
 | Result | Status | `error.code` | `retryable` |
 | --- | --- | --- | --- |
 | Deleted | `204 No Content` (empty body) | none | Not needed |
-| ID is empty, over 1024 characters, or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` |
+| ID is over 1024 characters or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` |
 | Unknown or already-deleted ID (Google 404 or 410) | `404` | `not_found` | `false` |
 | Google refused access (403 that is not a rate limit) | `403` | `access_denied` | `false` |
 | Local authorization missing or unusable; no Google call made | `503` | `provider_unavailable` | `false`; fix setup with the auth script first |
@@ -845,8 +851,9 @@ authenticated calendar's title and timezone and the response ID `primary`.
 Compare the values with Google Calendar settings. Unsupported calendar IDs
 return 404. This read-only verification requires no event cleanup.
 
-Juno verified reauthorization and real HTTP retrieval.
-A second teammate must reproduce calendar retrieval.
+Juno verified reauthorization and real HTTP retrieval. Jim recorded independent
+calendar retrieval and authorization verification in the
+[PR #31 review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/31#pullrequestreview-5560238109).
 Run all local checks and verify CI for the revision under review.
 
 ### Shared Google Calendar authentication
