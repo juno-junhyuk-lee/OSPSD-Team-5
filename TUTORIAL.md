@@ -151,7 +151,7 @@ Failures use one public shape:
 | `invalid_input` | 422 | Bad ID, body, or field values |
 | `not_found` | 404 | Missing or already deleted |
 | `access_denied` | 403 | Provider refused access |
-| `provider_unavailable` | 503 | Auth missing or rejected |
+| `provider_unavailable` | 503 | Auth missing/rejected (`retryable: false`), or temporary outage/rate limit (`retryable: true`) |
 | `provider_error` | 502 | Provider failed or result uncertain |
 
 ### Invalid create body (end before start)
