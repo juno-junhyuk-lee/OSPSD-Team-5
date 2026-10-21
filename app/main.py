@@ -66,7 +66,16 @@ app.add_exception_handler(RequestValidationError, request_validation_handler)
 EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,1024}")
 
 
-@app.get("/calendars/{calendar_id}", response_model=Calendar)
+@app.get(
+    "/calendars/{calendar_id}",
+    response_model=Calendar,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 def get_calendar(
     calendar_id: str,
     reader: Annotated[CalendarReader, Depends(get_calendar_reader)],
@@ -124,7 +133,16 @@ def get_calendar(
         ) from None
 
 
-@app.get("/events/{event_id}", response_model=Event)
+@app.get(
+    "/events/{event_id}",
+    response_model=Event,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 def get_event(
     event_id: str,
     reader: Annotated[EventReader, Depends(get_event_reader)],
@@ -298,7 +316,16 @@ def update_event(
         ) from None
 
 
-@app.delete("/events/{event_id}", status_code=204)
+@app.delete(
+    "/events/{event_id}",
+    status_code=204,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 def delete_event(
     event_id: str,
     deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
