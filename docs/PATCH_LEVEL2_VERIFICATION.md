@@ -61,4 +61,3 @@ your own verification events.
 | Date | Verifier | Revision | Result |
 | --- | --- | --- | --- |
 | 2026-10-07 | Niriti Pahadi | `01abd0d` | Auth OK; POST `201` id `f6rrpvrnujaf5369b2emfj8f8k`; PATCH `200` title/times updated; GET matched PATCH; independent Google read showed updated title; event left `cancelled` after cleanup; GET still `200` for cancelled (known GET behavior) |
-| _pending_ | second teammate | | |

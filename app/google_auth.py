@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_credentials(token_path: Path = ROOT / "token.json") -> Any:
+    provider_involved = False
     try:
         credentials = Credentials.from_authorized_user_file(str(token_path))
         if not credentials.has_scopes(SCOPES):
@@ -22,11 +23,12 @@ def load_credentials(token_path: Path = ROOT / "token.json") -> Any:
         if not credentials.valid:
             if not credentials.expired or not credentials.refresh_token:
                 raise CalendarAuthenticationError
+            provider_involved = True
             credentials.refresh(Request())
             token_path.write_text(credentials.to_json(), encoding="utf-8")
         return credentials
     except (OSError, ValueError, GoogleAuthError) as error:
-        raise CalendarAuthenticationError from error
+        raise CalendarAuthenticationError(provider=provider_involved) from error
 
 
 def calendar_client() -> Any:

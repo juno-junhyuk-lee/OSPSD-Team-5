@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,7 @@ from requests.exceptions import RequestException
 
 from app import google_create_events
 from app.event_creation_provider import (
+    EventCreationDeniedError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
     EventCreator,
@@ -132,7 +134,8 @@ def test_unusable_provider_response_is_not_a_success(
 @pytest.mark.parametrize(
     "error",
     [
-        HttpError(Response({"status": "403"}), b'{"error": "denied"}'),
+        HttpError(Response({"status": "429"}), b'{"error": "rate limited"}'),
+        HttpError(Response({"status": "500"}), b'{"error": "provider failure"}'),
         TimeoutError("Provider may have accepted the write."),
         TransportError("Private transport details"),
         HttpLib2Error("Private HTTP details"),
@@ -154,6 +157,90 @@ def test_provider_failure_does_not_retry(
 
     assert raised.value.__cause__ is error
     execute.assert_called_once_with(num_retries=0)
+    google_create_events.build.return_value.__exit__.assert_called_once()  # type: ignore[attr-defined]
+
+
+def test_permission_denial_is_distinct_from_uncertain_creation(
+    creator: EventCreator,
+    creation_request: CreateEventRequest,
+    service: MagicMock,
+) -> None:
+    error = HttpError(
+        Response({"status": "403"}),
+        b'{"error": {"errors": [{"reason": "forbidden"}], "message": "private"}}',
+    )
+    execute = service.events.return_value.insert.return_value.execute
+    execute.side_effect = error
+
+    with pytest.raises(EventCreationDeniedError) as raised:
+        creator.create_event(creation_request)
+
+    assert raised.value.__cause__ is error
+    assert "private" not in str(raised.value)
+    execute.assert_called_once_with(num_retries=0)
+
+
+@pytest.mark.parametrize(
+    "reason", ["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"]
+)
+def test_rate_limit_403_is_not_permission_denial(
+    creator: EventCreator,
+    creation_request: CreateEventRequest,
+    service: MagicMock,
+    reason: str,
+) -> None:
+    error = HttpError(
+        Response({"status": "403"}),
+        json.dumps(
+            {"error": {"message": "Quota limit", "errors": [{"reason": reason}]}}
+        ).encode(),
+    )
+    execute = service.events.return_value.insert.return_value.execute
+    execute.side_effect = error
+
+    with pytest.raises(EventCreationUnconfirmedError) as raised:
+        creator.create_event(creation_request)
+
+    assert raised.value.__cause__ is error
+    execute.assert_called_once_with(num_retries=0)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        HttpError(Response({"status": "401"}), b'{"error": "private token"}'),
+        RefreshError("Private refresh failure during insertion"),
+    ],
+)
+def test_remote_authorization_failure_is_unavailable(
+    creator: EventCreator,
+    creation_request: CreateEventRequest,
+    service: MagicMock,
+    error: Exception,
+) -> None:
+    execute = service.events.return_value.insert.return_value.execute
+    execute.side_effect = error
+
+    with pytest.raises(EventCreationUnavailableError) as raised:
+        creator.create_event(creation_request)
+
+    assert raised.value.provider is True
+    assert raised.value.__cause__ is error
+    assert "Private" not in str(raised.value)
+    execute.assert_called_once_with(num_retries=0)
+
+
+def test_unexpected_programming_error_is_not_hidden(
+    creator: EventCreator,
+    creation_request: CreateEventRequest,
+    service: MagicMock,
+) -> None:
+    service.events.return_value.insert.return_value.execute.side_effect = TypeError(
+        "Programming defect"
+    )
+
+    with pytest.raises(TypeError, match="Programming defect"):
+        creator.create_event(creation_request)
 
 
 @pytest.fixture
@@ -173,6 +260,7 @@ def test_missing_token_prevents_provider_creation(
     assert isinstance(
         raised.value.__cause__, google_create_events.GoogleCalendarSetupError
     )
+    assert raised.value.provider is False
     build.assert_not_called()
     assert not local_token.exists()
 
@@ -242,3 +330,30 @@ def test_unusable_authorization_does_not_save_token(
     assert not local_token.exists()
     if problem in ("scope", "unrefreshable"):
         credentials.refresh.assert_not_called()
+
+
+@pytest.mark.parametrize("problem", ["revoked", "invalid"])
+def test_refresh_failure_records_remote_involvement_without_insert(
+    creator: EventCreator,
+    creation_request: CreateEventRequest,
+    local_token: Path,
+    credentials: MagicMock,
+    problem: str,
+) -> None:
+    credentials.valid = False
+    credentials.expired = True
+    credentials.refresh_token = "test-refresh-token"
+    if problem == "revoked":
+        credentials.refresh.side_effect = RefreshError("Private revoked token")
+
+    with (
+        patch.object(google_create_events, "Request"),
+        patch.object(google_create_events, "build") as build,
+    ):
+        with pytest.raises(EventCreationUnavailableError) as raised:
+            creator.create_event(creation_request)
+
+    assert raised.value.provider is True
+    credentials.refresh.assert_called_once()
+    build.assert_not_called()
+    assert not local_token.exists()

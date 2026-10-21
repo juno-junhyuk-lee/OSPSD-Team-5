@@ -1,5 +1,46 @@
 # Verification and integration notes
 
+## Current evidence index
+
+| Scope | Detailed evidence | Completion reference |
+| --- | --- | --- |
+| Calendar GET Level 5 | [Calendar record](CALENDAR_GET_LEVEL5_VERIFICATION.md) | [PR #31](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/31), reviewed by Jim Lo |
+| Event GET Level 5 | [Event record](EVENT_GET_LEVEL5_VERIFICATION.md) | [PR #30](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30), re-reviewed by Ka Pui after the cancelled-event fix |
+| POST Level 5 and shared request validation | [POST record](POST_LEVEL5_VERIFICATION.md) | [PR #32](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/32), reviewed by Ka Pui |
+| PATCH Level 5 | [PATCH record](PATCH_LEVEL5_VERIFICATION.md) | [PR #33](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/33), reviewed by Ka Pui |
+| DELETE Level 5 and integrated workflow at `2fc8c4c` | [DELETE record](DELETE_LEVEL5_VERIFICATION.md) | PR #28 implementation; [PR #34](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/34) evidence |
+| Design decision, operation cost, teammate extension, process observation | [Final evidence](FINAL_RELEASE_EVIDENCE.md) | [Submission PR #35](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/35) |
+
+The dated records below preserve the original SHA, environment, test counts,
+responses, and limitations. Their pending-review statements describe the time
+of those runs; use the references above for later completion. Old reproduction
+steps target their recorded revision; use the README for the current contract.
+Operation approval, integration checks, and fresh-checkout verification of the
+final tag are distinct. Track final-tag verification, Release publication, and
+demonstration status in PR #35; the earlier checks do not establish them.
+
+## Event GET Level 5 verification
+
+On October 17, 2026, implementation `9fad9af` passed locked environment setup,
+Ruff lint/format, strict mypy, all 212 tests, and diff checks on Windows with
+Python 3.14.8. A separate controlled-reader run passed all 18 cases with external
+connections, real credential loading, and real Google client creation blocked.
+The existing TestClient deprecation warning remains.
+
+Real Google reads through normal FastAPI injection and TestClient verified 200
+with four public fields matching an independent Google read, real 404/not_found,
+and local 422/invalid_input. Each failure logged exactly one sanitized line with
+the correct provider flag. No events were changed. This is implementation
+verification, not a server/curl demo, teammate execution, or final-tag verification.
+See [the full record and PowerShell guide](EVENT_GET_LEVEL5_VERIFICATION.md).
+The [cancelled-event review follow-up](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up)
+records the later fix on the working tree based on `997261f`: 216 tests and
+required checks passed, and reading an existing cancelled Google event returned
+404/not_found with one sanitized log. No live events were changed.
+Subsequently, Ka Pui re-tested and approved `ecca548`, and matching checks passed
+before PR #30 merged. See the event record for links. Final-tag verification is
+separate. The remaining sections describe historical revisions and contracts.
+
 ## POST Level 4 verification
 
 Implementation commit `c54f52e` was verified on October 12, 2026, in Jim's macOS
@@ -201,77 +242,30 @@ fast tests; they were not induced against the live service.
 
 ### Local creation walkthrough (Level 1 history)
 
-This walkthrough records the earlier all-local behavior, including loss of
-created events after restart. The current branch uses Google for both POST and
-GET and requires authorization. Use [POST Level 2 verification](POST_LEVEL2_VERIFICATION.md)
-for the current workflow, restart behavior, and provider cleanup.
-
-Start the server using the README Run instructions. In another terminal,
-create an event (macOS/Linux or Git Bash):
-
-```sh
-curl -i http://localhost:8000/events \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"  Team Meeting  ","start_time":"2026-10-05T10:00:00-04:00","end_time":"2026-10-05T11:00:00-04:00"}'
-```
-
-Expect `201`, a generated `id`, the title `Team Meeting` without surrounding
-spaces, and the supplied times. Copy the returned ID into the next request:
-
-```sh
-curl -i "http://localhost:8000/events/<returned-id>"
-```
-
-Replace `<returned-id>` before running the command. Expect `200` with the same
-event. A second POST with the same body returns a different ID.
-
-In PowerShell, use the same workflow through `Invoke-RestMethod`:
-
-```powershell
-$body = @{
-    title = "  Team Meeting  "
-    start_time = "2026-10-05T10:00:00-04:00"
-    end_time = "2026-10-05T11:00:00-04:00"
-} | ConvertTo-Json
-$event = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/events" -ContentType "application/json" -Body $body
-$event
-Invoke-RestMethod -Uri "http://localhost:8000/events/$($event.id)"
-```
-
-To check validation, use Swagger UI's `POST /events` operation and submit a
-body with `end_time` equal to `start_time`. Expect `422` with a `detail` array.
-The rejected request must not create an event. Restarting the server removes
-created events; GET then returns `404` for their IDs.
+The earlier local implementation returned 201 with generated IDs and trimmed
+titles, supported GET of created events, and rejected invalid input with 422.
+Its in-memory events disappeared after restart; the Level 1 results and defect
+checks are recorded above. This is not the current provider-backed behavior.
+Use the [README](../README.md#create-and-retrieve-an-event) for current commands
+and [POST Level 2 verification](POST_LEVEL2_VERIFICATION.md) for integration,
+restart persistence, and cleanup evidence.
 
 
 ### Level 2 calendar details handoff
 
-Retrieve the authenticated user's primary calendar from Google,
-map `summary` to `title` and `timeZone` to `time_zone`, and retain the service
-alias `primary` as the response ID. Confirm metadata permissions separately:
-the event CRUD scope is not automatically sufficient for calendar metadata.
-Google's returned title and timezone replace the fixture values; decide any
-missing-title behavior before integration. Other calendar IDs remain unsupported
-until the team intentionally expands the contract. No Google lookup is added
-in Level 1.
+The completed handoff replaced local metadata with Google's primary calendar,
+mapping `summary` to `title` and `timeZone` to `time_zone`, while retaining the
+service alias `primary`. Metadata needs its own scope in addition to event
+access. Current behavior and scope requirements are in the
+[README calendar contract](../README.md#calendar-details-contract); later evidence
+is in [Calendar GET Level 5 verification](CALENDAR_GET_LEVEL5_VERIFICATION.md).
 
 
 ### Level 2 POST handoff
 
-Jim's Level 2 implementation replaces the local write with authenticated Google
-creation while preserving the request, 201 response, and validation rules.
-Invalid local input must be rejected before calling the provider.
-
-Use Google's [events.insert documentation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert)
-to verify the operation and write permissions. Translate `title` to `summary`,
-`start_time` to `start.dateTime`, and `end_time` to `end.dateTime`. Translate the
-created provider event back to the four-field `Event` response. Its returned ID
-works with the team's GET implementation on the same primary calendar; callers
-must not depend on Level 1's UUID format. Agree on the target test calendar
-and configuration with the team before integrating the operations.
-
-Keep fast tests offline by controlling the provider result. Separately document
-credentials, configuration, a real create/read verification, and cleanup of test
-events. Record behavior for rejected writes and uncertain outcomes rather than
-assuming a timeout means no event was created. No Google writes or provider
-failure handling have been verified by the Level 1 implementation.
+Jim's completed integration replaced local creation with authenticated Google
+writes, preserved the request and 201 response, and returned Google IDs usable
+by event GET. Invalid input is rejected before provider writes. The
+[POST Level 2 record](POST_LEVEL2_VERIFICATION.md) preserves real create/read,
+persistence, cleanup, and original integration evidence; the
+[Level 5 record](POST_LEVEL5_VERIFICATION.md) covers current failure handling.

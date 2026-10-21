@@ -1,15 +1,16 @@
 from collections.abc import Iterator
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error, Response  # type: ignore[import-untyped]
 from pydantic import ValidationError
 from requests.exceptions import RequestException
 
 from app import google_create_events, google_update_events
 from app.event_update_provider import (
+    EventUpdateDeniedError,
     EventUpdateNotFoundError,
     EventUpdater,
     EventUpdateUnavailableError,
@@ -115,14 +116,45 @@ def test_missing_authorization_raises_unavailable(
         "load_credentials",
         side_effect=google_create_events.GoogleCalendarSetupError("no token"),
     ):
-        with pytest.raises(EventUpdateUnavailableError):
+        with pytest.raises(EventUpdateUnavailableError) as raised:
             updater.update_event("test-event", update_request)
+
+    assert raised.value.provider is False
+
+
+def test_remote_authorization_refusal_raises_unavailable(
+    updater: EventUpdater, update_request: UpdateEventRequest, service: MagicMock
+) -> None:
+    error = HttpError(Response({"status": "401"}), b"")
+    service.events.return_value.patch.return_value.execute.side_effect = error
+
+    with pytest.raises(EventUpdateUnavailableError) as raised:
+        updater.update_event("test-event", update_request)
+
+    assert raised.value.provider is True
+    assert raised.value.__cause__ is error
+
+
+def test_permission_refusal_is_denied(
+    updater: EventUpdater, update_request: UpdateEventRequest, service: MagicMock
+) -> None:
+    error = HttpError(Response({"status": "403"}), b'{"error": "denied"}')
+    service.events.return_value.patch.return_value.execute.side_effect = error
+
+    with pytest.raises(EventUpdateDeniedError) as raised:
+        updater.update_event("test-event", update_request)
+
+    assert raised.value.__cause__ is error
 
 
 @pytest.mark.parametrize(
     "failure",
     [
-        HttpError(Mock(status=403, reason="Forbidden"), b""),
+        HttpError(
+            Response({"status": "403"}),
+            b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+        ),
+        HttpError(Response({"status": "500"}), b""),
         TransportError("transport"),
         HttpLib2Error("httplib2"),
         RequestException("requests"),
@@ -138,5 +170,7 @@ def test_provider_failure_raises_unconfirmed(
 ) -> None:
     service.events.return_value.patch.return_value.execute.side_effect = failure
 
-    with pytest.raises(EventUpdateUnconfirmedError):
+    with pytest.raises(EventUpdateUnconfirmedError) as raised:
         updater.update_event("test-event", update_request)
+
+    assert raised.value.__cause__ is failure

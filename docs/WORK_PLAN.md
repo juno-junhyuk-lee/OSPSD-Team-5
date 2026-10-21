@@ -12,13 +12,20 @@ individual operation ownership.
 
 | Owner | Operation | Current status | Reviewer |
 | --- | --- | --- | --- |
-| Juno Lee | `GET /calendars/{calendar_id}` | Level 2 merged in PR #9 | See PR #9 reviews |
-| Kristie Lee | `GET /events/{event_id}` | Level 2 merged in PR #8; Level 3 merged in PR #17; Level 4 implementation and local verification complete, review and PR CI pending | Level 4 reviewer to be agreed |
-| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–2 on main (`4a0865a`, PR #11); Level 3 at `89fb596` and Level 4 at `8057588` pass offline checks; real Google runs, review, and PR CI pending | Reviewer to be agreed |
-| Jim Lo | `POST /events` | Level 3 locally verified at `8741c90`; Level 4 injection, controlled tests, and real wiring locally verified at `c54f52e`; teammate review and matching PR CI pending | Level 3/4 teammate review pending; Level 2 reviewed by Juno and Ka Pui |
-| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–2 and Level 3 merged (PR #21); Level 4 injection on `feature/calendar-patch-level4-injection` | Level 4 reviewer: Ka Pui (approved; resolve main conflicts) |
+| Juno Lee | `GET /calendars/{calendar_id}` | Levels 1–5 merged; Level 5 in #31; scope check extended by Ka Pui for the final release | Jim Lo (#31) |
+| Kristie Lee | `GET /events/{event_id}` | Levels 1–5 merged; Level 5 in #30, including the cancelled-event fix | Ka Pui Cheung (#30) |
+| Ka Pui Cheung | `DELETE /events/{event_id}` | Levels 1–5 merged (#11, #23, #24, #28); Level 5 record in #34 | Jim Lo (#28) |
+| Jim Lo | `POST /events` | Levels 1–5 merged; Level 5 and the shared request-validation handler in #32 | Ka Pui Cheung (#32) |
+| Niriti Pahadi | `PATCH /events/{event_id}` | Levels 1–5 merged (#13, #21, #22, #33) | Ka Pui Cheung (#33) |
 
 Ka Pui's DELETE ownership is recorded above. Niriti owns event update.
+
+The operation table is the current implementation/review status. Detailed work
+sections below retain development history: pending tasks and uncommitted runs
+refer to the stage described, not a new verification of later commits. Use the
+[verification index](VERIFICATION.md#current-evidence-index) for later evidence.
+Final-tag verification, Release publication, and demonstration are tracked in
+[submission PR #35](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/35).
 
 ## Niriti Pahadi's event PATCH Level 3 work
 
@@ -38,7 +45,18 @@ owns dependency injection for event PATCH:
 2. Test the HTTP contract with a controlled updater and dependency overrides.
 3. Document wiring and verification evidence.
 
-The public PATCH contract is unchanged.
+Level 4 was merged in PR #22. The public PATCH success contract is unchanged.
+
+## Niriti Pahadi's event PATCH Level 5 work
+
+Branch: `feature/calendar-patch-level5-errors`. Niriti owns Level 5 for PATCH:
+
+1. Add `EventUpdateDeniedError` and provider-aware unavailable errors.
+2. Classify Google 401/403/404/410 and transport failures in `GoogleEventUpdater`.
+3. Map PATCH through shared `ServiceError` (including event-ID validation).
+4. Update offline contract/provider tests and document verification.
+
+See [PATCH Level 5 verification](PATCH_LEVEL5_VERIFICATION.md).
 
 The tables below retain the earlier GET implementation history; they do not
 establish the team's final operation ownership.
@@ -84,6 +102,77 @@ through normal injection returned 200 for the existing event and 404 for an abse
 ID. See [verification evidence](VERIFICATION.md#event-get-level-4-verification).
 Another teammate's review of production wiring and test substitution and matching
 PR CI remain required. Codex assisted with implementation, tests, and verification.
+
+## Kristie Lee's event GET Level 5 work
+
+Branch: `feature/calendar-event-get-level5-errors`. Kristie owns event retrieval
+errors, tests, and documentation. Provider translation and HTTP error/logging
+integration are implemented on this branch. Local checks and real Google Level 5
+verification passed at `9fad9af`. Subsequent cancelled-event changes at `ecca548`
+were re-tested and approved by Ka Pui, with passing checks, before PR #30 merged.
+Codex assisted with implementation, tests, documentation, and verification.
+The contract is in the README's
+[Level 5 event retrieval section](../README.md#level-5-event-retrieval-errors).
+The operation-specific status/retry policy and DELETE-compatible ID rule were
+confirmed by the student owner; this does not claim team-wide agreement.
+Have the team review these choices before merging.
+
+On October 17, 2026, all 212 tests and required local checks passed. The 18
+controlled-reader cases also passed with external connections and real
+credentials/provider creation blocked. Real TestClient requests with normal
+injection verified Google success, a Google missing-event failure, and local
+invalid input, including sanitized logs. No events changed. See
+[Level 5 verification and reproduction](EVENT_GET_LEVEL5_VERIFICATION.md).
+This evidence covers the implementation revision, not a later documentation
+commit, human server/curl demonstration, PR CI, or final release tag.
+
+Review follow-up: kc5931 identified cancelled events returning 200 after DELETE
+in PR #30. The uncommitted fix based on `997261f` now rejects cancelled records
+before field translation. All 216 tests and required checks passed, and an
+existing cancelled Google event returned 404/not_found with one sanitized log
+through normal injection. No events were changed in the live check. See the
+[follow-up evidence](EVENT_GET_LEVEL5_VERIFICATION.md#cancelled-event-review-follow-up).
+The working-tree results above were later followed by the committed fix and
+[Ka Pui's approval](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/30#pullrequestreview-5559065935).
+
+Work is split into four commits:
+
+1. Document the planned failure contract, compatibility changes, scope, and
+   acceptance criteria. Keep the current behavior clearly distinguished.
+2. Add provider-independent permission and temporary-failure distinctions,
+   translate Google failures inside `GoogleEventReader`, and test the adapter.
+   Do not treat rate-limit 403s as permission denials or hide programming errors.
+3. Validate IDs before calling the reader and map expected failures to the
+   existing `ServiceError` handler. Update controlled-reader HTTP tests and
+   affected regression expectations, including one sanitized log per failure.
+4. Record complete checks and real Google verification, update the README to
+   describe implemented behavior, and request teammate review and matching CI.
+
+Acceptance requires:
+
+- Preserve `200` and the existing four-field Event, timed-event restriction,
+  empty-title policy, dependency injection, and provider client cleanup.
+- Implement every row of the error table, including distinct access
+  denial, retryable temporary failures, and non-retryable invalid provider data.
+- Reject invalid ID syntax without calling the reader; accept recurring-instance
+  syntax and distinguish a valid but nonexistent ID from invalid input.
+- Keep SDK types and raw errors behind the provider boundary. Use fixed public
+  messages and the common logger without duplicate logs or sensitive content.
+- Cover success, invalid input, missing resource, access denial, unavailable
+  authorization, temporary provider failure, malformed data, and unsupported
+  events with deterministic offline tests. Restore dependency overrides.
+- Run required README checks on the final implementation revision. Verify a real
+  timed-event read and a syntactically valid missing ID through normal injection;
+  record responses, sanitized logs, revision, and any unverified cases honestly.
+- Obtain another teammate's review of the contract, translation, HTTP behavior,
+  tests, and docs, with CI evidence matching the revision to be merged.
+
+The shared handler from PR #28 supplies the logging requested by the sister-team
+[review comment](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/27#discussion_r4278070800).
+No separate route/provider failure logger is planned. App-wide FastAPI request
+validation and other owners' operations are separate team tasks, not silently
+included here. Final release, fresh-tag verification, demonstration, and private
+reflection remain milestone tasks beyond this operation PR.
 
 ## Juno Lee's calendar GET Level 4 work
 
@@ -311,6 +400,31 @@ restart persistence, other GET checks, and cleanup. See
 review both normal wiring and test substitution; matching PR CI and release
 verification remain required.
 
+## Jim Lo's POST Level 5 work
+
+Jim owns POST Level 5, developed on `feature/calendar-post-level5-errors` from
+main `ef1afe8`. PR #32 merged provider failure classification, shared
+403/503/502 responses and sanitized logging, and app-wide 422 request validation.
+Uncertain writes remain non-retryable, with no local fallback. Shared validation
+covers POST and PATCH bodies without exposing their input in errors or logs.
+
+Historical checks on Python 3.14.8 with locked dependencies:
+
+| Stage/revision | Recorded checks |
+| --- | --- |
+| Provider classification, `b4c721e` | 226 tests, Ruff lint/format, strict mypy, diff checks; no live Google calls |
+| Shared HTTP/validation stage | 239 tests, Ruff lint/format, strict mypy (36 source files), diff checks; no live Google calls |
+| Real verification, `ba8ebf3`, October 17, 2026 | 239 tests with external connections blocked; required checks passed; live POST/read/restart/cleanup and isolated Google 401 verification |
+| Working merge of POST `2b8af4b` and main `a6b6fa3` (PR #31) | 277 tests and required checks; repeated live POST/read/restart/cleanup, calendar metadata, and isolated 401 verification |
+
+The existing TestClient warning remained. The real 401 became
+503/provider_unavailable/retryable=false with one provider=true log. Shared
+permissions and normal credentials were unchanged; verification events were
+cleaned up and servers stopped. See [POST Level 5 verification](POST_LEVEL5_VERIFICATION.md)
+for detailed results, limits, reproduction, Ka Pui's approval, and passing CI.
+Codex assisted with implementation, tests, documentation, and verification.
+Final-tag verification is separate from these operation and integration runs.
+
 ## Ka Pui Cheung's DELETE Level 3 work
 
 Ka Pui owns `EventDeleter` and its Google implementation, following the
@@ -355,8 +469,8 @@ and fast tests.
 
 Foundation setup uses Python 3.14, pinned dependencies, Ruff, strict mypy, and
 GitHub Actions. Both GET Level 2 PRs are merged. POST Level 2 teammate execution
-and review are recorded in PR #10; the combined branch still needs its reviewed
-merge commit and updated PR checks. Historical test counts refer to the revisions
+and review are recorded in merged PR #10. Historical test counts refer to the
+revisions
 where they were recorded, not the combined suite.
 Follow the release rules in [AGENTS.md](../AGENTS.md).
 
@@ -371,3 +485,25 @@ note linking completed requirements and gaps. Have a teammate check the final
 rubric and verify the release. Every member participates in the demonstration
 and submits a private reflection. Before each class, post a linked team update
 covering shipped work, changed decisions, blockers, and next steps.
+
+## Juno Lee's calendar GET Level 5 work
+
+Owner: Juno Lee. Reviewer: Jim Lo (#31).
+Branch: `feature/calendar-get-level5-errors`.
+
+Scope: calendar metadata failure translation, shared `ServiceError` responses,
+controlled HTTP and Google adapter tests, sanitized logs, and documentation.
+Preserve the three-field success response, `primary` alias, unsupported-ID 404,
+dependency injection, noninteractive authorization, and client cleanup.
+
+Acceptance: distinguish missing calendar, authorization setup/renewal, permission,
+temporary failures, and invalid provider metadata; document retryability and
+compatibility changes. Offline tests must check public responses, one sanitized
+log per failure, and provider translation without credentials or network.
+Run all README checks and record practical real-provider verification.
+
+The endpoint has no new ID syntax rule or operation-specific 422 case. Shared
+request-validation work and other owners' routes stay outside this change.
+Teammate approval and matching CI are required before merge; release verification
+is separate. Codex assisted with implementation, tests, docs, and verification.
+See [calendar Level 5 verification](CALENDAR_GET_LEVEL5_VERIFICATION.md).

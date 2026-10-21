@@ -6,10 +6,14 @@
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
 - `app/calendar_provider.py`: typed calendar metadata interface; Google SDK details
-  stay in `GoogleCalendarReader` in `app/google_calendar.py`.
+  stay in `GoogleCalendarReader` in `app/google_calendar.py`. Metadata failures
+  use its service exceptions; calendar GET maps them to shared `ServiceError`.
 - `app/calendar_dependencies.py`: selects the calendar reader; calendar HTTP tests
   substitute it through FastAPI dependency overrides.
 
+- `app/errors.py`: Level 5 shared error format (`ServiceError`, `ErrorCode`),
+  response schema, service/request-validation handlers, and sanitized failure
+  logs. DELETE, both GETs, POST, and PATCH use it.
 - `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
@@ -46,18 +50,18 @@
 - `tests/test_create_events.py`: offline creation and validation contract tests.
 - `tests/test_create_event_contract.py`: controlled creator HTTP tests with
   isolated dependency overrides and cleanup, separate from Google SDK fixtures.
+- `tests/test_request_validation.py`: shared POST/PATCH validation errors,
+  no provider operation on invalid input, safe logs, and OpenAPI contracts.
 - `tests/conftest.py`: isolated provider data, Google clients, and shared HTTP fixture.
 - [README.md](README.md): setup, API contract, and testing strategy.
 - [Work plan](docs/WORK_PLAN.md): task owners and milestone dates.
 
-Use the README setup and commands. Each member owns one distinct, useful public
-operation through Levels 1–5, including its tests and documentation. Keep Level 1
-operations small and backed by local data. Jim Lo owns `POST /events`; its
-implemented Level 1 creation contract is in the README. Preserve existing
-GET behavior when adding POST. Creation tests must isolate fake provider state.
-Preserve each operation's public contract for Level 2 and translate Google
-fields before returning them. Do not commit credentials or add unnecessary layers.
-Fast tests must run without internet or Google credentials.
+Use the README setup and commands. Each member owns one distinct public
+operation through Levels 1–5, including its tests and documentation. Preserve
+public contracts, keep Google calls behind the provider boundary, and translate
+provider fields before returning them. Creation tests must isolate fake provider
+state. Do not commit credentials or add unnecessary layers. Fast tests must run
+without internet or Google credentials.
 
 Kristie owns event GET. It uses the shared account's primary Google Calendar;
 run scripts/google_calendar_auth.py before serving requests. Never start browser
@@ -71,9 +75,13 @@ Calendar GET already receives its reader through `app/calendar_dependencies.py`.
 Jim's POST writes to the same primary calendar and returns Google's event ID.
 POST calls the typed `EventCreator` boundary in `app/event_creation_provider.py`.
 Google calls, translation, and known failure handling stay in `GoogleEventCreator`.
-The POST handler maps service errors to the existing 503 and 502 responses.
-Preserve the shared `load_credentials` helper used by PATCH and DELETE while
-refactoring creation. `app/event_creation_dependencies.py` selects Google and
+The POST handler maps permission, authorization, and unconfirmed creation errors
+to shared 403/503/502 responses with retryable=false. Use the shared handler for
+one sanitized failure log; do not add route/adapter logging or expose raw input.
+FastAPI request validation uses the shared 422 shape for POST and PATCH body
+errors. PATCH application failures use the shared `ServiceError` format with
+operation `update_event`. Preserve the shared `load_credentials` helper used by
+PATCH and DELETE while refactoring creation. `app/event_creation_dependencies.py` selects Google and
 supplies the creator through `Depends`; POST does not construct the concrete
 provider. Controlled creator HTTP tests override that dependency, use fresh
 creator state, and restore prior overrides in `finally`. Keep Google provider
@@ -87,6 +95,8 @@ See [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md) for the provid
 boundary, refactor checks, and teammate reproduction steps.
 See [POST Level 4 verification](docs/POST_LEVEL4_VERIFICATION.md) for normal wiring,
 controlled substitution, and real verification through dependency injection.
+See [POST Level 5 verification](docs/POST_LEVEL5_VERIFICATION.md) for shared errors,
+sanitized logs, real creation/cleanup, and an isolated real authorization failure.
 Keep strict mypy checks. Calls to untyped Google credentials and auth exceptions
 are scoped in pyproject.toml; SDK imports have local `import-untyped` exclusions.
 

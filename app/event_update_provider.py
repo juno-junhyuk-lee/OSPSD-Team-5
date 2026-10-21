@@ -9,8 +9,16 @@ class EventUpdateNotFoundError(Exception):
     """The event is missing, already deleted, or cancelled."""
 
 
+class EventUpdateDeniedError(Exception):
+    """The provider refused the update; the event was not changed."""
+
+
 class EventUpdateUnavailableError(Exception):
-    """Local authorization is unavailable; no provider write was attempted."""
+    """Authorization is unavailable or rejected; no authorized write occurred."""
+
+    def __init__(self, message: str = "", *, provider: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
 
 
 class EventUpdateUnconfirmedError(Exception):
@@ -25,8 +33,10 @@ class EventUpdater(Protocol):
 
         Return the same id with the refreshed title and start/end instants.
         Raise EventUpdateNotFoundError when the event is absent or cancelled,
-        EventUpdateUnavailableError before a write if authorization is unusable,
-        or EventUpdateUnconfirmedError when the result is uncertain.
+        EventUpdateDeniedError when the provider refuses access,
+        EventUpdateUnavailableError if authorization is unusable or rejected
+        (provider flag records remote authorization involvement), or
+        EventUpdateUnconfirmedError when the result is uncertain.
         Do not automatically retry an uncertain write.
         """
         ...

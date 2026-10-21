@@ -22,9 +22,17 @@ def test_delete_created_event(
 
     assert response.status_code == 204
     assert response.content == b""
-    # Google keeps cancelled events readable; our GET still returns them.
+    # Google retains the tombstone, but the public API treats it as missing.
     assert provider_events[event_id]["status"] == "cancelled"
-    assert client.get(f"/events/{event_id}").status_code == 200
+    retrieved = client.get(f"/events/{event_id}")
+    assert retrieved.status_code == 404
+    assert retrieved.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
 
 
 def test_delete_leaves_other_events(client: TestClient) -> None:
@@ -45,7 +53,13 @@ def test_delete_unknown_event_preserves_state(
     response = client.delete("/events/missing-event")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Event not found"}
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
     assert provider_events == before
 
 
@@ -57,7 +71,13 @@ def test_repeated_delete_returns_not_found(client: TestClient) -> None:
 
     assert first.status_code == 204
     assert second.status_code == 404
-    assert second.json() == {"detail": "Event not found"}
+    assert second.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
 
 
 def test_delete_calls_google_without_retries(
@@ -83,13 +103,22 @@ def test_gone_google_event_returns_not_found(
     response = client.delete("/events/test-event")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Event not found"}
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Event not found.",
+            "retryable": False,
+        }
+    }
 
 
 @pytest.mark.parametrize(
     "failure",
     [
-        HttpError(Mock(status=403, reason="Forbidden"), b'{"error": "secret detail"}'),
+        HttpError(
+            Mock(status=403, reason="Rate Limit Exceeded"),
+            b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+        ),
         HttpError(Mock(status=500, reason="Server Error"), b""),
         TimeoutError("network timeout"),
     ],
@@ -106,6 +135,32 @@ def test_provider_failure_returns_bad_gateway(
     response = client.delete("/events/test-event")
 
     assert response.status_code == 502
+    assert response.json()["error"]["code"] == "provider_error"
+    assert response.json()["error"]["retryable"] is True
+    assert "secret" not in response.text
+    assert "test-event" in provider_events
+
+
+def test_permission_denied_returns_forbidden(
+    client: TestClient,
+    google_service: MagicMock,
+    provider_events: dict[str, dict[str, object]],
+) -> None:
+    execute = google_service.events.return_value.delete.return_value.execute
+    execute.side_effect = HttpError(
+        Mock(status=403, reason="Forbidden"), b'{"error": "secret detail"}'
+    )
+
+    response = client.delete("/events/test-event")
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "error": {
+            "code": "access_denied",
+            "message": "Google Calendar denied access to this event.",
+            "retryable": False,
+        }
+    }
     assert "secret" not in response.text
     assert "test-event" in provider_events
 
