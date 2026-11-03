@@ -609,6 +609,20 @@ One sanitized failure log is written per failure. Uncertain updates are never
 automatically retried. See
 [PATCH Level 5 verification](docs/PATCH_LEVEL5_VERIFICATION.md).
 
+### Event replacement contract
+
+`PUT /events/{event_id}` replaces the shared fields of one timed event, as the
+HW2 joint Calendar contract requires. Ka Pui Cheung owns this operation. It
+takes the same path parameter, body, validation, and failure table as PATCH
+above, and returns `200 OK` with the four-field `Event`. The body must contain
+`title`, `start_time`, and `end_time`; the `id` never changes.
+
+PUT replaces only the title and both times. Google fields outside the shared
+model (description, location, attendees, reminders, recurrence) are kept,
+because the request reaches Google as `events.patch` with only `summary`,
+`start`, and `end`. A missing, deleted, or cancelled event returns `404` without
+a write. Failure logs use the operation name `replace_event`.
+
 ### Event deletion contract
 
 `DELETE /events/{event_id}` deletes one event from the shared test account's

@@ -236,27 +236,47 @@ def create_event(
     return event
 
 
-@app.patch(
-    "/events/{event_id}",
-    response_model=Event,
-    responses={
-        403: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        502: {"model": ErrorResponse},
-        503: {"model": ErrorResponse},
-    },
-)
+EVENT_WRITE_RESPONSES: dict[int | str, dict[str, object]] = {
+    403: {"model": ErrorResponse},
+    404: {"model": ErrorResponse},
+    502: {"model": ErrorResponse},
+    503: {"model": ErrorResponse},
+}
+
+
+@app.put("/events/{event_id}", response_model=Event, responses=EVENT_WRITE_RESPONSES)
+def replace_event(
+    event_id: str,
+    request: UpdateEventRequest,
+    updater: Annotated[EventUpdater, Depends(get_event_updater)],
+) -> Event:
+    """Replace a timed event's title and times, keeping its other Google fields."""
+    return _write_event(event_id, request, updater, operation="replace_event")
+
+
+@app.patch("/events/{event_id}", response_model=Event, responses=EVENT_WRITE_RESPONSES)
 def update_event(
     event_id: str,
     request: UpdateEventRequest,
     updater: Annotated[EventUpdater, Depends(get_event_updater)],
 ) -> Event:
     """Update a timed Google event and return the refreshed Event fields."""
+    return _write_event(event_id, request, updater, operation="update_event")
+
+
+def _write_event(
+    event_id: str,
+    request: UpdateEventRequest,
+    updater: EventUpdater,
+    *,
+    operation: str,
+) -> Event:
+    """Apply `request` to `event_id` through `updater` and map its failures."""
     if not EVENT_ID_PATTERN.fullmatch(event_id):
         raise ServiceError(
             ErrorCode.INVALID_INPUT,
             "Event ID must be 1-1024 letters, digits, '_' or '-'.",
-            operation="update_event",
+            operation=operation,
             retryable=False,
             provider=False,
         )
@@ -266,7 +286,7 @@ def update_event(
         raise ServiceError(
             ErrorCode.NOT_FOUND,
             "Event not found.",
-            operation="update_event",
+            operation=operation,
             retryable=False,
             provider=True,
         ) from None
@@ -274,7 +294,7 @@ def update_event(
         raise ServiceError(
             ErrorCode.ACCESS_DENIED,
             "Google Calendar denied permission to update this event.",
-            operation="update_event",
+            operation=operation,
             retryable=False,
             provider=True,
         ) from None
@@ -283,7 +303,7 @@ def update_event(
             ErrorCode.PROVIDER_UNAVAILABLE,
             "Google Calendar authorization is unavailable. "
             "Run scripts/google_calendar_auth.py.",
-            operation="update_event",
+            operation=operation,
             retryable=False,
             provider=error.provider,
         ) from None
@@ -292,7 +312,7 @@ def update_event(
             ErrorCode.PROVIDER_ERROR,
             "Google Calendar update could not be confirmed. "
             "Check the calendar before retrying.",
-            operation="update_event",
+            operation=operation,
             retryable=False,
             provider=True,
         ) from None

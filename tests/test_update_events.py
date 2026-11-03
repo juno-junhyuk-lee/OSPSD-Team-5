@@ -219,3 +219,60 @@ def test_missing_authorization_returns_unavailable(
     assert response.json()["error"]["code"] == "provider_unavailable"
     assert response.json()["error"]["retryable"] is False
     google_service.events.return_value.patch.assert_not_called()
+
+
+def test_put_replaces_shared_fields_and_keeps_google_fields(
+    client: TestClient, provider_events: dict[str, dict[str, object]]
+) -> None:
+    provider_events["rich-event"] = {
+        "id": "rich-event",
+        "summary": "Original",
+        "description": "Agenda",
+        "location": "Room 1",
+        "attendees": [{"email": "guest@example.com"}],
+        "start": {"dateTime": "2026-10-06T14:00:00Z"},
+        "end": {"dateTime": "2026-10-06T15:00:00Z"},
+    }
+
+    response = client.put("/events/rich-event", json=UPDATE)
+
+    assert response.status_code == 200
+    event = response.json()
+    assert set(event) == {"id", "title", "start_time", "end_time"}
+    assert event["id"] == "rich-event"
+    assert event["title"] == "Updated Meeting"
+    assert datetime.fromisoformat(event["start_time"]) == datetime.fromisoformat(
+        UPDATE["start_time"]
+    )
+    assert datetime.fromisoformat(event["end_time"]) == datetime.fromisoformat(
+        UPDATE["end_time"]
+    )
+    stored = provider_events["rich-event"]
+    assert stored["description"] == "Agenda"
+    assert stored["location"] == "Room 1"
+    assert stored["attendees"] == [{"email": "guest@example.com"}]
+    assert client.get("/events/rich-event").json() == event
+
+
+def test_put_unknown_event_returns_not_found(
+    client: TestClient, provider_events: dict[str, dict[str, object]]
+) -> None:
+    before = deepcopy(provider_events)
+
+    response = client.put("/events/missing-event", json=UPDATE)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert provider_events == before
+
+
+def test_put_after_delete_returns_not_found(
+    client: TestClient, google_service: MagicMock
+) -> None:
+    event_id = client.post("/events", json=EVENT).json()["id"]
+    assert client.delete(f"/events/{event_id}").status_code == 204
+
+    response = client.put(f"/events/{event_id}", json=UPDATE)
+
+    assert response.status_code == 404
+    google_service.events.return_value.patch.assert_not_called()
