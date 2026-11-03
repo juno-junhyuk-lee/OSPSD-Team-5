@@ -14,7 +14,8 @@
 - `app/errors.py`: Level 5 shared error format (`ServiceError`, `ErrorCode`),
   response schema, service/request-validation handlers, and sanitized failure
   logs. DELETE, both GETs, POST, and PATCH use it.
-- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
+- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, PUT, and DELETE.
+  PUT and PATCH share `EventUpdater` and its failure mapping; PUT keeps non-shared Google fields.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
 - `app/google_create_events.py`: `GoogleEventCreator`, shared authorization,
