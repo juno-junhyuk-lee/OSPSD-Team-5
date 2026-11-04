@@ -19,6 +19,9 @@ HW1 field-name and per-route error wiring descriptions in historical evidence.
 - `tests/test_shared_provider_failures.py`: controlled adapter failure phases.
 - `tests/test_event_shape_policy.py`: offline HTTP ID checks, pre-write rejection
   of all-day/series replacements, and timed-instance preservation.
+- `tests/test_shared_conformance.py`: the shared `CalendarServiceConformance`
+  suite against `GoogleCalendarService`, offline on the fake Google client;
+  `CALENDAR_LIVE_CONFORMANCE=1` also runs it against real Google.
 - `scripts/verify_put_live.py`: tagged POST/GET/PUT/GET/DELETE workflow with
   independent Google checks and cleanup. This command changes Google state.
 - `tests/test_verify_put_live.py`: controlled script checks; not live evidence.
