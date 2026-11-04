@@ -38,6 +38,7 @@ from app.event_update_provider import (
     EventUpdater,
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
+    EventUpdateUnsupportedError,
 )
 
 Operation = Literal["create", "get", "replace", "delete"]
@@ -77,10 +78,18 @@ class GoogleCalendarService:
 
     @staticmethod
     def _error(
-        code: ErrorCode, message: str, *, retryable: bool = False, provider: bool = True
+        code: ErrorCode,
+        message: str,
+        *,
+        retryable: bool = False,
+        provider: bool = True,
+        reason: str | None = None,
     ) -> CalendarError:
         # This flag is safe log context, not raw provider exception details.
-        return CalendarError(code, message, retryable, details={"provider": provider})
+        details: dict[str, object] = {"provider": provider}
+        if reason is not None:
+            details["reason"] = reason
+        return CalendarError(code, message, retryable, details=details)
 
     @contextmanager
     def _errors(self, operation: Operation) -> Iterator[None]:
@@ -144,6 +153,13 @@ class GoogleCalendarService:
                 ErrorCode.PROVIDER_ERROR,
                 messages[operation],
                 retryable=operation == "delete",
+            ) from None
+        except EventUpdateUnsupportedError:
+            raise self._error(
+                ErrorCode.INVALID_INPUT,
+                "Only individual timed events can be replaced; "
+                "all-day events and recurring series are unsupported.",
+                reason="unsupported_event_shape",
             ) from None
         except UnsupportedEventError:
             raise self._error(

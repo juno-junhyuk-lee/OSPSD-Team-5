@@ -34,7 +34,10 @@ from app.models import Calendar
 app = FastAPI(
     title="Calendar Service",
     responses={
-        400: {"model": ErrorResponse, "description": "Malformed JSON"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Malformed JSON or unsupported event operation",
+        },
         422: {"model": ErrorResponse, "description": "Invalid request"},
     },
 )

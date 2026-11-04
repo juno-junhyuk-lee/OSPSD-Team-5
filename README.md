@@ -676,6 +676,20 @@ because the request reaches Google as `events.patch` with only `summary`,
 `start`, and `end`. A missing, deleted, or cancelled event returns `404` without
 a write. Failure logs use the operation name `replace_event`.
 
+### Unsupported replacements and recurring instances
+
+PUT and PATCH reject all-day events and recurring-series parents with
+400 `invalid_input`, `retryable=false`, after reading the target and before
+writing. Individual timed recurring instances can be replaced by ID; the patch
+updates only title/start/end and preserves their series metadata and other
+Google fields. GET retains its existing 422 for all-day events and can read
+timed series/instances. DELETE behavior is unchanged. These are Team 5 policies;
+listing and recurrence editing are outside the shared core.
+
+Controlled coverage is in `tests/test_event_shape_policy.py`; it verifies
+unchanged provider state on rejection and preservation of instance metadata.
+See [the adoption guide](docs/SHARED_CONTRACT_ADOPTION.md#local-event-shape-policy).
+
 ### Event deletion contract
 
 `DELETE /events/{event_id}` deletes one event from the shared test account's

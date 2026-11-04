@@ -15,6 +15,7 @@ from app.event_update_provider import (
     EventUpdateProviderUnavailableError,
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
+    EventUpdateUnsupportedError,
 )
 from app.google_create_events import GoogleCalendarSetupError, load_credentials
 from app.google_delete_events import GoogleEventNotFoundError, is_permission_denied
@@ -52,6 +53,15 @@ def update_google_event(event_id: str, request: ReplaceEvent) -> Event:
                 raise EventUpdateProviderError
             if existing.get("status") == "cancelled":
                 raise GoogleEventNotFoundError(event_id)
+            start, end = existing.get("start"), existing.get("end")
+            if not isinstance(start, dict) or not isinstance(end, dict):
+                raise EventUpdateProviderError
+            if "date" in start or "date" in end or existing.get("recurrence"):
+                raise EventUpdateUnsupportedError
+            if not isinstance(start.get("dateTime"), str) or not isinstance(
+                end.get("dateTime"), str
+            ):
+                raise EventUpdateProviderError
             patch = service.events().patch(
                 calendarId="primary", eventId=event_id, body=body
             )

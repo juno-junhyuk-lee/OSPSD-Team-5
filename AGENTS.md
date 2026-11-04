@@ -17,6 +17,8 @@ HW1 field-name and per-route error wiring descriptions in historical evidence.
 - `tests/test_calendar_service.py` and `tests/test_shared_calendar_http.py`:
   direct shared-boundary checks and whole-service HTTP substitution.
 - `tests/test_shared_provider_failures.py`: controlled adapter failure phases.
+- `tests/test_event_shape_policy.py`: offline HTTP ID checks, pre-write rejection
+  of all-day/series replacements, and timed-instance preservation.
 - `scripts/verify_put_live.py`: tagged POST/GET/PUT/GET/DELETE workflow with
   independent Google checks and cleanup. This command changes Google state.
 - `tests/test_verify_put_live.py`: controlled script checks; not live evidence.

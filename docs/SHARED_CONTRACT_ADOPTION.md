@@ -195,3 +195,23 @@ provenance, exact commands, sanitized output, exit status, and cleanup results.
 Formal shared conformance wiring, another teammate's reproduction, and adoption
 PR/CI approval remain open. Future runs must record their own revisions and
 observed results; HW1 evidence does not establish this shared-package path.
+
+## Local event-shape policy
+
+Team 5 retains the HTTP ID policy: 1-1024 letters, digits, underscores, or
+hyphens, forwarded unchanged. The shared package keeps IDs opaque. Tests cover
+ordinary and recurring-instance IDs and invalid character/length rejection
+before provider calls. Recurrence is determined from Google metadata, not IDs.
+
+GET retains 422 `invalid_input` for all-day events; timed series/instances can
+be read through the four-field representation. PUT/PATCH read the target first
+and reject all-day events and recurring-series parents with 400 `invalid_input`
+and `retryable=false`, without patching. Individual timed instances are allowed;
+only summary/start/end are patched, leaving series metadata and unrelated fields
+untouched. DELETE behavior is unchanged. Malformed provider time structures are
+502 `provider_error`. Body-validation errors remain 422.
+
+`tests/test_event_shape_policy.py` verifies these behaviors using controlled
+provider state; it does not establish real Google recurrence behavior. See
+[Google's recurrence guide](https://developers.google.com/workspace/calendar/api/guides/recurringevents)
+for the distinction between series parents and instances.

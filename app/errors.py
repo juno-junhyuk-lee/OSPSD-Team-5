@@ -106,6 +106,13 @@ def calendar_error_handler(request: Request, error: Exception) -> JSONResponse:
             operation=operation,
             retryable=error.retryable,
             provider=provider,
+            status=(
+                400
+                if error.code == ErrorCode.INVALID_INPUT
+                and error.details is not None
+                and error.details.get("reason") == "unsupported_event_shape"
+                else None
+            ),
         ),
     )
 

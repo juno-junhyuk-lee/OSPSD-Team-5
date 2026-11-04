@@ -145,9 +145,10 @@ events return an empty title. No new application title-length maximum is added.
 
 IDs identify events in the configured primary calendar, not globally across
 accounts. The shared model treats them as opaque. Team 5 retains HTTP ID
-validation of 1-1024 letters, digits, underscores, or hyphens. Whether that
-restriction is portable under the shared contract remains a contract-review
-question; do not add that Google-oriented restriction to the shared model.
+validation of 1-1024 letters, digits, underscores, or hyphens. This
+restriction is a Team 5 HTTP policy, not a shared-model rule. Controlled
+tests verify boundary lengths, unchanged forwarding, and recurring-instance
+IDs. IDs are not parsed to infer recurrence; provider metadata determines shape.
 
 Illustrative expected request/response, not an observed event:
 
@@ -167,9 +168,18 @@ Content-Type: application/json
 
 The shared representation omits description, location, attendees, recurrence,
 and other Google fields without requiring those fields to be deleted. All-day
-and unsupported provider shapes remain outside the timed-event model. The
-adoption code maps unsupported reads to `INVALID_INPUT`; explicit all-day and
-recurring-series replacement policy still needs owner and contract-facing review.
+and unsupported provider shapes remain outside the timed-event model.
+GET retains 422 `invalid_input` for all-day events and can read the timed
+representation of a recurring series or instance. PUT/PATCH reject all-day
+events and recurring-series parents with 400 `invalid_input`, `retryable=false`,
+before any patch. Individual timed recurring instances can be replaced;
+`recurringEventId`, `originalStartTime`, description, and the parent are retained
+by the controlled patch checks. Malformed provider time structures return 502.
+DELETE keeps its existing behavior; these guards concern replacement only.
+This local policy does not add operations or fields to the shared interface.
+Google identifies series and instances through
+[recurrence metadata](https://developers.google.com/workspace/calendar/api/guides/recurringevents);
+Team 5 tests the behavior offline and does not claim new live recurrence evidence.
 [Observed verification][adoption-evidence] records actual sanitized results and
 reproduction steps for the adopted shared commit.
 
@@ -211,6 +221,8 @@ Known operation failures instead cross the service boundary as `CalendarError`.
 | --- | --- | --- |
 | Malformed or empty JSON | 400 `invalid_input` | False; correct input |
 | Invalid valid-JSON input or HTTP ID | 422 `invalid_input` | False |
+| All-day or series-parent replacement | 400 `invalid_input` | False; event unchanged |
+| All-day GET | Existing 422 `invalid_input` | False |
 | Missing/cancelled/deleted event | 404 `not_found` | False |
 | Confirmed permission denial | 403 `access_denied` | False |
 | Missing/unusable OAuth or rejected authorization | 503 `provider_unavailable` | False; repair setup |
@@ -225,7 +237,9 @@ retry delay is currently known; do not invent `Retry-After`. Supply it if a
 meaningful wait becomes available.
 
 The common error envelope is `{"error":{"code":"...","message":"...","retryable":false}}`.
-The service supplies safe messages and a Boolean provider-involvement flag.
+The service supplies safe messages, a Boolean provider-involvement flag, and
+a controlled reason for unsupported shapes. The HTTP handler uses that reason
+to select 400 without changing other `INVALID_INPUT` mappings.
 `app/errors.py` logs operation, code, status, and that flag once; it does not
 expose raw exception messages, request bodies, titles, tokens, or authorization
 headers. Credential files stay outside Git and evidence. Deployment must define
@@ -244,16 +258,17 @@ suite's cleanup gaps remain a separate review concern described below.
 
 ### Deployment planning for November 11
 
-Hosting, infrastructure tooling, image registry, protected state storage, secret
-store, pipeline, and telemetry backend remain undecided. The team must assign
-a proposal owner and name account owners, expected costs, and teardown date.
+Juno Lee owns the deployment proposal. Hosting, infrastructure tooling, image
+registry, protected state storage, secret store, pipeline, and telemetry backend
+remain undecided. Juno will propose the platform/tools, name account owners,
+and record expected costs and teardown date for team review.
 These are unresolved design dependencies, not claims of deployed infrastructure.
 
 The proposal must cover locked builds, startup configuration validation,
 readiness, reproducible provisioning/teardown, deployment and rollback checks,
 and observability. A provider outage should not cause restart loops. Credential
 refresh persistence and filesystem permissions must be checked before hosting
-is accepted. Record an owner and proposal before design acceptance; implementation
+is accepted. Record the proposal and team review before design acceptance; implementation
 remains due at the November 11 milestone.
 
 ## Testing and verification
@@ -262,6 +277,7 @@ remains due at the November 11 milestone.
 | --- | --- |
 | Shared validation and migration | `test_shared_model_migration.py` and HTTP validation tests: required/unknown/legacy fields, malformed JSON, ordering, and no provider operation on rejection |
 | Shared interface and DI | `test_calendar_service.py` and `test_shared_calendar_http.py`: composition, service substitution, statuses/errors, and restored overrides |
+| Local ID and event-shape policy | `test_event_shape_policy.py`: no writes for all-day/series replacement, timed instance preservation, existing GET policy, HTTP ID boundaries |
 | Google translation and write phases | Adapter tests and `test_shared_provider_failures.py`: controlled SDK outcomes, unchanged replacement ID, before/after-write classification, no retry |
 | Sanitized logs | Controlled HTTP log assertions: one failure entry without sensitive payloads |
 | Same vertical suite | #44's `test_shared_conformance.py`: tagged `CalendarServiceConformance` against Team 5's implementation |
@@ -327,6 +343,12 @@ successful live run does not establish cleanup behavior during failures.
   #43 at `b088ad9`. The earlier live run remains tied to `327e8bc`; it is not
   relabeled as a new run at the merge commit.
 
+The local policy revision passed 475 offline tests, Ruff lint/format, strict
+mypy, verification-script typing, and whitespace checks on Python 3.14.2.
+These checks cover the ID/event-shape guards; no new live Google run was made.
+Record the committed revision and matching CI before treating this as final
+submission evidence.
+
 Before final integration, repeat the README checks at the selected commit:
 
 ```sh
@@ -352,7 +374,7 @@ credentials. Historical HW1 results cannot substitute for HW2 checks.
 | Kristie Lee | Shared-contract and contract-facing coordination | Record accepted revision, cross-team review, and release references before submission |
 | Jim Lo | #43 adoption merged; migration, models/errors, examples | Follow up on the inherited tag pin/lock/current references before final submission |
 | Ka Pui Cheung | #41 PUT, #44 conformance and real verification | Resolve live cleanup concern; update #44 on the reviewed #43 base and verify before integration |
-| Team assignment pending | Deployment proposal, account/cost/teardown owners | Name owner and proposal before design acceptance; deliver infrastructure by November 11 |
+| Juno Lee | Deployment proposal, account/cost/teardown plan | Prepare platform/tooling proposal for team review before design acceptance; infrastructure due November 11 |
 
 `hw2/milestone-2` is the integration branch. This document stays on
 `doc/design.md` in #40; Niriti's #42 revisions are consolidated here to avoid
@@ -377,8 +399,8 @@ team review. Publish a new tag rather than moving an existing published tag.
 | Shared tag pin | Published tag is `v0.1.0-rc.1`; merged #43 still declares removed `v0.1.0` | Jim; fix source/lock/current references before final submission |
 | Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; review #44 before integration |
 | Replacement-start and live cleanup gaps | Keep separate start-change tests; fix cleanup fixtures locally or via a new shared release | Ka Pui; before relying on those guarantees/live-suite approval |
-| HTTP ID restriction and unsupported event shapes | Confirm contract portability and all-day/series replacement behavior; document outcomes | Jim/Ka Pui with Kristie; before final acceptance |
-| Hosting and credential persistence | Owner/platform/tooling/cost decisions remain open | Team to assign; proposal before acceptance, implementation November 11 |
+| HTTP IDs and unsupported event shapes | Local policy implemented and checked in `tests/test_event_shape_policy.py`: ID forwarding/rejection, no unsupported writes, instance metadata preserved | Juno implements; Jim/Ka Pui review with the consolidated design before final acceptance |
+| Hosting and credential persistence | Juno owns the proposal; platform/tools/account access/cost choices remain open for team review | Juno; proposal before acceptance, implementation November 11 |
 | Final complete-design and contract-facing reviews | Review the consolidated revision, link substantive comments/resolutions and scope of approval | Niriti and Team 2/7 reviewer; before submission |
 
 Niriti's #42 provides review revisions; it does not approve this later revision.
@@ -408,6 +430,9 @@ requirements.
   stale progress notes with current review dependencies. Adoption merged via
   #43 at `b088ad9`; #44 integration, final reviews, and hosting decisions remain
   pending. The merged source pin still needs the published tag correction.
+- November 4: Juno took deployment-proposal ownership. Added local pre-write
+  shape guards and controlled policy checks; preserved the shared interface and
+  existing GET/ID behavior. Runtime policy changes still require teammate review.
 - Codex assisted with drafting, repository inspection, and review checks.
   Students must understand, verify, and own their submitted work.
 
