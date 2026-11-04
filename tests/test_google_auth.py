@@ -2,10 +2,13 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from google.auth.exceptions import RefreshError
+from calendar_contract import CalendarError, ErrorCode
+from google.auth.exceptions import RefreshError, TransportError
 
+from app.calendar_service import GoogleCalendarService
 from app.event_provider import CalendarAuthenticationError
 from app.google_auth import SCOPES, load_credentials
+from app.google_events import GoogleEventReader
 
 
 @pytest.mark.parametrize("contents", [None, "not-json", "{}"])
@@ -78,6 +81,37 @@ def test_revoked_token_requires_authentication(
         load_credentials(token)
     assert raised.value.provider is True
     assert not token.exists()
+
+
+def test_refresh_transport_failure_is_not_an_authentication_failure(
+    tmp_path: Path, credentials: Mock
+) -> None:
+    credentials.valid = False
+    credentials.expired = True
+    credentials.refresh_token = "fake-refresh-token"
+    credentials.refresh.side_effect = TransportError("network down")
+    token = tmp_path / "token.json"
+
+    with pytest.raises(TransportError):
+        load_credentials(token)
+    assert not token.exists()
+
+
+def test_get_reports_refresh_transport_failure_as_temporary(
+    credentials: Mock,
+) -> None:
+    credentials.valid = False
+    credentials.expired = True
+    credentials.refresh_token = "fake-refresh-token"
+    credentials.refresh.side_effect = TransportError("network down")
+    service = GoogleCalendarService(
+        creator=Mock(), reader=GoogleEventReader(), updater=Mock(), deleter=Mock()
+    )
+
+    with pytest.raises(CalendarError) as raised:
+        service.get("event-id")
+    assert raised.value.code is ErrorCode.PROVIDER_UNAVAILABLE
+    assert raised.value.retryable is True
 
 
 def test_expired_token_without_refresh_requires_authentication(
