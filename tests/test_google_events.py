@@ -321,6 +321,7 @@ def test_event_reader_translates_requested_event(
     [
         (401, "authError", CalendarAuthenticationError),
         (404, "notFound", EventNotFoundError),
+        (410, "gone", EventNotFoundError),
         (403, "forbidden", EventAccessDeniedError),
         (403, "rateLimitExceeded", EventReadUnavailableError),
         (403, "userRateLimitExceeded", EventReadUnavailableError),

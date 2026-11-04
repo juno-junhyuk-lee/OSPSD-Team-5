@@ -16,6 +16,7 @@ from requests.exceptions import RequestException
 from app import google_create_events
 from app.event_creation_provider import (
     EventCreationDeniedError,
+    EventCreationProviderUnavailableError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
     EventCreator,
@@ -137,15 +138,24 @@ def test_unusable_provider_response_is_not_a_success(
 
 
 @pytest.mark.parametrize(
-    "error",
+    ("error", "expected"),
     [
-        HttpError(Response({"status": "429"}), b'{"error": "rate limited"}'),
-        HttpError(Response({"status": "500"}), b'{"error": "provider failure"}'),
-        TimeoutError("Provider may have accepted the write."),
-        TransportError("Private transport details"),
-        HttpLib2Error("Private HTTP details"),
-        RequestException("Private request details"),
-        OSError("Private connection details"),
+        (
+            HttpError(Response({"status": "429"}), b'{"error": "rate limited"}'),
+            EventCreationProviderUnavailableError,
+        ),
+        (
+            HttpError(Response({"status": "500"}), b'{"error": "provider failure"}'),
+            EventCreationUnconfirmedError,
+        ),
+        (
+            TimeoutError("Provider may have accepted the write."),
+            EventCreationUnconfirmedError,
+        ),
+        (TransportError("Private transport details"), EventCreationUnconfirmedError),
+        (HttpLib2Error("Private HTTP details"), EventCreationUnconfirmedError),
+        (RequestException("Private request details"), EventCreationUnconfirmedError),
+        (OSError("Private connection details"), EventCreationUnconfirmedError),
     ],
 )
 def test_provider_failure_does_not_retry(
@@ -153,11 +163,12 @@ def test_provider_failure_does_not_retry(
     creation_request: CreateEvent,
     service: MagicMock,
     error: Exception,
+    expected: type[Exception],
 ) -> None:
     execute = service.events.return_value.insert.return_value.execute
     execute.side_effect = error
 
-    with pytest.raises(EventCreationUnconfirmedError) as raised:
+    with pytest.raises(expected) as raised:
         creator.create_event(creation_request)
 
     assert raised.value.__cause__ is error
@@ -203,7 +214,7 @@ def test_rate_limit_403_is_not_permission_denial(
     execute = service.events.return_value.insert.return_value.execute
     execute.side_effect = error
 
-    with pytest.raises(EventCreationUnconfirmedError) as raised:
+    with pytest.raises(EventCreationProviderUnavailableError) as raised:
         creator.create_event(creation_request)
 
     assert raised.value.__cause__ is error

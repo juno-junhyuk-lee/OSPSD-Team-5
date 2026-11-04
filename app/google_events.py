@@ -71,7 +71,7 @@ class GoogleEventReader:
                     .execute()
                 )
         except HttpError as error:
-            if error.resp.status == 404:
+            if error.resp.status in (404, 410):
                 raise EventNotFoundError from error
             if error.resp.status == 401:
                 raise CalendarAuthenticationError(provider=True) from error

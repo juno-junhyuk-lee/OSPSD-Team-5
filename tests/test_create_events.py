@@ -178,7 +178,7 @@ def test_missing_authorization_returns_503_without_provider_write(
         OSError("Private connection details"),
     ],
 )
-def test_provider_failure_returns_502_without_retry(
+def test_provider_failure_is_classified_without_retry(
     client: TestClient,
     event_payload: dict[str, object],
     google_service: MagicMock,
@@ -191,13 +191,16 @@ def test_provider_failure_returns_502_without_retry(
 
     response = client.post("/events", json=event_payload)
 
-    assert response.status_code == 502
+    rate_limited = isinstance(error, HttpError) and error.resp.status == 429
+    assert response.status_code == (503 if rate_limited else 502)
     assert response.json() == {
         "error": {
-            "code": "provider_error",
-            "message": "Google Calendar creation could not be confirmed. "
+            "code": "provider_unavailable" if rate_limited else "provider_error",
+            "message": "Calendar provider temporarily unavailable. Retry later."
+            if rate_limited
+            else "Google Calendar creation could not be confirmed. "
             "Check the calendar before retrying.",
-            "retryable": False,
+            "retryable": rate_limited,
         }
     }
     assert provider_events == before

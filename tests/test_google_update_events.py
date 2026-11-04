@@ -13,6 +13,7 @@ from app import google_create_events, google_update_events
 from app.event_update_provider import (
     EventUpdateDeniedError,
     EventUpdateNotFoundError,
+    EventUpdateProviderUnavailableError,
     EventUpdater,
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
@@ -148,29 +149,33 @@ def test_permission_refusal_is_denied(
 
 
 @pytest.mark.parametrize(
-    "failure",
+    ("failure", "expected"),
     [
-        HttpError(
-            Response({"status": "403"}),
-            b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+        (
+            HttpError(
+                Response({"status": "403"}),
+                b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+            ),
+            EventUpdateProviderUnavailableError,
         ),
-        HttpError(Response({"status": "500"}), b""),
-        TransportError("transport"),
-        HttpLib2Error("httplib2"),
-        RequestException("requests"),
-        OSError("os"),
-        ValidationError.from_exception_data("Event", []),
+        (HttpError(Response({"status": "500"}), b""), EventUpdateUnconfirmedError),
+        (TransportError("transport"), EventUpdateUnconfirmedError),
+        (HttpLib2Error("httplib2"), EventUpdateUnconfirmedError),
+        (RequestException("requests"), EventUpdateUnconfirmedError),
+        (OSError("os"), EventUpdateUnconfirmedError),
+        (ValidationError.from_exception_data("Event", []), EventUpdateUnconfirmedError),
     ],
 )
-def test_provider_failure_raises_unconfirmed(
+def test_provider_failure_is_classified(
     updater: EventUpdater,
     update_request: ReplaceEvent,
     service: MagicMock,
     failure: Exception,
+    expected: type[Exception],
 ) -> None:
     service.events.return_value.patch.return_value.execute.side_effect = failure
 
-    with pytest.raises(EventUpdateUnconfirmedError) as raised:
+    with pytest.raises(expected) as raised:
         updater.update_event("test-event", update_request)
 
     assert raised.value.__cause__ is failure

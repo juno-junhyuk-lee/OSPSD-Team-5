@@ -1,7 +1,13 @@
 import re
 from typing import Annotated
 
-from calendar_contract import CreateEvent, Event, ReplaceEvent
+from calendar_contract import (
+    CalendarError,
+    CalendarService,
+    CreateEvent,
+    Event,
+    ReplaceEvent,
+)
 from fastapi import Depends, FastAPI, Response
 from fastapi.exceptions import RequestValidationError
 
@@ -14,57 +20,48 @@ from app.calendar_provider import (
     CalendarMetadataUnavailableError,
     CalendarReader,
 )
+from app.calendar_service_dependencies import get_calendar_service
 from app.errors import (
     ErrorCode,
     ErrorResponse,
     ServiceError,
+    calendar_error_handler,
     request_validation_handler,
     service_error_handler,
-)
-from app.event_creation_dependencies import get_event_creator
-from app.event_creation_provider import (
-    EventCreationDeniedError,
-    EventCreationUnavailableError,
-    EventCreationUnconfirmedError,
-    EventCreator,
-)
-from app.event_deletion_dependencies import get_event_deleter
-from app.event_deletion_provider import (
-    EventDeleter,
-    EventDeletionDeniedError,
-    EventDeletionNotFoundError,
-    EventDeletionUnavailableError,
-    EventDeletionUnconfirmedError,
-)
-from app.event_dependencies import get_event_reader
-from app.event_provider import (
-    CalendarAuthenticationError,
-    CalendarProviderError,
-    EventAccessDeniedError,
-    EventNotFoundError,
-    EventReader,
-    EventReadUnavailableError,
-    UnsupportedEventError,
-)
-from app.event_update_dependencies import get_event_updater
-from app.event_update_provider import (
-    EventUpdateDeniedError,
-    EventUpdateNotFoundError,
-    EventUpdater,
-    EventUpdateUnavailableError,
-    EventUpdateUnconfirmedError,
 )
 from app.models import Calendar
 
 app = FastAPI(
     title="Calendar Service",
-    responses={422: {"model": ErrorResponse, "description": "Invalid request"}},
+    responses={
+        400: {"model": ErrorResponse, "description": "Malformed JSON"},
+        422: {"model": ErrorResponse, "description": "Invalid request"},
+    },
 )
 app.add_exception_handler(ServiceError, service_error_handler)
+app.add_exception_handler(CalendarError, calendar_error_handler)
 app.add_exception_handler(RequestValidationError, request_validation_handler)
 
 # Google event IDs, including recurring instances, use only these characters.
 EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,1024}")
+EVENT_RESPONSES: dict[int | str, dict[str, object]] = {
+    403: {"model": ErrorResponse},
+    404: {"model": ErrorResponse},
+    502: {"model": ErrorResponse},
+    503: {"model": ErrorResponse},
+}
+
+
+def validate_event_id(event_id: str, *, operation: str) -> None:
+    """Reject unsupported IDs before calling the provider."""
+    if not EVENT_ID_PATTERN.fullmatch(event_id):
+        raise ServiceError(
+            ErrorCode.INVALID_INPUT,
+            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
+            operation=operation,
+            retryable=False,
+            provider=False,
+        )
 
 
 @app.get("/calendars/{calendar_id}", response_model=Calendar)
@@ -125,248 +122,53 @@ def get_calendar(
         ) from None
 
 
-@app.get("/events/{event_id}", response_model=Event)
+@app.get("/events/{event_id}", response_model=Event, responses=EVENT_RESPONSES)
 def get_event(
     event_id: str,
-    reader: Annotated[EventReader, Depends(get_event_reader)],
+    service: Annotated[CalendarService, Depends(get_calendar_service)],
 ) -> Event:
     """Retrieve one timed event from the authenticated primary Google Calendar."""
-    if not EVENT_ID_PATTERN.fullmatch(event_id):
-        raise ServiceError(
-            ErrorCode.INVALID_INPUT,
-            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
-            operation="get_event",
-            retryable=False,
-            provider=False,
-        )
-    try:
-        return reader.get_event(event_id)
-    except EventNotFoundError:
-        raise ServiceError(
-            ErrorCode.NOT_FOUND,
-            "Event not found.",
-            operation="get_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    except CalendarAuthenticationError as error:
-        raise ServiceError(
-            ErrorCode.PROVIDER_UNAVAILABLE,
-            "Calendar authentication required. Run scripts/google_calendar_auth.py.",
-            operation="get_event",
-            retryable=False,
-            provider=error.provider,
-        ) from None
-    except UnsupportedEventError:
-        raise ServiceError(
-            ErrorCode.INVALID_INPUT,
-            "Only timed events are supported.",
-            operation="get_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventAccessDeniedError:
-        raise ServiceError(
-            ErrorCode.ACCESS_DENIED,
-            "Calendar denied access to this event.",
-            operation="get_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventReadUnavailableError:
-        raise ServiceError(
-            ErrorCode.PROVIDER_UNAVAILABLE,
-            "Calendar provider temporarily unavailable. Retry later.",
-            operation="get_event",
-            retryable=True,
-            provider=True,
-        ) from None
-    except CalendarProviderError:
-        raise ServiceError(
-            ErrorCode.PROVIDER_ERROR,
-            "Calendar provider request failed.",
-            operation="get_event",
-            retryable=False,
-            provider=True,
-        ) from None
+    validate_event_id(event_id, operation="get_event")
+    return service.get(event_id)
 
 
-@app.post(
-    "/events",
-    response_model=Event,
-    status_code=201,
-    responses={
-        403: {"model": ErrorResponse},
-        502: {"model": ErrorResponse},
-        503: {"model": ErrorResponse},
-    },
-)
+@app.post("/events", response_model=Event, status_code=201, responses=EVENT_RESPONSES)
 def create_event(
     request: CreateEvent,
-    creator: Annotated[EventCreator, Depends(get_event_creator)],
+    service: Annotated[CalendarService, Depends(get_calendar_service)],
 ) -> Event:
     """Create a timed Google event and return its provider-assigned ID."""
-    try:
-        event = creator.create_event(request)
-    except EventCreationUnavailableError as error:
-        raise ServiceError(
-            ErrorCode.PROVIDER_UNAVAILABLE,
-            "Google Calendar authorization is unavailable. "
-            "Run scripts/google_calendar_auth.py.",
-            operation="create_event",
-            retryable=False,
-            provider=error.provider,
-        ) from None
-    except EventCreationDeniedError:
-        raise ServiceError(
-            ErrorCode.ACCESS_DENIED,
-            "Google Calendar denied permission to create this event.",
-            operation="create_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventCreationUnconfirmedError:
-        raise ServiceError(
-            ErrorCode.PROVIDER_ERROR,
-            "Google Calendar creation could not be confirmed. "
-            "Check the calendar before retrying.",
-            operation="create_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    return event
+    return service.create(request)
 
 
-EVENT_WRITE_RESPONSES: dict[int | str, dict[str, object]] = {
-    403: {"model": ErrorResponse},
-    404: {"model": ErrorResponse},
-    502: {"model": ErrorResponse},
-    503: {"model": ErrorResponse},
-}
-
-
-@app.put("/events/{event_id}", response_model=Event, responses=EVENT_WRITE_RESPONSES)
+@app.put("/events/{event_id}", response_model=Event, responses=EVENT_RESPONSES)
 def replace_event(
     event_id: str,
     request: ReplaceEvent,
-    updater: Annotated[EventUpdater, Depends(get_event_updater)],
+    service: Annotated[CalendarService, Depends(get_calendar_service)],
 ) -> Event:
     """Replace a timed event's title and times, keeping its other Google fields."""
-    return _write_event(event_id, request, updater, operation="replace_event")
+    validate_event_id(event_id, operation="replace_event")
+    return service.replace(event_id, request)
 
 
-@app.patch("/events/{event_id}", response_model=Event, responses=EVENT_WRITE_RESPONSES)
+@app.patch("/events/{event_id}", response_model=Event, responses=EVENT_RESPONSES)
 def update_event(
     event_id: str,
     request: ReplaceEvent,
-    updater: Annotated[EventUpdater, Depends(get_event_updater)],
+    service: Annotated[CalendarService, Depends(get_calendar_service)],
 ) -> Event:
-    """Update a timed Google event and return the refreshed Event fields."""
-    return _write_event(event_id, request, updater, operation="update_event")
+    """Keep the full-field PATCH extension using the shared replacement path."""
+    validate_event_id(event_id, operation="update_event")
+    return service.replace(event_id, request)
 
 
-def _write_event(
-    event_id: str,
-    request: ReplaceEvent,
-    updater: EventUpdater,
-    *,
-    operation: str,
-) -> Event:
-    """Apply `request` to `event_id` through `updater` and map its failures."""
-    if not EVENT_ID_PATTERN.fullmatch(event_id):
-        raise ServiceError(
-            ErrorCode.INVALID_INPUT,
-            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
-            operation=operation,
-            retryable=False,
-            provider=False,
-        )
-    try:
-        return updater.update_event(event_id, request)
-    except EventUpdateNotFoundError:
-        raise ServiceError(
-            ErrorCode.NOT_FOUND,
-            "Event not found.",
-            operation=operation,
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventUpdateDeniedError:
-        raise ServiceError(
-            ErrorCode.ACCESS_DENIED,
-            "Google Calendar denied permission to update this event.",
-            operation=operation,
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventUpdateUnavailableError as error:
-        raise ServiceError(
-            ErrorCode.PROVIDER_UNAVAILABLE,
-            "Google Calendar authorization is unavailable. "
-            "Run scripts/google_calendar_auth.py.",
-            operation=operation,
-            retryable=False,
-            provider=error.provider,
-        ) from None
-    except EventUpdateUnconfirmedError:
-        raise ServiceError(
-            ErrorCode.PROVIDER_ERROR,
-            "Google Calendar update could not be confirmed. "
-            "Check the calendar before retrying.",
-            operation=operation,
-            retryable=False,
-            provider=True,
-        ) from None
-
-
-@app.delete("/events/{event_id}", status_code=204)
+@app.delete("/events/{event_id}", status_code=204, responses=EVENT_RESPONSES)
 def delete_event(
     event_id: str,
-    deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
+    service: Annotated[CalendarService, Depends(get_calendar_service)],
 ) -> Response:
     """Delete an event; repeating the request returns 404."""
-    if not EVENT_ID_PATTERN.fullmatch(event_id):
-        raise ServiceError(
-            ErrorCode.INVALID_INPUT,
-            "Event ID must be 1-1024 letters, digits, '_' or '-'.",
-            operation="delete_event",
-            retryable=False,
-            provider=False,
-        )
-    try:
-        deleter.delete_event(event_id)
-    except EventDeletionNotFoundError:
-        raise ServiceError(
-            ErrorCode.NOT_FOUND,
-            "Event not found.",
-            operation="delete_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventDeletionDeniedError:
-        raise ServiceError(
-            ErrorCode.ACCESS_DENIED,
-            "Google Calendar denied access to this event.",
-            operation="delete_event",
-            retryable=False,
-            provider=True,
-        ) from None
-    except EventDeletionUnavailableError:
-        raise ServiceError(
-            ErrorCode.PROVIDER_UNAVAILABLE,
-            "Google Calendar authorization is unavailable. "
-            "Run scripts/google_calendar_auth.py.",
-            operation="delete_event",
-            retryable=False,
-            provider=False,
-        ) from None
-    except EventDeletionUnconfirmedError:
-        raise ServiceError(
-            ErrorCode.PROVIDER_ERROR,
-            "Google Calendar deletion could not be confirmed. "
-            "Retrying is safe; it returns not_found if the event is already gone.",
-            operation="delete_event",
-            retryable=True,
-            provider=True,
-        ) from None
+    validate_event_id(event_id, operation="delete_event")
+    service.delete(event_id)
     return Response(status_code=204)

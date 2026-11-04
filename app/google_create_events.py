@@ -15,9 +15,11 @@ from requests.exceptions import RequestException
 
 from app.event_creation_provider import (
     EventCreationDeniedError,
+    EventCreationProviderUnavailableError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
 )
+from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
@@ -83,18 +85,29 @@ def load_credentials() -> Credentials:
 
 def create_google_event(request: CreateEvent) -> Event:
     """Insert into primary and translate the provider result to the public model."""
-    credentials = load_credentials()
     body = {
         "summary": request.title.strip(),
         "start": {"dateTime": request.start},
         "end": {"dateTime": request.end},
     }
-    with build("calendar", "v3", credentials=credentials) as service:
-        result = (
-            service.events()
-            .insert(calendarId="primary", body=body)
-            .execute(num_retries=0)
-        )
+    write_started = False
+    try:
+        credentials = load_credentials()
+        with build("calendar", "v3", credentials=credentials) as service:
+            insert = service.events().insert(calendarId="primary", body=body)
+            write_started = True
+            result = insert.execute(num_retries=0)
+    except HttpError as error:
+        if not write_started and (
+            error.resp.status in TEMPORARY_HTTP_STATUSES
+            or (error.resp.status == 403 and is_rate_limited(error))
+        ):
+            raise EventCreationProviderUnavailableError from error
+        raise
+    except (TransportError, HttpLib2Error, RequestException, OSError) as error:
+        if not write_started:
+            raise EventCreationProviderUnavailableError from error
+        raise
     provider_event = _GoogleEvent.model_validate(result)
     translated = CreateEvent.model_validate(
         {
@@ -137,6 +150,9 @@ class GoogleEventCreator:
                 )
                 if not reasons & RATE_LIMIT_REASONS:
                     raise EventCreationDeniedError from error
+                raise EventCreationProviderUnavailableError from error
+            if error.resp.status == 429:
+                raise EventCreationProviderUnavailableError from error
             raise EventCreationUnconfirmedError from error
         except (
             TransportError,

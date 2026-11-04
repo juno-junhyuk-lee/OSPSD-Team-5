@@ -12,6 +12,7 @@ from app.event_deletion_provider import (
     EventDeleter,
     EventDeletionDeniedError,
     EventDeletionNotFoundError,
+    EventDeletionProviderUnavailableError,
     EventDeletionUnavailableError,
     EventDeletionUnconfirmedError,
 )
@@ -73,27 +74,36 @@ def test_unusable_authorization_is_unavailable(
 
 
 @pytest.mark.parametrize(
-    "error",
+    ("error", "expected"),
     [
-        HttpError(
-            Response({"status": "403"}),
-            b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+        (
+            HttpError(
+                Response({"status": "403"}),
+                b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+            ),
+            EventDeletionProviderUnavailableError,
         ),
-        HttpError(Response({"status": "500"}), b""),
-        TimeoutError("Provider may have deleted the event."),
-        TransportError("Private transport details"),
-        HttpLib2Error("Private HTTP details"),
-        RequestException("Private request details"),
-        OSError("Private connection details"),
+        (HttpError(Response({"status": "500"}), b""), EventDeletionUnconfirmedError),
+        (
+            TimeoutError("Provider may have deleted the event."),
+            EventDeletionUnconfirmedError,
+        ),
+        (TransportError("Private transport details"), EventDeletionUnconfirmedError),
+        (HttpLib2Error("Private HTTP details"), EventDeletionUnconfirmedError),
+        (RequestException("Private request details"), EventDeletionUnconfirmedError),
+        (OSError("Private connection details"), EventDeletionUnconfirmedError),
     ],
 )
-def test_provider_failure_is_unconfirmed_without_retry(
-    deleter: EventDeleter, service: MagicMock, error: Exception
+def test_provider_failure_is_classified_without_retry(
+    deleter: EventDeleter,
+    service: MagicMock,
+    error: Exception,
+    expected: type[Exception],
 ) -> None:
     execute = service.events.return_value.delete.return_value.execute
     execute.side_effect = error
 
-    with pytest.raises(EventDeletionUnconfirmedError) as raised:
+    with pytest.raises(expected) as raised:
         deleter.delete_event("google-event-1")
 
     assert raised.value.__cause__ is error

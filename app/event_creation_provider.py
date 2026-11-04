@@ -21,6 +21,10 @@ class EventCreationUnconfirmedError(Exception):
     """Creation could not be confirmed; the provider may have accepted the write."""
 
 
+class EventCreationProviderUnavailableError(Exception):
+    """A temporary failure prevented or explicitly rejected creation."""
+
+
 class EventCreator(Protocol):
     """Create timed events in the configured calendar."""
 

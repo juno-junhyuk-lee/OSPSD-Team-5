@@ -11,11 +11,14 @@ from requests.exceptions import RequestException
 from app.event_update_provider import (
     EventUpdateDeniedError,
     EventUpdateNotFoundError,
+    EventUpdateProviderError,
+    EventUpdateProviderUnavailableError,
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
 )
 from app.google_create_events import GoogleCalendarSetupError, load_credentials
 from app.google_delete_events import GoogleEventNotFoundError, is_permission_denied
+from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
 
 
 class _GoogleEventTime(BaseModel):
@@ -31,34 +34,49 @@ class _GoogleEvent(BaseModel):
 
 def update_google_event(event_id: str, request: ReplaceEvent) -> Event:
     """Patch one timed event on primary and return the public Event model."""
-    credentials = load_credentials()
     body = {
         "summary": request.title.strip(),
         "start": {"dateTime": request.start},
         "end": {"dateTime": request.end},
     }
+    write_started = False
     try:
+        credentials = load_credentials()
         with build("calendar", "v3", credentials=credentials) as service:
             existing = (
                 service.events()
                 .get(calendarId="primary", eventId=event_id)
                 .execute(num_retries=0)
             )
+            if not isinstance(existing, dict):
+                raise EventUpdateProviderError
             if existing.get("status") == "cancelled":
                 raise GoogleEventNotFoundError(event_id)
-            result = (
-                service.events()
-                .patch(calendarId="primary", eventId=event_id, body=body)
-                .execute(num_retries=0)
+            patch = service.events().patch(
+                calendarId="primary", eventId=event_id, body=body
             )
+            write_started = True
+            result = patch.execute(num_retries=0)
     except HttpError as error:
         if error.resp.status in (404, 410):
             raise GoogleEventNotFoundError(event_id) from error
+        if not write_started and (
+            error.resp.status in TEMPORARY_HTTP_STATUSES
+            or (error.resp.status == 403 and is_rate_limited(error))
+        ):
+            raise EventUpdateProviderUnavailableError from error
         raise
-    # Guard if Google still returns a cancelled body after patch.
+    except (TransportError, HttpLib2Error, RequestException, OSError) as error:
+        if not write_started:
+            raise EventUpdateProviderUnavailableError from error
+        raise
+    if not isinstance(result, dict):
+        raise EventUpdateProviderError
     if result.get("status") == "cancelled":
         raise GoogleEventNotFoundError(event_id)
     provider_event = _GoogleEvent.model_validate(result)
+    if provider_event.id != event_id:
+        raise EventUpdateProviderError
     translated = ReplaceEvent.model_validate(
         {
             "title": provider_event.summary,
@@ -91,6 +109,10 @@ class GoogleEventUpdater:
                 raise EventUpdateUnavailableError(provider=True) from error
             if is_permission_denied(error):
                 raise EventUpdateDeniedError from error
+            if error.resp.status == 429 or (
+                error.resp.status == 403 and is_rate_limited(error)
+            ):
+                raise EventUpdateProviderUnavailableError from error
             raise EventUpdateUnconfirmedError from error
         except (
             TransportError,

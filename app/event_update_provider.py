@@ -25,6 +25,14 @@ class EventUpdateUnconfirmedError(Exception):
     """Update could not be confirmed; the provider may have accepted the write."""
 
 
+class EventUpdateProviderUnavailableError(Exception):
+    """A temporary failure prevented or explicitly rejected the write."""
+
+
+class EventUpdateProviderError(Exception):
+    """The provider returned an unexpected update response."""
+
+
 class EventUpdater(Protocol):
     """Update timed events in the configured calendar."""
 
