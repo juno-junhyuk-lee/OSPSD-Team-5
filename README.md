@@ -16,7 +16,7 @@ network access.
 ### Shared contract adoption (HW2)
 
 The dependency is `calendar-contract` at annotated tag
-[`v0.1.0`](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0), commit
+[`v0.1.0-rc.1`](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1), commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424`. `pyproject.toml` selects the tag;
 `uv.lock` fixes its commit. The package supports Python 3.14 and supplies
 `CalendarService`, `Event`, `CreateEvent`, `ReplaceEvent`, `CalendarError`, and

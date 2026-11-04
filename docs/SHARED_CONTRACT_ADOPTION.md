@@ -2,9 +2,9 @@
 
 ## Scope and status
 
-Team 5 uses `calendar-contract` tag `v0.1.0`, pointing to commit
+Team 5 uses `calendar-contract` tag `v0.1.0-rc.1`, pointing to commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424` in
-[OSPSD-Calendar](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0).
+[OSPSD-Calendar](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1).
 The package supplies provider-independent models, validation, errors, the
 four-operation interface, and reusable conformance tests. Google SDK, OAuth,
 FastAPI, and configuration remain in this repository.
@@ -35,7 +35,7 @@ git status --short
 ```
 
 The installed package version must be `0.1.0`. `pyproject.toml` selects tag
-`v0.1.0`, and `uv.lock` pins the commit above. Initial installation needs network
+`v0.1.0-rc.1`, and `uv.lock` pins the commit above. Initial installation needs network
 access; the fast test suite does not. Do not replace the tag with a moving branch
 or run a dependency update merely to reproduce this revision.
 
@@ -135,7 +135,7 @@ That file is not supplied by this adoption change. The tagged suite requires
 both `service` and `failing_service` fixtures; the latter receives a
 `ProviderFailure` and returns the real implementation wired to a controlled
 failing provider. Keep failure hooks in tests, not in the production protocol.
-See the tag's [Python interface guide](https://github.com/Airbus-A330/OSPSD-Calendar/blob/v0.1.0/docs/PYTHON_INTERFACE.md).
+See the tag's [Python interface guide](https://github.com/Airbus-A330/OSPSD-Calendar/blob/v0.1.0-rc.1/docs/PYTHON_INTERFACE.md).
 Running against the package's in-memory reference service alone does not test
 Team 5's Google adapters. Offline, live, and cross-team checks remain distinct.
 
@@ -189,7 +189,9 @@ script against the reviewed adoption commit. Juno/Niriti maintain DESIGN.md,
 and Kristie coordinates interface/design review and accepted revisions.
 
 Real Google verification of the four common operations passed on November 4
-at clean commit `327e8bc`, with package `v0.1.0`. The
+at clean commit `327e8bc`, with shared commit `1c1cad7`. Its historical output
+used the former tag label `v0.1.0`; that commit is now published as
+`v0.1.0-rc.1`. The
 [verification record](SHARED_CONTRACT_VERIFICATION.md) contains environment,
 provenance, exact commands, sanitized output, exit status, and cleanup results.
 Formal shared conformance wiring, another teammate's reproduction, and adoption

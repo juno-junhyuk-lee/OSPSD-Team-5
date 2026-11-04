@@ -2,7 +2,7 @@
 
 ## Code and setup
 
-HW2 uses calendar-contract tag `v0.1.0`, commit
+HW2 uses calendar-contract tag `v0.1.0-rc.1`, commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424`. Import shared Event, CreateEvent,
 ReplaceEvent, CalendarService, CalendarError, and ErrorCode from that package.
 Use start/end string fields; reject legacy start_time/end_time and unknown

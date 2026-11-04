@@ -111,9 +111,10 @@ not establish whether Google changed the event.
 
 The linked memo and versioned Python/HTTP contracts define the shared agreement.
 This section records Team 5's migration choices rather than duplicating that
-agreement. The integration branch inherited #43's former `v0.1.0` source pin.
-Jim must update the source pin and lock metadata to the published
-`v0.1.0-rc.1` tag before final submission.
+agreement. This revision corrects the inherited `v0.1.0` source pin to the
+published `v0.1.0-rc.1` tag, updates lock metadata and current references, and
+keeps the shared commit unchanged. The correction still needs review and merge
+through #40 before it is part of `hw2/milestone-2`.
 Both names have referred to commit `1c1cad7`; the current published tag is the
 reproducible reference. The distribution's internal version remains `0.1.0`.
 
@@ -256,20 +257,99 @@ checks after failures. If creation is uncertain without an ID, inspect the
 calendar using the printed run marker before another POST. The shared live
 suite's cleanup gaps remain a separate review concern described below.
 
-### Deployment planning for November 11
+### Deployment proposal for November 11
 
-Juno Lee owns the deployment proposal. Hosting, infrastructure tooling, image
-registry, protected state storage, secret store, pipeline, and telemetry backend
-remain undecided. Juno will propose the platform/tools, name account owners,
-and record expected costs and teardown date for team review.
-These are unresolved design dependencies, not claims of deployed infrastructure.
+For Milestone 2, assignment section 4.6 asks for deployment tools, hosting,
+and their assumptions. The proposal below supplies that planning context.
+Render, its paid plan, the budget, bearer access, and the operational steps are
+Team 5 proposals, not technologies or purchases mandated by that section.
+Local account/configuration details may be resolved during implementation under
+section 4.9. No cloud account, payment, or deployed infrastructure is required
+by this design-document excerpt; validate the implementation plan against the
+full Milestone 3 requirements before provisioning.
 
-The proposal must cover locked builds, startup configuration validation,
-readiness, reproducible provisioning/teardown, deployment and rollback checks,
-and observability. A provider outage should not cause restart loops. Credential
-refresh persistence and filesystem permissions must be checked before hosting
-is accepted. Record the proposal and team review before design acceptance; implementation
-remains due at the November 11 milestone.
+**Proposed by Juno Lee; awaiting team review.** Use one paid Render Starter web
+service with a 1 GB persistent disk in the Oregon region, one Uvicorn worker,
+and no database. The workload assumption is low-volume classroom demonstrations,
+not high availability. Google retains event state; the disk stores refreshed
+OAuth authorization only. No cloud resources, charges, or deployment are created
+by this design change.
+
+| Responsibility | Proposed implementation |
+| --- | --- |
+| Infrastructure | Version `render.yaml` using [Render Blueprints](https://render.com/docs/blueprint-spec); reproducible service/disk/config declarations, secret placeholders only |
+| Build | Python 3.14 Docker image and locked uv dependencies; pin reviewed base-image/uv versions, exclude local secrets with `.dockerignore`, run as a non-root user |
+| Artifact | Render builds from the selected Git commit and retains deploy artifacts; no separate registry is needed initially |
+| Release | GitHub Actions runs required checks before an authorized deployment workflow calls a secret Render deploy hook with the selected commit SHA; disable independent branch auto-deploys |
+| Accounts | Juno is the proposed Render workspace, deployment, billing, and teardown coordinator; account creation, payment method, and teammate access still need agreement |
+| Observability | Existing sanitized JSON failure logs plus planned request latency/status and provider-call outcome metrics; use platform logs/metrics and confirm retention/access meet the assignment before implementation acceptance |
+
+A [persistent disk](https://render.com/docs/disks) is required because the default
+filesystem is ephemeral. The tradeoff is one disk-backed instance and downtime
+during deployment; do not promise zero-downtime updates or horizontal scaling.
+Free ephemeral hosting is an alternative, but it loses refreshed tokens across
+redeploys unless authorization moves to another durable store. A VM with Docker
+and a volume offers more control but adds patching, TLS, and host management.
+Revisit Render if the disk/deploy limits, memory use, or rubric requirements
+cannot support the demonstration and operational checks.
+
+**Credential and access plan.** Authorize the shared test account locally using
+the existing script and both scopes; no route performs browser authorization.
+Provide the OAuth client JSON and initial token through Render runtime secret
+files, never the image, Git, logs, CI artifacts, or Blueprint values. On first
+startup only, seed `/var/data/google/token.json` from the initial token if it
+does not already exist. Subsequent restarts retain refreshed credentials rather
+than overwriting them with the original secret. Before deployment, make both
+read/write credential helpers use the same configured token path, restrict its
+permissions to the runtime user, and serialize refresh/persist with atomic file
+replacement. These configuration and refresh changes are planned, not currently
+implemented. Use the provider's [runtime secret-file facilities](https://render.com/docs/configure-environment-variables)
+and keep credential values out of Docker build steps.
+
+The hosted shared-account API will require a separately managed demo bearer
+secret on event/calendar routes; exempt only payload-free health endpoints.
+The proposed client-access guard is also Milestone 3 work and must be tested
+before exposing write endpoints. OAuth authorizes Google access; it does not
+authenticate callers to this service. Share demo access privately with authorized
+reviewers and keep a documented rotation procedure.
+
+**Readiness and rollback plan.** Add `/healthz` for process/local configuration
+checks without a Google call, and use it as Render's restart-oriented health
+check. Add `/readyz` for credential/provider readiness with bounded timeouts and
+sanitized failure output; a temporary Google outage must not cause process
+restart loops. Check persisted token loading before enabling traffic. The
+[health-check behavior](https://render.com/docs/health-checks) makes the separation
+necessary. The deployment workflow must wait for completion and run an
+authenticated disposable-event smoke test, recording status and cleanup. A
+failed rollout redeploys the previous known-good commit/artifact and rechecks
+readiness. [Render rollback](https://render.com/docs/rollbacks) restores code,
+not disk contents or Google events; never restore stale tokens or assume
+rolling back code undoes calendar writes. Record each deploy SHA and result.
+
+**Cost assumption, checked November 4.** Published [Render pricing](https://render.com/pricing)
+lists Starter compute at US$7/month and disks at US$0.25/GB/month. The proposed
+single service plus 1 GB disk is approximately US$7.25/month before tax and
+usage-based extras. This is an estimate, not an approved purchase. Propose a
+US$15 total classroom-deployment budget through November 12; Juno will confirm
+workspace-plan, bandwidth, build, and storage charges before provisioning,
+monitor usage daily, and ask the team before any increase. Budget monitoring
+is not an assumed provider-enforced spending cap. No paid workspace upgrade,
+custom domain, database, or autoscaling is proposed.
+
+**Execution and teardown.** Juno will present this proposal for team review by
+the November 4 submission checkpoint. Before November 11, implement the
+Dockerfile, Blueprint, configuration/access guards, health endpoints, deployment
+workflow, and runbook as reviewed changes; another teammate must reproduce
+provisioning, deploy, restart/token persistence, smoke-test cleanup, rollback,
+and teardown. After grading/demo needs are confirmed, target November 12 at
+18:00 America/New_York for teardown; retain only if the team explicitly records
+a new date and budget. Juno will remove test events, delete the service and its
+disk/snapshots, remove platform secrets/deploy hooks and CI access, revoke the
+deployment's OAuth authorization, and verify resources and billing are stopped.
+Do not revoke the shared account's other active authorizations without checking
+with their owners. Retain sanitized verification and resource inventory, never
+credentials. Platform/account access and the teardown extension decision remain
+team-review items, not completed setup.
 
 ## Testing and verification
 
@@ -372,9 +452,9 @@ credentials. Historical HW1 results cannot substitute for HW2 checks.
 | Juno Lee | This design and initial shared-interface contribution | Consolidate #42 into #40, resolve feedback, obtain reviews before November 4 submission |
 | Niriti Pahadi | Complete-design review and verification support | Review the consolidated revision and record concerns/outcomes; help reproduce adoption as needed |
 | Kristie Lee | Shared-contract and contract-facing coordination | Record accepted revision, cross-team review, and release references before submission |
-| Jim Lo | #43 adoption merged; migration, models/errors, examples | Follow up on the inherited tag pin/lock/current references before final submission |
+| Jim Lo | #43 adoption merged; migration, models/errors, examples | Review #40's tag-reference correction and unchanged shared commit before integration |
 | Ka Pui Cheung | #41 PUT, #44 conformance and real verification | Resolve live cleanup concern; update #44 on the reviewed #43 base and verify before integration |
-| Juno Lee | Deployment proposal, account/cost/teardown plan | Prepare platform/tooling proposal for team review before design acceptance; infrastructure due November 11 |
+| Juno Lee | Render/Docker/Blueprint proposal, credential persistence, budget and teardown plan | Proposal supplied for Milestone 2 review; agree accounts/budget before provisioning, implement by November 11 |
 
 `hw2/milestone-2` is the integration branch. This document stays on
 `doc/design.md` in #40; Niriti's #42 revisions are consolidated here to avoid
@@ -396,11 +476,11 @@ team review. Publish a new tag rather than moving an existing published tag.
 | Stale progress and missing local PUT | Incorporated Niriti's #42 corrections and #41 evidence; shared release, merged #43, and open #44 distinguished | Juno; this revision |
 | Concrete CalendarService/error boundary | Documented #43's composition, DI, and adapter-to-CalendarError translation | Jim/Ka Pui; confirm during implementation/design review |
 | Old names and PATCH behavior | Documented #43's rejection of legacy names and full-field PATCH with `start/end` | Jim; review with affected callers before integration |
-| Shared tag pin | Published tag is `v0.1.0-rc.1`; merged #43 still declares removed `v0.1.0` | Jim; fix source/lock/current references before final submission |
+| Shared tag pin | Corrected source/lock/current references to `v0.1.0-rc.1` in this revision; shared commit unchanged, historical output retained with clarification | Juno implements; Jim reviews before #40 integration |
 | Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; review #44 before integration |
 | Replacement-start and live cleanup gaps | Keep separate start-change tests; fix cleanup fixtures locally or via a new shared release | Ka Pui; before relying on those guarantees/live-suite approval |
 | HTTP IDs and unsupported event shapes | Local policy implemented and checked in `tests/test_event_shape_policy.py`: ID forwarding/rejection, no unsupported writes, instance metadata preserved | Juno implements; Jim/Ka Pui review with the consolidated design before final acceptance |
-| Hosting and credential persistence | Juno owns the proposal; platform/tools/account access/cost choices remain open for team review | Juno; proposal before acceptance, implementation November 11 |
+| Hosting and credential persistence | Proposed tools/hosting and assumptions supplied for section 4.6; local account/budget details remain open and do not change the common Calendar contract | Juno; review design assumptions now, resolve local setup before provisioning, implement by November 11 |
 | Final complete-design and contract-facing reviews | Review the consolidated revision, link substantive comments/resolutions and scope of approval | Niriti and Team 2/7 reviewer; before submission |
 
 Niriti's #42 provides review revisions; it does not approve this later revision.
@@ -429,10 +509,15 @@ requirements.
   described #43/#44 implementation choices and observed evidence, and replaced
   stale progress notes with current review dependencies. Adoption merged via
   #43 at `b088ad9`; #44 integration, final reviews, and hosting decisions remain
-  pending. The merged source pin still needs the published tag correction.
+  pending. The source-pin correction is supplied in the subsequent revision below.
 - November 4: Juno took deployment-proposal ownership. Added local pre-write
   shape guards and controlled policy checks; preserved the shared interface and
   existing GET/ID behavior. Runtime policy changes still require teammate review.
+- November 4: proposed a Render/Docker/Blueprint deployment with token
+  persistence, access controls, health checks, rollout/rollback, estimated budget,
+  and teardown; team approval and actual provisioning remain pending. Corrected
+  the shared source tag to `v0.1.0-rc.1` without changing its locked commit and
+  clarified historical verification labels.
 - Codex assisted with drafting, repository inspection, and review checks.
   Students must understand, verify, and own their submitted work.
 

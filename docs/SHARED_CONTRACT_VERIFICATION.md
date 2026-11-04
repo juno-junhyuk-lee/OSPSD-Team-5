@@ -1,5 +1,15 @@
 # Tagged Calendar contract: real Google verification
 
+## Current release-reference clarification
+
+The observed run and JSON below retain their original `v0.1.0` tag label.
+That tag is no longer published. The same shared commit
+`1c1cad7a0732ddb242a05400d8833d94e4422424` is now available as
+[`v0.1.0-rc.1`](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1).
+The installed distribution version remains `0.1.0`. Current dependency setup,
+lock metadata, and verification-script output use `v0.1.0-rc.1`; this clarification
+does not claim another live run or alter the recorded service/shared commits.
+
 ## Revision and environment
 
 | Item | Observed value |
