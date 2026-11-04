@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from datetime import datetime
 
 import pytest
+from calendar_contract import Event, ReplaceEvent
 from fastapi.testclient import TestClient
 
 from app.event_update_dependencies import get_event_updater
@@ -16,23 +17,22 @@ from app.event_update_provider import (
 )
 from app.google_update_events import GoogleEventUpdater
 from app.main import app
-from app.models import Event, UpdateEventRequest
 
 
 class ControlledEventUpdater:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, UpdateEventRequest]] = []
+        self.calls: list[tuple[str, ReplaceEvent]] = []
         self.error: Exception | None = None
 
-    def update_event(self, event_id: str, request: UpdateEventRequest) -> Event:
+    def update_event(self, event_id: str, request: ReplaceEvent) -> Event:
         self.calls.append((event_id, request))
         if self.error is not None:
             raise self.error
         return Event(
             id=event_id,
             title=request.title,
-            start_time=request.start_time,
-            end_time=request.end_time,
+            start=request.start,
+            end=request.end,
         )
 
 
@@ -56,12 +56,20 @@ def client(updater: ControlledEventUpdater) -> Iterator[TestClient]:
         app.dependency_overrides.update(previous_overrides)
 
 
+@pytest.fixture(params=["PATCH", "PUT"])
+def method(request: pytest.FixtureRequest) -> str:
+    return str(request.param)
+
+
+OPERATIONS = {"PATCH": "update_event", "PUT": "replace_event"}
+
+
 @pytest.fixture
 def payload() -> dict[str, object]:
     return {
         "title": "  Updated Meeting  ",
-        "start_time": "2026-10-13T11:00:00-04:00",
-        "end_time": "2026-10-13T12:00:00-04:00",
+        "start": "2026-10-13T11:00:00-04:00",
+        "end": "2026-10-13T12:00:00-04:00",
     }
 
 
@@ -70,46 +78,58 @@ def test_normal_requests_use_google() -> None:
 
 
 def test_update_event_contract(
-    client: TestClient, updater: ControlledEventUpdater, payload: dict[str, object]
+    client: TestClient,
+    method: str,
+    updater: ControlledEventUpdater,
+    payload: dict[str, object],
 ) -> None:
-    response = client.patch("/events/test-event", json=payload)
+    response = client.request(method, "/events/test-event", json=payload)
 
     assert response.status_code == 200
     assert response.json() == {
         "id": "test-event",
-        "title": "Updated Meeting",
-        "start_time": "2026-10-13T11:00:00-04:00",
-        "end_time": "2026-10-13T12:00:00-04:00",
+        "title": "  Updated Meeting  ",
+        "start": "2026-10-13T11:00:00-04:00",
+        "end": "2026-10-13T12:00:00-04:00",
     }
     assert len(updater.calls) == 1
     event_id, request = updater.calls[0]
     assert event_id == "test-event"
-    assert request.title == "Updated Meeting"
-    assert request.start_time == datetime.fromisoformat("2026-10-13T11:00:00-04:00")
-    assert request.end_time == datetime.fromisoformat("2026-10-13T12:00:00-04:00")
+    assert request.title == "  Updated Meeting  "
+    assert datetime.fromisoformat(request.start) == datetime.fromisoformat(
+        "2026-10-13T11:00:00-04:00"
+    )
+    assert datetime.fromisoformat(request.end) == datetime.fromisoformat(
+        "2026-10-13T12:00:00-04:00"
+    )
 
 
 def test_success_does_not_log_failure(
     client: TestClient,
+    method: str,
     payload: dict[str, object],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level(logging.WARNING, logger="calendar_service"):
-        assert client.patch("/events/test-event", json=payload).status_code == 200
+        assert (
+            client.request(method, "/events/test-event", json=payload).status_code
+            == 200
+        )
 
     assert not [r for r in caplog.records if r.name == "calendar_service"]
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_does_not_call_updater(
     client: TestClient,
+    method: str,
     updater: ControlledEventUpdater,
     payload: dict[str, object],
     field: str,
 ) -> None:
     del payload[field]
 
-    response = client.patch("/events/test-event", json=payload)
+    response = client.request(method, "/events/test-event", json=payload)
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_input"
@@ -118,11 +138,14 @@ def test_missing_field_does_not_call_updater(
 
 
 def test_equal_times_does_not_call_updater(
-    client: TestClient, updater: ControlledEventUpdater, payload: dict[str, object]
+    client: TestClient,
+    method: str,
+    updater: ControlledEventUpdater,
+    payload: dict[str, object],
 ) -> None:
-    payload["end_time"] = payload["start_time"]
+    payload["end"] = payload["start"]
 
-    response = client.patch("/events/test-event", json=payload)
+    response = client.request(method, "/events/test-event", json=payload)
 
     assert response.status_code == 422
     assert updater.calls == []
@@ -158,6 +181,7 @@ def test_equal_times_does_not_call_updater(
 )
 def test_update_failure_contract(
     client: TestClient,
+    method: str,
     updater: ControlledEventUpdater,
     payload: dict[str, object],
     caplog: pytest.LogCaptureFixture,
@@ -170,7 +194,7 @@ def test_update_failure_contract(
     updater.error = error
 
     with caplog.at_level(logging.WARNING, logger="calendar_service"):
-        response = client.patch("/events/test-event", json=payload)
+        response = client.request(method, "/events/test-event", json=payload)
 
     body = response.json()
     assert response.status_code == status
@@ -182,7 +206,7 @@ def test_update_failure_contract(
     assert len(updater.calls) == 1
     [record] = [r for r in caplog.records if r.name == "calendar_service"]
     assert json.loads(record.getMessage()) == {
-        "operation": "update_event",
+        "operation": OPERATIONS[method],
         "error": code,
         "provider": provider,
         "status": status,
@@ -193,11 +217,12 @@ def test_update_failure_contract(
 @pytest.mark.parametrize("event_id", ["bad%20id", "x" * 1025, "semi;colon", "dot.ted"])
 def test_invalid_event_id_is_rejected_before_provider(
     client: TestClient,
+    method: str,
     updater: ControlledEventUpdater,
     event_id: str,
     payload: dict[str, object],
 ) -> None:
-    response = client.patch(f"/events/{event_id}", json=payload)
+    response = client.request(method, f"/events/{event_id}", json=payload)
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_input"
@@ -206,9 +231,12 @@ def test_invalid_event_id_is_rejected_before_provider(
 
 
 def test_recurring_instance_id_is_accepted(
-    client: TestClient, updater: ControlledEventUpdater, payload: dict[str, object]
+    client: TestClient,
+    method: str,
+    updater: ControlledEventUpdater,
+    payload: dict[str, object],
 ) -> None:
-    response = client.patch("/events/abc123_20261016T150000Z", json=payload)
+    response = client.request(method, "/events/abc123_20261016T150000Z", json=payload)
 
     assert response.status_code == 200
     assert updater.calls[0][0] == "abc123_20261016T150000Z"

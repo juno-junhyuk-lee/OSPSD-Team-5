@@ -48,8 +48,8 @@ def test_google_fields_are_translated(client: TestClient, provider: Mock) -> Non
     assert response.json() == {
         "id": "google-event",
         "title": "Provider meeting",
-        "start_time": "2026-10-05T10:00:00-04:00",
-        "end_time": "2026-10-05T11:00:00-04:00",
+        "start": "2026-10-05T10:00:00-04:00",
+        "end": "2026-10-05T11:00:00-04:00",
     }
 
 
@@ -307,8 +307,8 @@ def test_event_reader_translates_requested_event(
     assert event.model_dump(mode="json") == {
         "id": "google-event",
         "title": "Provider meeting",
-        "start_time": "2026-10-05T10:00:00-04:00",
-        "end_time": "2026-10-05T11:00:00-04:00",
+        "start": "2026-10-05T10:00:00-04:00",
+        "end": "2026-10-05T11:00:00-04:00",
     }
     service.events.return_value.get.assert_called_once_with(
         calendarId="primary", eventId="google-event"
@@ -321,6 +321,7 @@ def test_event_reader_translates_requested_event(
     [
         (401, "authError", CalendarAuthenticationError),
         (404, "notFound", EventNotFoundError),
+        (410, "gone", EventNotFoundError),
         (403, "forbidden", EventAccessDeniedError),
         (403, "rateLimitExceeded", EventReadUnavailableError),
         (403, "userRateLimitExceeded", EventReadUnavailableError),

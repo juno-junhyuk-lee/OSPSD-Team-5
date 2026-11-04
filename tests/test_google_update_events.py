@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
 import pytest
+from calendar_contract import ReplaceEvent
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error, Response  # type: ignore[import-untyped]
@@ -12,11 +13,11 @@ from app import google_create_events, google_update_events
 from app.event_update_provider import (
     EventUpdateDeniedError,
     EventUpdateNotFoundError,
+    EventUpdateProviderUnavailableError,
     EventUpdater,
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
 )
-from app.models import UpdateEventRequest
 
 
 @pytest.fixture
@@ -25,12 +26,12 @@ def updater() -> EventUpdater:
 
 
 @pytest.fixture
-def update_request() -> UpdateEventRequest:
-    return UpdateEventRequest.model_validate(
+def update_request() -> ReplaceEvent:
+    return ReplaceEvent.model_validate(
         {
             "title": "  Updated Meeting  ",
-            "start_time": "2026-10-06T11:00:00-04:00",
-            "end_time": "2026-10-06T12:00:00-04:00",
+            "start": "2026-10-06T11:00:00-04:00",
+            "end": "2026-10-06T12:00:00-04:00",
         }
     )
 
@@ -67,7 +68,7 @@ def service(provider_response: dict[str, object]) -> Iterator[MagicMock]:
 
 
 def test_update_translates_google_fields(
-    updater: EventUpdater, update_request: UpdateEventRequest, service: MagicMock
+    updater: EventUpdater, update_request: ReplaceEvent, service: MagicMock
 ) -> None:
     event = updater.update_event("test-event", update_request)
 
@@ -86,13 +87,13 @@ def test_update_translates_google_fields(
     assert event.model_dump(mode="json") == {
         "id": "test-event",
         "title": "Updated Meeting",
-        "start_time": "2026-10-06T15:00:00Z",
-        "end_time": "2026-10-06T16:00:00Z",
+        "start": "2026-10-06T15:00:00Z",
+        "end": "2026-10-06T16:00:00Z",
     }
 
 
 def test_cancelled_existing_event_raises_not_found(
-    updater: EventUpdater, update_request: UpdateEventRequest, service: MagicMock
+    updater: EventUpdater, update_request: ReplaceEvent, service: MagicMock
 ) -> None:
     service.events.return_value.get.return_value.execute.return_value = {
         "id": "test-event",
@@ -109,7 +110,7 @@ def test_cancelled_existing_event_raises_not_found(
 
 
 def test_missing_authorization_raises_unavailable(
-    updater: EventUpdater, update_request: UpdateEventRequest
+    updater: EventUpdater, update_request: ReplaceEvent
 ) -> None:
     with patch.object(
         google_update_events,
@@ -123,7 +124,7 @@ def test_missing_authorization_raises_unavailable(
 
 
 def test_remote_authorization_refusal_raises_unavailable(
-    updater: EventUpdater, update_request: UpdateEventRequest, service: MagicMock
+    updater: EventUpdater, update_request: ReplaceEvent, service: MagicMock
 ) -> None:
     error = HttpError(Response({"status": "401"}), b"")
     service.events.return_value.patch.return_value.execute.side_effect = error
@@ -136,7 +137,7 @@ def test_remote_authorization_refusal_raises_unavailable(
 
 
 def test_permission_refusal_is_denied(
-    updater: EventUpdater, update_request: UpdateEventRequest, service: MagicMock
+    updater: EventUpdater, update_request: ReplaceEvent, service: MagicMock
 ) -> None:
     error = HttpError(Response({"status": "403"}), b'{"error": "denied"}')
     service.events.return_value.patch.return_value.execute.side_effect = error
@@ -148,29 +149,33 @@ def test_permission_refusal_is_denied(
 
 
 @pytest.mark.parametrize(
-    "failure",
+    ("failure", "expected"),
     [
-        HttpError(
-            Response({"status": "403"}),
-            b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+        (
+            HttpError(
+                Response({"status": "403"}),
+                b'{"error": {"message": "Rate Limit Exceeded", "errors": [{"reason": "rateLimitExceeded"}]}}',
+            ),
+            EventUpdateProviderUnavailableError,
         ),
-        HttpError(Response({"status": "500"}), b""),
-        TransportError("transport"),
-        HttpLib2Error("httplib2"),
-        RequestException("requests"),
-        OSError("os"),
-        ValidationError.from_exception_data("Event", []),
+        (HttpError(Response({"status": "500"}), b""), EventUpdateUnconfirmedError),
+        (TransportError("transport"), EventUpdateUnconfirmedError),
+        (HttpLib2Error("httplib2"), EventUpdateUnconfirmedError),
+        (RequestException("requests"), EventUpdateUnconfirmedError),
+        (OSError("os"), EventUpdateUnconfirmedError),
+        (ValidationError.from_exception_data("Event", []), EventUpdateUnconfirmedError),
     ],
 )
-def test_provider_failure_raises_unconfirmed(
+def test_provider_failure_is_classified(
     updater: EventUpdater,
-    update_request: UpdateEventRequest,
+    update_request: ReplaceEvent,
     service: MagicMock,
     failure: Exception,
+    expected: type[Exception],
 ) -> None:
     service.events.return_value.patch.return_value.execute.side_effect = failure
 
-    with pytest.raises(EventUpdateUnconfirmedError) as raised:
+    with pytest.raises(expected) as raised:
         updater.update_event("test-event", update_request)
 
     assert raised.value.__cause__ is failure

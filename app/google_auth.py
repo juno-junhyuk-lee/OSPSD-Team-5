@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from google.auth.exceptions import GoogleAuthError
+from google.auth.exceptions import GoogleAuthError, TransportError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
@@ -27,6 +27,8 @@ def load_credentials(token_path: Path = ROOT / "token.json") -> Any:
             credentials.refresh(Request())
             token_path.write_text(credentials.to_json(), encoding="utf-8")
         return credentials
+    except TransportError:
+        raise
     except (OSError, ValueError, GoogleAuthError) as error:
         raise CalendarAuthenticationError(provider=provider_involved) from error
 

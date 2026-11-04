@@ -85,16 +85,10 @@ def google_service(
             event_id = patch_call.call_args.kwargs["eventId"]
             if event_id not in provider_events:
                 raise HttpError(Mock(status=404, reason="Not Found"), b"")
-            body = patch_call.call_args.kwargs["body"]
-            updated = {
-                "id": event_id,
-                "summary": body["summary"],
-                "start": body["start"],
-                "end": body["end"],
-                "htmlLink": "https://calendar.google.com/example",
-            }
-            if provider_events[event_id].get("status") == "cancelled":
-                updated["status"] = "cancelled"
+            # Google patch replaces only the top-level fields in the body.
+            updated = deepcopy(provider_events[event_id])
+            updated.update(deepcopy(patch_call.call_args.kwargs["body"]))
+            updated.setdefault("htmlLink", "https://calendar.google.com/example")
             provider_events[event_id] = deepcopy(updated)
             return deepcopy(updated)
 

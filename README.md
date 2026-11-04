@@ -2,7 +2,7 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## Calendar service — Milestone 1
+## Calendar service — HW2 shared contract adoption
 
 Juno Lee owns `GET /calendars/{calendar_id}`, Kristie Lee owns
 `GET /events/{event_id}`, Jim Lo owns `POST /events`, Ka Pui Cheung owns
@@ -13,12 +13,58 @@ event GET reads; created events can be retrieved after a server restart.
 Offline tests control provider responses and do not require credentials or
 network access.
 
+### Shared contract adoption (HW2)
+
+The dependency is `calendar-contract` at annotated tag
+[`v0.1.0`](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0), commit
+`1c1cad7a0732ddb242a05400d8833d94e4422424`. `pyproject.toml` selects the tag;
+`uv.lock` fixes its commit. The package supports Python 3.14 and supplies
+`CalendarService`, `Event`, `CreateEvent`, `ReplaceEvent`, `CalendarError`, and
+`ErrorCode`. Google SDK and OAuth code remain in this service repository.
+
+| Operation | Success | Shared service method |
+| --- | --- | --- |
+| POST /events | 201 with Event | create |
+| GET /events/{event_id} | 200 with Event | get |
+| PUT /events/{event_id} | 200 with Event | replace |
+| DELETE /events/{event_id} | 204, no body | delete |
+
+POST and PUT require `title`, `start`, and `end`. Times are RFC 3339 **strings**
+with an explicit offset, and end must follow start by instant. Event responses
+use `id`, `title`, `start`, and `end`. Old `start_time`/`end_time` inputs and
+unknown fields are rejected with 422, even when the new fields are also present.
+There are no compatibility aliases. PATCH uses the new names and continues to
+require all three editable fields; it is not a partial-update implementation.
+
+Malformed or empty JSON returns 400. Valid JSON that fails field/model rules
+returns 422. Both use the common error envelope. Missing events and repeated
+DELETE return 404. Permission denial is 403; missing/unusable OAuth is 503 with
+`retryable=false`. Temporary failure before a write or an explicit rate limit
+is 503 with `retryable=true`. An uncertain POST/PUT is 502 with
+`retryable=false` and is never automatically retried.
+
+Team 5 trims titles at the Google write boundary, preserves unrelated Google
+fields on PUT, and does not deliberately truncate timestamp strings. Responses
+follow provider-stored instants; output offset and fractional precision are not
+guaranteed. Use whole-second times for cross-team verification. Listing and
+all-day events remain outside the shared core; calendar metadata and PATCH
+remain extensions.
+
+See the [migration and verification guide](docs/SHARED_CONTRACT_ADOPTION.md) for
+installation, ownership, reproducible checks, and remaining evidence. The
+[manual tutorial](TUTORIAL.md) uses the current fields. Level 1–5 subsections
+below retain HW1 implementation history; their historical verification records
+refer to their recorded commits and do not prove tagged HW2 verification.
+The [November 4 real Google record](docs/SHARED_CONTRACT_VERIFICATION.md)
+separately verifies the tagged normal workflow at clean commit `327e8bc`;
+shared conformance wiring and adoption review/CI remain open.
+
 ### Installation
 
 Run commands from the repository root. Use Python 3.14 and
 [uv](https://docs.astral.sh/uv/) for environments and locked dependencies.
-`pyproject.toml` and `uv.lock` are authoritative; `requirements.txt` is an
-exported convenience file.
+`pyproject.toml` and `uv.lock` are authoritative; `requirements.txt` is a
+historical HW1 export and does not install the shared package; use uv for HW2.
 
 Install uv using its [installation instructions](https://docs.astral.sh/uv/getting-started/installation/),
 then run on macOS, Linux, or Windows:
@@ -40,7 +86,7 @@ uv run uvicorn app.main:app --reload
 Keep the server running while making requests in another terminal. Stop it with
 Ctrl+C. Swagger UI: http://localhost:8000/docs
 
-For a step-by-step Create → Read → Update → Delete walkthrough with example
+For a step-by-step Create → Read → Replace → Read → Delete walkthrough with example
 requests, responses, and shared error handling, see [TUTORIAL.md](TUTORIAL.md).
 
 Endpoints that call Google need a local `token.json`. Create it first with [Shared Google Calendar authentication](#shared-google-calendar-authentication); reviewers outside the team should follow [External reviewers](#external-reviewers). The offline tests need neither.
@@ -54,11 +100,11 @@ link or the old local `test-event` ID. No query/body parameters are required.
 Run the shared authentication command below before starting the server.
 
 Success returns `200 OK` with exactly four fields: string `id` and `title`,
-and ISO 8601 datetime strings `start_time` and `end_time`. The provider mapping
-is `id` → `id`, `summary` → `title`, `start.dateTime` → `start_time`, and
-`end.dateTime` → `end_time`. Additional Google fields remain hidden.
+and RFC 3339 timestamp strings `start` and `end`. The provider mapping
+is `id` → `id`, `summary` → `title`, `start.dateTime` → `start`, and
+`end.dateTime` → `end`. Additional Google fields remain hidden.
 
-Example from the real shared test calendar (times may change if the event is edited):
+Illustrative response shape; choose an existing event ID from your test calendar:
 
 ```sh
 curl -i http://localhost:8000/events/lf797iogm23bfjn97ogpfocl80
@@ -68,24 +114,22 @@ curl -i http://localhost:8000/events/lf797iogm23bfjn97ogpfocl80
 {
   "id": "lf797iogm23bfjn97ogpfocl80",
   "title": "Team 5 GET Test",
-  "start_time": "2026-10-05T13:30:00-04:00",
-  "end_time": "2026-10-05T14:00:00-04:00"
+  "start": "2026-10-05T13:30:00-04:00",
+  "end": "2026-10-05T14:00:00-04:00"
 }
 ```
 
 An absent provider title is represented as an empty string. All-day events use
 Google date fields and are rejected because this public model represents timed
 events. These policies are covered by tests and require teammate review.
-The shared Event model does not add timezone or start/end ordering validation;
-POST validates its own input separately.
+The shared Event model validates RFC 3339 timestamps with explicit offsets and
+requires the end instant to follow the start. It permits an empty read title.
 
 #### Level 5 event retrieval errors
 
-This contract is implemented on `feature/calendar-event-get-level5-errors`.
-Local checks and real Google success/failure verification passed at `9fad9af`;
-see [Level 5 verification and reproduction](docs/EVENT_GET_LEVEL5_VERIFICATION.md).
-Teammate review and matching PR CI remain pending; this does not claim final
-release completion. Kristie owns this change. The service never starts browser
+Historical HW1 local and real Google verification at `9fad9af` is recorded in
+[Level 5 verification and reproduction](docs/EVENT_GET_LEVEL5_VERIFICATION.md).
+That evidence does not establish tagged HW2 integration or release completion. Kristie owns this change. The service never starts browser
 authorization during a request.
 
 Successful reads retain the existing `200` response and four-field Event model.
@@ -98,7 +142,7 @@ Failures use the shared [error format](#error-format), for example:
 | Condition | HTTP status | `error.code` | `retryable` | Caller action |
 | --- | --- | --- | --- | --- |
 | ID violates the local format below | 422 | `invalid_input` | `false` | Correct the ID |
-| Google returns 404 or an event with `status: cancelled` (including deleted events) | 404 | `not_found` | `false` | Check the ID or choose another event |
+| Google returns 404/410 or an event with `status: cancelled` (including deleted events) | 404 | `not_found` | `false` | Check the ID or choose another event |
 | All-day event cannot be represented by the timed-event model | 422 | `invalid_input` | `false` | Choose a timed event |
 | Google refuses permission; excludes rate-limit responses | 403 | `access_denied` | `false` | Resolve access before another request |
 | Authorization is missing, invalid, insufficiently scoped, needs renewal, or is rejected by Google with HTTP 401 | 503 | `provider_unavailable` | `false` | Repair authorization with the authentication script |
@@ -134,9 +178,9 @@ raw exception messages are logged. No request ID is added in this change.
 
 This intentionally changes GET errors from `{"detail": ...}` to the shared
 shape, adds local ID validation and a distinct permission-denied response,
-and maps temporary failures to 503. Other operations and the app-wide FastAPI
-request-validation handler are outside this change; their owners coordinate
-those migrations separately. Controlled-provider HTTP tests, Google adapter
+and maps temporary failures to 503. Those were the boundaries of the HW1 GET
+change. HW2 now applies the shared request models, error types, and HTTP
+validation rules to event routes. Controlled-provider HTTP tests, Google adapter
 translation tests, and sanitized-log assertions cover the implementation.
 Real Google success, missing-event, and local-invalid-input checks are recorded
 in the verification guide; teammate and final-release verification remain separate.
@@ -155,19 +199,18 @@ their current HTTP meanings are in the error table above.
 `GoogleEventReader` in `app/google_events.py` implements the contract. It uses
 `app/google_auth.py` for local authorization and client construction, owns the
 Google request and response translation, and closes the client on success or
-failure. The event GET route calls the typed `EventReader` boundary and maps
-service errors to the documented 403, 404, 422, 503, and 502 responses.
+failure. The shared service calls the typed `EventReader` boundary and converts its
+errors to `CalendarError`; the HTTP handler selects the documented statuses.
 
 The Level 3 boundary was merged in PR #17. Codex assisted with implementation,
-tests, and documentation. POST uses a provider-independent interface with fixed
-Google selection until Level 4; PATCH injects `EventUpdater` through FastAPI;
-DELETE retains its existing implementation.
+tests, and documentation. Those were the HW1 boundaries. Current HW2 routing composes the existing
+operation interfaces beneath the shared `CalendarService`.
 
 #### Level 4 event provider injection
 
 `get_event_reader()` in `app/event_dependencies.py` selects `GoogleEventReader`
-and returns it as an `EventReader`. FastAPI supplies it to the event GET route
-through `Depends`; the route does not construct or import the concrete reader.
+and returns it as an `EventReader`. FastAPI supplies it to the shared service
+through a subdependency; the route does not construct or import the concrete reader.
 The dependency creates a lightweight reader per request. Authorization and SDK
 client creation occur during retrieval, and the Google implementation closes
 the client after use. Level 4 preserved the earlier responses; Level 5 changes
@@ -307,17 +350,18 @@ for check results, real-provider verification, and remaining review requirements
 
 `POST /events` creates one timed event in Google Calendar's `primary` calendar. Jim Lo
 owns this operation, including its implementation, tests, and documentation
-through Levels 1–5. Level 2 preserves the Level 1 input and success contract;
-it requires local authorization from the Shared Google Calendar authentication
-instructions below. One real-provider run is recorded in the verification guide.
+through Levels 1–5. HW2 renames the time fields to match the common contract. Local authorization
+is required; follow Shared Google Calendar authentication below. Historical HW1
+runs are separate from the [tagged HW2 verification](docs/SHARED_CONTRACT_VERIFICATION.md)
+recorded on November 4 at `327e8bc`.
 
 The request uses `Content-Type: application/json` and requires three body fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `title` | string | Strip leading and trailing whitespace; the result must not be empty. |
-| `start_time` | ISO 8601 datetime string | Must include a UTC offset or `Z`. |
-| `end_time` | ISO 8601 datetime string | Must include a UTC offset or `Z` and represent an instant after `start_time`. |
+| `title` | string | Must not be blank after trimming. The shared model preserves the string; Team 5 trims it at the Google write boundary. |
+| `start` | RFC 3339 string | Must include a UTC offset or `Z`. |
+| `end` | RFC 3339 string | Must include a UTC offset or `Z` and represent an instant after `start`. |
 
 There are no required path or query parameters. The caller does not supply
 the event ID; Google generates it. For example:
@@ -325,25 +369,24 @@ the event ID; Google generates it. For example:
 ```json
 {
   "title": "Team Meeting",
-  "start_time": "2026-10-05T10:00:00-04:00",
-  "end_time": "2026-10-05T11:00:00-04:00"
+  "start": "2026-10-05T10:00:00-04:00",
+  "end": "2026-10-05T11:00:00-04:00"
 }
 ```
 
 Success returns `201 Created` with exactly the existing `Event` response fields:
-`id`, `title`, `start_time`, and `end_time`. For example:
+`id`, `title`, `start`, and `end`. For example:
 
 ```json
 {
   "id": "<server-generated-id>",
   "title": "Team Meeting",
-  "start_time": "2026-10-05T10:00:00-04:00",
-  "end_time": "2026-10-05T11:00:00-04:00"
+  "start": "2026-10-05T10:00:00-04:00",
+  "end": "2026-10-05T11:00:00-04:00"
 }
 ```
 
-The response contains the normalized title and datetime strings representing
-the supplied instants. Equivalent datetime serialization, such as `Z` versus
+The response contains the stored title and timestamps returned by Google. Equivalent datetime serialization, such as `Z` versus
 `+00:00`, is permitted. The generated ID identifies the new event and must not
 overwrite an existing event. The event can then be retrieved through
 `GET /events/{event_id}` in the same running process.
@@ -351,9 +394,7 @@ overwrite an existing event. The event can then be retrieved through
 Missing required fields, invalid field values, timezone-free timestamps, and
 an end time equal to or earlier than the start time return `422 Unprocessable
 Entity` using the shared `invalid_input` error format with `retryable=false`.
-Rejected requests do not add an event or change existing events. Validation
-applies to creation inputs; it does not add guarantees to the existing GET
-operation or shared response model.
+Rejected requests do not add an event or change existing events. The shared models validate both write inputs and returned event timestamps.
 
 Each valid POST creates a new event, even when its body matches a previous
 request. Repeated requests receive different IDs; this operation does not provide
@@ -365,10 +406,11 @@ contract.
 Setup failure or rejected Google authorization returns 503 with code
 `provider_unavailable` and a message directing the developer to the authorization
 script. Permission denial returns 403 with code `access_denied`.
-Other provider HTTP/transport failure or an unusable response returns 502 with
-code `provider_error` and a message stating that creation could not be confirmed
-and to check the calendar before retrying. All use the shared error format with
-`retryable=false`. No failure falls back to local
+A temporary failure before sending the write, or an explicit quota/rate-limit
+rejection, returns 503 / `provider_unavailable` with `retryable=true`. A failed
+or unusable response after sending a write returns 502 / `provider_error` with
+`retryable=false`; inspect the calendar before retrying. Missing or rejected
+authorization instead uses 503 with `retryable=false`. No failure falls back to local
 creation. A 502 does not guarantee that Google created no event; do not blindly repeat a write with an uncertain result. Raw provider
 errors and credential contents are not included in these HTTP responses.
 
@@ -387,7 +429,7 @@ creation contract. Jim Lo owns this boundary for POST through Levels 1–5.
 
 | Operation | Input | Return value | External state |
 | --- | --- | --- | --- |
-| `create_event(request)` | A validated `CreateEventRequest` with a normalized title and timezone-aware start/end times | An `Event` with a generated ID, normalized title, and the submitted time instants | Creates one new timed event in the configured calendar |
+| `create_event(request)` | A shared `CreateEvent` with a validated title and RFC 3339 start/end strings | An `Event` with a generated ID, stored title, and provider-returned time instants | Creates one new timed event in the configured calendar |
 
 The interface uses service models and exposes no SDK requests, credentials, or
 provider response types. The provider implementation is responsible for
@@ -409,30 +451,32 @@ At Level 3, two service errors described POST failure behavior:
 `GoogleEventCreator` in `app/google_create_events.py` implements the interface.
 It delegates insertion and translation to the existing `create_google_event`
 helper and converts its known setup, SDK, transport, and response-validation
-failures into the service errors above. The POST handler calls an
-`EventCreator` and handles those errors without inspecting Google SDK exceptions.
+failures into operation-specific errors. `GoogleCalendarService` calls the
+`EventCreator` and translates those failures without exposing SDK exceptions.
 At implementation commit `8741c90`, Level 3 selected Google in `app/main.py`.
 Current provider injection is described below. The shared `load_credentials`
 helper remains unchanged for
 PATCH and DELETE. [POST Level 3 verification](docs/POST_LEVEL3_VERIFICATION.md)
 records offline checks, real create/read, restart persistence, and cleanup for
-implementation commit `8741c90`. Teammate review and matching PR CI remain pending.
+implementation commit `8741c90`. Teammate review and matching PR CI were pending at that HW1 checkpoint.
 
 #### Level 4 event creation provider injection
 
 `get_event_creator()` in `app/event_creation_dependencies.py` selects
 `GoogleEventCreator` and returns it as an `EventCreator`. FastAPI supplies it
-to POST through `Depends`; the handler calls the interface without constructing
+to `GoogleCalendarService` through a subdependency. The shared service calls
+the operation interface; the route calls `CalendarService` without constructing
 or importing the concrete creator. The dependency creates a lightweight,
 stateless creator per request. Authorization and SDK client creation happen
-inside its creation operation, after request validation. The existing input,
-201 response, and 422/503/502 behavior remain in place.
+inside its creation operation, after request validation. HW1 Level 4 preserved
+its existing input and responses; HW2 adds shared field/model validation and
+the 400/422 distinction described above.
 
 `tests/test_create_event_contract.py` replaces `get_event_creator` through
 `app.dependency_overrides` with a `ControlledEventCreator`. Its own TestClient
 fixture uses no Google SDK mocks, credentials, or network access. The controlled
-implementation records normalized requests and returns predictable Event values
-or raises a configured service error. Tests check the exact 201 response,
+implementation records validated shared requests and returns predictable Event
+values or raises a configured service error. Tests check the exact 201 response,
 returned IDs, time instants, invalid input without a creator call, and existing
 503/502 responses without retries. Each test gets fresh creator state and restores
 previous dependency overrides in `finally`. Google translation, token, and CRUD
@@ -454,7 +498,8 @@ POST maps provider-independent errors to the shared HTTP format:
 | --- | --- | --- |
 | `EventCreationUnavailableError` | Local authorization is unusable, token refresh was rejected, or Google returned 401 | `503 / provider_unavailable`, not retryable until authorization is fixed |
 | `EventCreationDeniedError` | Google returned a permission-denied 403, excluding known quota/rate limits | `403 / access_denied`, not retryable |
-| `EventCreationUnconfirmedError` | Other Google HTTP failures, transport failures, or unusable provider data prevent confirmation | `502 / provider_error`, not retryable without checking the calendar |
+| `EventCreationProviderUnavailableError` | Temporary failure before insertion, or explicit quota/rate-limit rejection | `503 / provider_unavailable`, retryable later |
+| `EventCreationUnconfirmedError` | Insertion started but its failed or unusable response prevents confirmation | `502 / provider_error`, not retryable without checking the calendar |
 
 The authorization error's `provider` flag is false for local setup failures and
 true for rejected refreshes, unusable refreshed credentials, or remote 401s.
@@ -463,21 +508,22 @@ refresh, or storage behavior for PATCH and DELETE. SDK details remain inside
 the Google adapter. Known 403 rate/quota failures remain provider failures,
 not permission denials. Google insertion still uses `num_retries=0`.
 
-Missing fields, invalid JSON, and invalid field values return 422 with
-`invalid_input`, the message "Invalid request. Check required fields, types,
-and values.", and `retryable=false`. Validation rejects these requests without
-calling the creator. The shared request-validation handler also covers PATCH;
-it does not change either operation's field validation rules.
+Malformed or empty JSON returns 400; valid JSON with missing, unknown, or
+invalid fields returns 422. Both use `invalid_input`, the message "Invalid
+request. Check required fields, types, and values.", and `retryable=false`.
+Validation rejects these requests without calling the creator. The shared
+request-validation handler also covers PUT and PATCH.
 
-POST failures raise `ServiceError` and produce exactly one structured log via
-the shared handler, with `operation=create_event`. Local validation and setup
-failures log `provider=false`; remote authorization and provider outcomes log
+The shared service translates POST failures into `CalendarError`; the HTTP
+handler adds `ServiceError` log context and writes exactly one structured log
+with `operation=create_event`. Local validation and setup failures log `provider=false`; remote authorization and provider outcomes log
 `provider=true`. Logs omit titles, event bodies, authorization headers, raw SDK
 errors, and stack traces. Successful creation produces no failure log.
 
 Compatibility: POST errors change from `detail` to `error`, and a permission
-denial now returns 403 instead of the earlier broad 502. Successful responses
-and validation rules are unchanged. FastAPI request-validation errors across
+denial changed to 403 instead of the earlier broad 502 in HW1. HW2 additionally
+renames time fields, rejects unknown fields, and distinguishes malformed JSON
+from model-validation failures. FastAPI request-validation errors across
 the app now use the shared shape, including PATCH. Swagger documents the shared
 validation response and operation 403/404/502/503 responses.
 
@@ -502,7 +548,7 @@ create an event (macOS/Linux or Git Bash):
 ```sh
 curl -i http://localhost:8000/events \
   -H 'Content-Type: application/json' \
-  -d '{"title":"  Team Meeting  ","start_time":"2026-10-05T10:00:00-04:00","end_time":"2026-10-05T11:00:00-04:00"}'
+  -d '{"title":"  Team Meeting  ","start":"2026-10-05T10:00:00-04:00","end":"2026-10-05T11:00:00-04:00"}'
 ```
 
 Expect `201`, a generated `id`, the title `Team Meeting` without surrounding
@@ -520,8 +566,8 @@ In PowerShell, use the same workflow through `Invoke-RestMethod`:
 ```powershell
 $body = @{
     title = "  Team Meeting  "
-    start_time = "2026-10-05T10:00:00-04:00"
-    end_time = "2026-10-05T11:00:00-04:00"
+    start = "2026-10-05T10:00:00-04:00"
+    end = "2026-10-05T11:00:00-04:00"
 } | ConvertTo-Json
 $event = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/events" -ContentType "application/json" -Body $body
 $event
@@ -529,7 +575,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/events/$($event.id)"
 ```
 
 To check validation, use Swagger UI's `POST /events` operation and submit a
-body with `end_time` equal to `start_time`. Expect `422` with code `invalid_input`
+body with `end` equal to `start`. Expect `422` with code `invalid_input`
 and `retryable=false` in the shared error format.
 The rejected request must not create an event. Restarting the server preserves
 Google events; event GET should still return 200 for the created ID. Delete only your own verification events afterward.
@@ -539,6 +585,8 @@ teammate verification links are in [POST Level 2 verification](docs/POST_LEVEL2_
 
 ### Event update contract
 
+PATCH remains a full-field extension and requires title, start, and end.
+
 `PATCH /events/{event_id}` updates one timed event on the shared test account's
 `primary` Google Calendar. Niriti Pahadi owns this operation through Levels 1–5.
 `event_id` is a required string path parameter (a Google event ID, as returned
@@ -547,8 +595,8 @@ by POST). The body uses the same required fields and validation as create:
 ```json
 {
   "title": "  Updated Meeting  ",
-  "start_time": "2026-10-06T11:00:00-04:00",
-  "end_time": "2026-10-06T12:00:00-04:00"
+  "start": "2026-10-06T11:00:00-04:00",
+  "end": "2026-10-06T12:00:00-04:00"
 }
 ```
 
@@ -559,12 +607,14 @@ is unchanged. The title is stripped of surrounding whitespace. A following
 | Result | Status | `error.code` | `retryable` | State change? |
 | --- | --- | --- | --- | --- |
 | Updated | `200` | none | Not needed | Yes |
+| Malformed or empty JSON | `400` | `invalid_input` | `false` | No |
 | ID is empty, over 1024 characters, or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` | No |
 | Unknown, deleted, or cancelled ID (Google 404/410, or `events.get` status `cancelled` before patch) | `404` | `not_found` | `false` | No |
-| Missing/invalid fields, timezone-free times, or `end_time <= start_time` | `422` | `invalid_input` | `false` | No |
+| Missing/invalid fields, timezone-free times, or `end <= start` | `422` | `invalid_input` | `false` | No |
 | Google refused access (403 that is not a rate limit) | `403` | `access_denied` | `false` | No |
 | Local authorization missing or unusable, or remote authorization rejected | `503` | `provider_unavailable` | `false` | No |
-| Google failed, rate-limited, or the response was unusable | `502` | `provider_error` | `false`; check calendar before retry | Uncertain |
+| Temporary failure before patch or explicit rate-limit rejection | `503` | `provider_unavailable` | `true` | No |
+| Response after patch is lost, failed, or unusable | `502` | `provider_error` | `false`; check calendar before retry | Uncertain |
 
 Failures use the shared [error format](#error-format). An invalid ID is
 rejected before any Google call. Partial/optional fields, all-day events, and
@@ -580,7 +630,7 @@ update contract. Niriti Pahadi owns this boundary for PATCH through Levels 1–5
 
 | Operation | Input | Return value | External state |
 | --- | --- | --- | --- |
-| `update_event(event_id, request)` | A provider event ID and a validated `UpdateEventRequest` | An `Event` with the same ID and refreshed title/times | Updates one existing timed event in the configured calendar |
+| `update_event(event_id, request)` | A provider event ID and a validated `ReplaceEvent` | An `Event` with the same ID and refreshed title/times | Updates one existing timed event in the configured calendar |
 
 The interface uses service models and exposes no SDK requests, credentials, or
 provider response types. `GoogleEventUpdater` in `app/google_update_events.py`
@@ -595,19 +645,36 @@ See [PATCH Level 3 verification](docs/PATCH_LEVEL3_VERIFICATION.md) and
 
 Niriti Pahadi owns PATCH Level 5. The Google adapter classifies authorization,
 permission, not-found, and unconfirmed failures into update service errors. The
-PATCH route maps them through the shared `ServiceError` handler:
+shared service maps them to `CalendarError`, then the HTTP handler renders them:
 
 | Service error | HTTP | Code | Retryable |
 | --- | --- | --- | --- |
-| Invalid event ID or body | `422` | `invalid_input` | `false` |
+| Malformed or empty JSON | `400` | `invalid_input` | `false` |
+| Invalid event ID or valid-JSON body | `422` | `invalid_input` | `false` |
 | `EventUpdateNotFoundError` | `404` | `not_found` | `false` |
 | `EventUpdateDeniedError` | `403` | `access_denied` | `false` |
 | `EventUpdateUnavailableError` | `503` | `provider_unavailable` | `false` |
+| `EventUpdateProviderUnavailableError` | `503` | `provider_unavailable` | `true` |
+| `EventUpdateProviderError` | `502` | `provider_error` | `false` |
 | `EventUpdateUnconfirmedError` | `502` | `provider_error` | `false` |
 
 One sanitized failure log is written per failure. Uncertain updates are never
 automatically retried. See
 [PATCH Level 5 verification](docs/PATCH_LEVEL5_VERIFICATION.md).
+
+### Event replacement contract
+
+`PUT /events/{event_id}` replaces the shared fields of one timed event, as the
+HW2 joint Calendar contract requires. Ka Pui Cheung owns this operation. It
+takes the same path parameter, body, validation, and failure table as PATCH
+above, and returns `200 OK` with the four-field `Event`. The body must contain
+`title`, `start`, and `end`; the `id` never changes.
+
+PUT replaces only the title and both times. Google fields outside the shared
+model (description, location, attendees, reminders, recurrence) are kept,
+because the request reaches Google as `events.patch` with only `summary`,
+`start`, and `end`. A missing, deleted, or cancelled event returns `404` without
+a write. Failure logs use the operation name `replace_event`.
 
 ### Event deletion contract
 
@@ -622,8 +689,9 @@ returned by POST), and no query or body parameters.
 | ID is empty, over 1024 characters, or has characters other than letters, digits, `_`, `-` | `422` | `invalid_input` | `false` |
 | Unknown or already-deleted ID (Google 404 or 410) | `404` | `not_found` | `false` |
 | Google refused access (403 that is not a rate limit) | `403` | `access_denied` | `false` |
-| Local authorization missing or unusable; no Google call made | `503` | `provider_unavailable` | `false`; fix setup with the auth script first |
-| Google failed, rate-limited, or the response was lost | `502` | `provider_error` | `true` |
+| Local authorization missing/unusable, or remote authorization rejected | `503` | `provider_unavailable` | `false`; fix setup with the auth script first |
+| Temporary failure before deletion or explicit rate-limit rejection | `503` | `provider_unavailable` | `true` |
+| Deletion response failed or was lost | `502` | `provider_error` | `true` |
 
 Failures use the shared [error format](#error-format). An invalid ID is
 rejected before any Google call.
@@ -650,8 +718,10 @@ provider call, and translating provider outcomes into the service errors below.
 - `EventDeletionNotFoundError`: no event has the ID, including one that was
   already deleted; the route keeps the existing 404. A repeated delete reports
   the event as missing.
-- `EventDeletionUnavailableError`: local authorization is unusable before any
-  provider call; the route keeps the existing 503.
+- `EventDeletionUnavailableError`: local authorization is unusable or Google
+  rejects it; the shared service returns a non-retryable authorization failure.
+- `EventDeletionProviderUnavailableError`: temporary setup failure or an explicit
+  rate limit; the HTTP outcome is 503 with `retryable=true`.
 - `EventDeletionUnconfirmedError`: the provider call failed or its result was
   lost; the route keeps the existing 502. The event may already be deleted, so
   the implementation does not retry; a caller's retry is safe and returns 404
@@ -661,8 +731,8 @@ provider call, and translating provider outcomes into the service errors below.
 It delegates to the existing `delete_google_event` helper, which keeps
 `events.delete`, the `primary` calendar, `sendUpdates="none"`, and Google's
 404/410 handling, and converts known setup, SDK, and transport failures into
-the service errors above. The DELETE handler calls an `EventDeleter` and no
-longer inspects Google SDK exceptions. `GoogleEventNotFoundError` stays in the
+the service errors above. The shared service calls an `EventDeleter` and converts operation-specific
+failures to `CalendarError`; routes do not inspect SDK exceptions. `GoogleEventNotFoundError` stays in the
 same module because PATCH still uses it. `tests/test_google_delete_events.py`
 checks the translation; `tests/test_delete_events.py` keeps the HTTP contract
 tests. See [DELETE Level 3 verification](docs/DELETE_LEVEL3_VERIFICATION.md).
@@ -671,7 +741,7 @@ tests. See [DELETE Level 3 verification](docs/DELETE_LEVEL3_VERIFICATION.md).
 
 `get_event_deleter()` in `app/event_deletion_dependencies.py` is the only place that
 selects `GoogleEventDeleter`; it returns it as an `EventDeleter`. FastAPI
-supplies it to the DELETE route through `Depends`, so the route neither
+supplies it to the shared service through a subdependency, so the route neither
 constructs nor imports the concrete deleter. The dependency creates a
 lightweight deleter per request; authorization and SDK client creation happen
 during deletion. The real deleter needs the local `token.json` from the shared
@@ -703,7 +773,8 @@ Operations moved to Level 5 return failures in one shape, defined in
 
 | `code` | Status | When | Retry? |
 | --- | --- | --- | --- |
-| `invalid_input` | `422` | The request is malformed (bad ID, body, or field) | No; fix the request |
+| `invalid_input` | `400` | Malformed or empty JSON | No; fix the request |
+| `invalid_input` | `422` | Valid JSON with invalid/missing/unknown fields, or a bad ID | No; fix the request |
 | `not_found` | `404` | The resource does not exist or was deleted | No |
 | `access_denied` | `403` | The provider refused access to the resource | No |
 | `provider_error` | `502` | The provider failed or its result is unknown | Per operation; see `retryable` |
@@ -713,9 +784,11 @@ Operations moved to Level 5 return failures in one shape, defined in
 provider responses, and credentials are never included. `retryable` tells the
 caller whether repeating the same request unchanged is safe and useful.
 
-To use it, an operation raises `ServiceError(code, message, operation=...,
-retryable=..., provider=...)`; the handler registered in `app/main.py` renders
-the response and logs one JSON line on the `calendar_service` logger:
+Core operation failures cross the shared interface as `CalendarError` with
+`ErrorCode` from `calendar_contract`. `app/errors.py` adds `ServiceError` HTTP
+and log context. Calendar metadata and local ID validation use `ServiceError`
+directly. The handlers registered in `app/main.py` render the envelope and log
+one JSON line on the `calendar_service` logger:
 
 ```json
 {"operation": "delete_event", "error": "not_found", "provider": true, "status": 404}
@@ -724,67 +797,40 @@ the response and logs one JSON line on the `calendar_service` logger:
 `provider` is true when the provider was called or caused the failure. 5xx
 failures log at ERROR, others at WARNING, without stack traces, request bodies,
 or tokens. The service has no request ID yet, so none is logged. DELETE, both
-GETs, POST, and PATCH use this format, as do FastAPI request-validation
+GETs, POST, PUT, and PATCH use this format, as do FastAPI request-validation
 failures. Request-validation logs use the matched route's operation name and
 `provider=false`; they never serialize the validation exception's inputs or body.
 
 ### Code map and request flow
 
-`app/main.py` owns the FastAPI routes.
-Calendar GET calls the `CalendarReader` interface, implemented by
-`GoogleCalendarReader.get_primary_calendar` in `app/google_calendar.py`,
-which loads local OAuth authorization, retrieves Google metadata, and
-returns the `Calendar` model. Unsupported calendar IDs return 404 locally.
-FastAPI supplies the calendar reader through `get_calendar_reader` in
-`app/calendar_dependencies.py`.
+FastAPI event routes in `app/main.py` receive `CalendarService` through
+`get_calendar_service` in `app/calendar_service_dependencies.py`:
 
-Event GET validates the ID before calling the `EventReader` interface, implemented by
-`GoogleEventReader.get_event` in `app/google_events.py`. It requests Google's
-`events.get` on `primary` and translates the result to `Event`.
-FastAPI supplies the reader through `get_event_reader` in `app/event_dependencies.py`.
-`app/google_auth.py` loads and refreshes the local token for event retrieval.
-Neither GET operation starts browser authorization during a request.
+```text
+HTTP input -> shared request model -> GoogleCalendarService
+           -> existing Google adapter -> primary Google Calendar
+           -> shared Event or CalendarError -> HTTP response
+```
 
-Event GET translates expected service errors to `ServiceError`; the registered
-handler in `app/errors.py` renders the common error body and one sanitized log.
-SDK exceptions stay inside `GoogleEventReader`; local versus remote authorization
-failure is carried as provider-independent metadata for logging.
+`GoogleCalendarService` in `app/calendar_service.py` delegates `create`, `get`,
+`replace`, and `delete` to `GoogleEventCreator`, `GoogleEventReader`,
+`GoogleEventUpdater`, and `GoogleEventDeleter`. PATCH is a full-field extension
+using the same `replace` path. It still requires title and both times.
 
-The synchronous handlers keep blocking SDK work off the async event loop.
-Each request constructs its own authorized client. Both GET operations use
-provider-independent interfaces and receive their readers through FastAPI dependencies.
-Neither adds a cross-request client cache or retry layer.
+The existing operation factories remain FastAPI subdependencies. Tests may
+replace an individual adapter or override `get_calendar_service` with another
+implementation of the shared protocol. Overrides must be restored after tests.
+Adapters remain responsible for authorization, SDK calls, field translation,
+and closing clients. The shared service translates their known failures to
+`CalendarError`; it does not log or retry operations. `app/errors.py` adds HTTP
+status and operation context, writes one sanitized failure log, and returns the
+common error envelope. Unexpected programming errors propagate.
 
-POST validates and normalizes `CreateEventRequest`, then calls
-`EventCreator.create_event`. `GoogleEventCreator` in `app/google_create_events.py`
-is supplied through `get_event_creator` in `app/event_creation_dependencies.py` and
-uses the existing insertion helper, which loads or
-refreshes local event authorization, calls `events.insert` on `primary`, closes
-the client, and translates the Google response to `Event`. Invalid input is
-rejected before a write. Each creation request uses `num_retries=0`; an uncertain
-result must be investigated before retrying. The adapter translates known
-failures into service errors; the POST handler maps them to the documented
-403/503/502 shared error responses and sanitized logs.
-Authorization helpers remain
-operation-specific at this level; the shared setup script obtains both scopes.
-
-PATCH validates and normalizes `UpdateEventRequest`, then calls
-`EventUpdater.update_event`. FastAPI supplies the updater through
-`get_event_updater` in `app/event_update_dependencies.py`.
-`GoogleEventUpdater` in `app/google_update_events.py` reuses POST's
-`load_credentials`, checks cancelled status with `events.get`, calls
-`events.patch` on `primary` once without retries, and translates the response
-to `Event`. The adapter maps missing/cancelled events and other failures into
-service errors; the PATCH handler maps them through shared `ServiceError`.
-Controlled updater tests override the dependency without constructing Google
-clients.
-
-DELETE calls `EventDeleter.delete_event`. `GoogleEventDeleter` in
-`app/google_delete_events.py` reuses POST's `load_credentials` and calls
-`events.delete` on `primary` once, without retries. It translates Google 404/410
-and other known failures into service errors, which the handler maps to the
-documented responses. FastAPI supplies the deleter through `get_event_deleter`
-in `app/event_deletion_dependencies.py`.
+Calendar metadata remains an extension using `CalendarReader` and
+`get_calendar_reader` in `app/calendar_dependencies.py`. It shares the HTTP
+error envelope but is not a method of `CalendarService`. Authorization remains
+noninteractive in every route; the separate setup script requests both scopes.
+Synchronous route handlers keep blocking SDK work off the async event loop.
 
 ### Checks and testing
 
@@ -895,7 +941,10 @@ Both calendar-details GET and event GET use local authorization to call Google.
 The flow follows the [Google Python quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python).
 
 
-### Level 2 integration status
+### Historical Level 2 integration status
+
+The following status was recorded during HW1; current HW2 progress is in the
+[adoption guide](docs/SHARED_CONTRACT_ADOPTION.md).
 
 PRs #8 and #9 are merged. POST Level 2 is under review in
 [PR #10](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/10).
