@@ -1,10 +1,11 @@
 """Update timed events using the team's local Google authorization."""
 
+from calendar_contract import Event, ReplaceEvent
 from google.auth.exceptions import RefreshError, TransportError
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
-from pydantic import AwareDatetime, BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from requests.exceptions import RequestException
 
 from app.event_update_provider import (
@@ -15,11 +16,10 @@ from app.event_update_provider import (
 )
 from app.google_create_events import GoogleCalendarSetupError, load_credentials
 from app.google_delete_events import GoogleEventNotFoundError, is_permission_denied
-from app.models import Event, UpdateEventRequest
 
 
 class _GoogleEventTime(BaseModel):
-    dateTime: AwareDatetime
+    dateTime: str
 
 
 class _GoogleEvent(BaseModel):
@@ -29,13 +29,13 @@ class _GoogleEvent(BaseModel):
     end: _GoogleEventTime
 
 
-def update_google_event(event_id: str, request: UpdateEventRequest) -> Event:
+def update_google_event(event_id: str, request: ReplaceEvent) -> Event:
     """Patch one timed event on primary and return the public Event model."""
     credentials = load_credentials()
     body = {
-        "summary": request.title,
-        "start": {"dateTime": request.start_time.isoformat()},
-        "end": {"dateTime": request.end_time.isoformat()},
+        "summary": request.title.strip(),
+        "start": {"dateTime": request.start},
+        "end": {"dateTime": request.end},
     }
     try:
         with build("calendar", "v3", credentials=credentials) as service:
@@ -59,25 +59,25 @@ def update_google_event(event_id: str, request: UpdateEventRequest) -> Event:
     if result.get("status") == "cancelled":
         raise GoogleEventNotFoundError(event_id)
     provider_event = _GoogleEvent.model_validate(result)
-    translated = UpdateEventRequest.model_validate(
+    translated = ReplaceEvent.model_validate(
         {
             "title": provider_event.summary,
-            "start_time": provider_event.start.dateTime.isoformat(),
-            "end_time": provider_event.end.dateTime.isoformat(),
+            "start": provider_event.start.dateTime,
+            "end": provider_event.end.dateTime,
         }
     )
     return Event(
         id=provider_event.id,
         title=translated.title,
-        start_time=translated.start_time,
-        end_time=translated.end_time,
+        start=translated.start,
+        end=translated.end,
     )
 
 
 class GoogleEventUpdater:
     """Update Google events through the service update contract."""
 
-    def update_event(self, event_id: str, request: UpdateEventRequest) -> Event:
+    def update_event(self, event_id: str, request: ReplaceEvent) -> Event:
         try:
             return update_google_event(event_id, request)
         except GoogleEventNotFoundError as error:

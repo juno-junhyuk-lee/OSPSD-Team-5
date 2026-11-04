@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from app.models import Event, UpdateEventRequest
+from calendar_contract import Event, ReplaceEvent
 
 
 class EventUpdateNotFoundError(Exception):
@@ -28,7 +28,7 @@ class EventUpdateUnconfirmedError(Exception):
 class EventUpdater(Protocol):
     """Update timed events in the configured calendar."""
 
-    def update_event(self, event_id: str, request: UpdateEventRequest) -> Event:
+    def update_event(self, event_id: str, request: ReplaceEvent) -> Event:
         """Replace title and times for one existing timed event.
 
         Return the same id with the refreshed title and start/end instants.

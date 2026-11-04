@@ -1,6 +1,7 @@
 import re
 from typing import Annotated
 
+from calendar_contract import CreateEvent, Event, ReplaceEvent
 from fastapi import Depends, FastAPI, Response
 from fastapi.exceptions import RequestValidationError
 
@@ -53,7 +54,7 @@ from app.event_update_provider import (
     EventUpdateUnavailableError,
     EventUpdateUnconfirmedError,
 )
-from app.models import Calendar, CreateEventRequest, Event, UpdateEventRequest
+from app.models import Calendar
 
 app = FastAPI(
     title="Calendar Service",
@@ -201,7 +202,7 @@ def get_event(
     },
 )
 def create_event(
-    request: CreateEventRequest,
+    request: CreateEvent,
     creator: Annotated[EventCreator, Depends(get_event_creator)],
 ) -> Event:
     """Create a timed Google event and return its provider-assigned ID."""
@@ -247,7 +248,7 @@ EVENT_WRITE_RESPONSES: dict[int | str, dict[str, object]] = {
 @app.put("/events/{event_id}", response_model=Event, responses=EVENT_WRITE_RESPONSES)
 def replace_event(
     event_id: str,
-    request: UpdateEventRequest,
+    request: ReplaceEvent,
     updater: Annotated[EventUpdater, Depends(get_event_updater)],
 ) -> Event:
     """Replace a timed event's title and times, keeping its other Google fields."""
@@ -257,7 +258,7 @@ def replace_event(
 @app.patch("/events/{event_id}", response_model=Event, responses=EVENT_WRITE_RESPONSES)
 def update_event(
     event_id: str,
-    request: UpdateEventRequest,
+    request: ReplaceEvent,
     updater: Annotated[EventUpdater, Depends(get_event_updater)],
 ) -> Event:
     """Update a timed Google event and return the refreshed Event fields."""
@@ -266,7 +267,7 @@ def update_event(
 
 def _write_event(
     event_id: str,
-    request: UpdateEventRequest,
+    request: ReplaceEvent,
     updater: EventUpdater,
     *,
     operation: str,

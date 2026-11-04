@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from contextlib import closing
 
+from calendar_contract import Event
 from google.auth.exceptions import TransportError
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
@@ -18,7 +19,6 @@ from app.event_provider import (
     UnsupportedEventError,
 )
 from app.google_auth import calendar_client
-from app.models import Event
 
 # Google can report quota/rate limits as 403 instead of 429.
 RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
@@ -51,8 +51,8 @@ def translate_event(data: Mapping[str, object]) -> Event:
             {
                 "id": data.get("id"),
                 "title": data.get("summary", ""),
-                "start_time": start["dateTime"],
-                "end_time": end["dateTime"],
+                "start": start["dateTime"],
+                "end": end["dateTime"],
             }
         )
     except ValidationError as error:

@@ -8,8 +8,8 @@ from app import google_create_events, google_delete_events
 
 EVENT = {
     "title": "Delete Me",
-    "start_time": "2026-10-06T10:00:00-04:00",
-    "end_time": "2026-10-06T11:00:00-04:00",
+    "start": "2026-10-06T10:00:00-04:00",
+    "end": "2026-10-06T11:00:00-04:00",
 }
 
 

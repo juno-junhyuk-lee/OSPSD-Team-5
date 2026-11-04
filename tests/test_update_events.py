@@ -10,14 +10,14 @@ from app import google_create_events, google_update_events
 
 EVENT = {
     "title": "Original Meeting",
-    "start_time": "2026-10-06T10:00:00-04:00",
-    "end_time": "2026-10-06T11:00:00-04:00",
+    "start": "2026-10-06T10:00:00-04:00",
+    "end": "2026-10-06T11:00:00-04:00",
 }
 
 UPDATE = {
     "title": "  Updated Meeting  ",
-    "start_time": "2026-10-06T11:00:00-04:00",
-    "end_time": "2026-10-06T12:00:00-04:00",
+    "start": "2026-10-06T11:00:00-04:00",
+    "end": "2026-10-06T12:00:00-04:00",
 }
 
 
@@ -28,13 +28,13 @@ def test_update_and_retrieve_event(client: TestClient) -> None:
 
     assert response.status_code == 200
     event = response.json()
-    assert set(event) == {"id", "title", "start_time", "end_time"}
+    assert set(event) == {"id", "title", "start", "end"}
     assert event["id"] == event_id
     assert event["title"] == "Updated Meeting"
-    assert datetime.fromisoformat(event["start_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["start"]) == datetime.fromisoformat(
         "2026-10-06T11:00:00-04:00"
     )
-    assert datetime.fromisoformat(event["end_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["end"]) == datetime.fromisoformat(
         "2026-10-06T12:00:00-04:00"
     )
     assert client.get(f"/events/{event_id}").json() == event
@@ -68,7 +68,7 @@ def test_update_unknown_event_preserves_state(
     assert provider_events == before
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_preserves_state(
     client: TestClient,
     provider_events: dict[str, dict[str, object]],
@@ -94,8 +94,8 @@ def test_equal_times_preserves_state(
     before = deepcopy(provider_events)
     payload = {
         "title": "Bad Times",
-        "start_time": "2026-10-06T11:00:00-04:00",
-        "end_time": "2026-10-06T11:00:00-04:00",
+        "start": "2026-10-06T11:00:00-04:00",
+        "end": "2026-10-06T11:00:00-04:00",
     }
 
     response = client.patch(f"/events/{event_id}", json=payload)
@@ -238,15 +238,13 @@ def test_put_replaces_shared_fields_and_keeps_google_fields(
 
     assert response.status_code == 200
     event = response.json()
-    assert set(event) == {"id", "title", "start_time", "end_time"}
+    assert set(event) == {"id", "title", "start", "end"}
     assert event["id"] == "rich-event"
     assert event["title"] == "Updated Meeting"
-    assert datetime.fromisoformat(event["start_time"]) == datetime.fromisoformat(
-        UPDATE["start_time"]
+    assert datetime.fromisoformat(event["start"]) == datetime.fromisoformat(
+        UPDATE["start"]
     )
-    assert datetime.fromisoformat(event["end_time"]) == datetime.fromisoformat(
-        UPDATE["end_time"]
-    )
+    assert datetime.fromisoformat(event["end"]) == datetime.fromisoformat(UPDATE["end"])
     stored = provider_events["rich-event"]
     assert stored["description"] == "Agenda"
     assert stored["location"] == "Room 1"

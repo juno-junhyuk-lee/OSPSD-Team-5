@@ -49,7 +49,7 @@ def validation_client() -> Iterator[tuple[TestClient, Mock, Mock]]:
         "",
         '{"title": "private-title",',
         '{"title": "private-title"}',
-        '{"title":"private-title", "start_time":"private-invalid-time", "end_time":null}',
+        '{"title":"private-title", "start":"private-invalid-time", "end":null}',
     ],
 )
 def test_validation_uses_shared_errors_without_leaking_inputs(

@@ -3,13 +3,14 @@
 from pathlib import Path
 from typing import cast
 
+from calendar_contract import CreateEvent, Event
 from google.auth.exceptions import RefreshError, TransportError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
-from pydantic import AwareDatetime, BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from requests.exceptions import RequestException
 
 from app.event_creation_provider import (
@@ -17,7 +18,6 @@ from app.event_creation_provider import (
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
 )
-from app.models import CreateEventRequest, Event
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
@@ -35,7 +35,7 @@ RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceed
 
 
 class _GoogleEventTime(BaseModel):
-    dateTime: AwareDatetime
+    dateTime: str
 
 
 class _GoogleEvent(BaseModel):
@@ -81,13 +81,13 @@ def load_credentials() -> Credentials:
     return credentials
 
 
-def create_google_event(request: CreateEventRequest) -> Event:
+def create_google_event(request: CreateEvent) -> Event:
     """Insert into primary and translate the provider result to the public model."""
     credentials = load_credentials()
     body = {
-        "summary": request.title,
-        "start": {"dateTime": request.start_time.isoformat()},
-        "end": {"dateTime": request.end_time.isoformat()},
+        "summary": request.title.strip(),
+        "start": {"dateTime": request.start},
+        "end": {"dateTime": request.end},
     }
     with build("calendar", "v3", credentials=credentials) as service:
         result = (
@@ -96,25 +96,25 @@ def create_google_event(request: CreateEventRequest) -> Event:
             .execute(num_retries=0)
         )
     provider_event = _GoogleEvent.model_validate(result)
-    translated = CreateEventRequest.model_validate(
+    translated = CreateEvent.model_validate(
         {
             "title": provider_event.summary,
-            "start_time": provider_event.start.dateTime.isoformat(),
-            "end_time": provider_event.end.dateTime.isoformat(),
+            "start": provider_event.start.dateTime,
+            "end": provider_event.end.dateTime,
         }
     )
     return Event(
         id=provider_event.id,
         title=translated.title,
-        start_time=translated.start_time,
-        end_time=translated.end_time,
+        start=translated.start,
+        end=translated.end,
     )
 
 
 class GoogleEventCreator:
     """Create Google events through the service creation contract."""
 
-    def create_event(self, request: CreateEventRequest) -> Event:
+    def create_event(self, request: CreateEvent) -> Event:
         try:
             return create_google_event(request)
         except GoogleCalendarSetupError as error:

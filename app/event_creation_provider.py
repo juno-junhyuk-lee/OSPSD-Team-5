@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from app.models import CreateEventRequest, Event
+from calendar_contract import CreateEvent, Event
 
 
 class EventCreationUnavailableError(Exception):
@@ -24,8 +24,8 @@ class EventCreationUnconfirmedError(Exception):
 class EventCreator(Protocol):
     """Create timed events in the configured calendar."""
 
-    def create_event(self, request: CreateEventRequest) -> Event:
-        """Create one new event from validated, normalized input.
+    def create_event(self, request: CreateEvent) -> Event:
+        """Create one new event from validated shared input.
 
         Return the generated id, normalized title, and the supplied time instants.
         Each successful call creates a distinct event; creation is not idempotent.

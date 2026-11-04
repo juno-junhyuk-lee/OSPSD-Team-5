@@ -18,8 +18,8 @@ from app import google_create_events
 def event_payload() -> dict[str, object]:
     return {
         "title": "Team Meeting",
-        "start_time": "2026-10-05T10:00:00-04:00",
-        "end_time": "2026-10-05T11:00:00-04:00",
+        "start": "2026-10-05T10:00:00-04:00",
+        "end": "2026-10-05T11:00:00-04:00",
     }
 
 
@@ -31,16 +31,16 @@ def test_create_and_retrieve_event(
 
     assert response.status_code == 201
     event = response.json()
-    assert set(event) == {"id", "title", "start_time", "end_time"}
+    assert set(event) == {"id", "title", "start", "end"}
     assert isinstance(event["id"], str)
     assert event["id"]
     assert event["id"] != "test-event"
     assert event["id"] == "google-event-1"
     assert event["title"] == "Team Meeting"
-    assert datetime.fromisoformat(event["start_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["start"]) == datetime.fromisoformat(
         "2026-10-05T10:00:00-04:00"
     )
-    assert datetime.fromisoformat(event["end_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["end"]) == datetime.fromisoformat(
         "2026-10-05T11:00:00-04:00"
     )
     retrieved = client.get(f"/events/{event['id']}")
@@ -70,7 +70,7 @@ def test_repeated_creation_has_distinct_ids(
         assert client.get(f"/events/{event['id']}").json() == event
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_preserves_state(
     client: TestClient,
     event_payload: dict[str, object],
@@ -97,16 +97,16 @@ def test_missing_field_preserves_state(
         ("title", " \t\n "),
         ("title", None),
         ("title", 123),
-        ("start_time", "not-a-date"),
-        ("end_time", "not-a-date"),
-        ("start_time", "2026-10-05T10:00:00"),
-        ("end_time", "2026-10-05T11:00:00"),
-        ("start_time", 1791208800),
-        ("start_time", "1791208800"),
-        ("end_time", None),
-        ("end_time", "2026-10-05T10:00:00-04:00"),
-        ("end_time", "2026-10-05T09:59:59-04:00"),
-        ("end_time", "2026-10-05T15:00:00+02:00"),
+        ("start", "not-a-date"),
+        ("end", "not-a-date"),
+        ("start", "2026-10-05T10:00:00"),
+        ("end", "2026-10-05T11:00:00"),
+        ("start", 1791208800),
+        ("start", "1791208800"),
+        ("end", None),
+        ("end", "2026-10-05T10:00:00-04:00"),
+        ("end", "2026-10-05T09:59:59-04:00"),
+        ("end", "2026-10-05T15:00:00+02:00"),
     ],
 )
 def test_invalid_field_preserves_state(
@@ -132,7 +132,7 @@ def test_invalid_field_preserves_state(
 def test_time_order_compares_instants(
     client: TestClient, event_payload: dict[str, object]
 ) -> None:
-    event_payload["end_time"] = "2026-10-05T09:00:00-06:00"
+    event_payload["end"] = "2026-10-05T09:00:00-06:00"
 
     response = client.post("/events", json=event_payload)
 
