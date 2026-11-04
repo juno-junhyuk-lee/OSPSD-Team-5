@@ -2,434 +2,426 @@
 
 | Item | Value |
 | --- | --- |
-| Status | Draft; proposed implementation, not approved or integrated |
-| Author | Juno Lee, with team input pending |
+| Status | In review; adoption merged into integration branch, conformance PR open |
+| Author | Juno Lee, with team input and Niriti Pahadi's review revisions |
 | Team / vertical | Team 5 / Calendar |
 | Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
-| Last updated | November 3, 2026 |
-| Complete-design reviewer | Another Team 5 member; assignment pending |
-| Contract-facing reviewer | Representative from Team 2 or Team 7; assignment pending |
-| Shared agreement | [Calendar API joint decision memo](https://docs.google.com/document/d/1bVv6tLLtfGKt75HH1OPBTuJ3d1kkMdkEgzz9ef3UcOI/edit), version 4, October 28, 2026; staff access needs verification |
-| Shared Python / HTTP contract revision | [calendar-contract repository](https://github.com/Airbus-A330/OSPSD-Calendar); Python proposal [#15](https://github.com/Airbus-A330/OSPSD-Calendar/pull/15), HTTP reference proposal [#11](https://github.com/Airbus-A330/OSPSD-Calendar/pull/11); adopted release tag pending |
-| Implementation work | Team 5 design [#40](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/40); shared interface/conformance [issue #2](https://github.com/Airbus-A330/OSPSD-Calendar/issues/2), suite [#14](https://github.com/Airbus-A330/OSPSD-Calendar/pull/14), interface draft [#15](https://github.com/Airbus-A330/OSPSD-Calendar/pull/15); Team 5 adoption/PUT PR links pending |
+| Last updated | November 4, 2026 |
+| Complete-design reviewer | Niriti Pahadi; [review revisions #42][design-review], final review of this revision pending |
+| Contract-facing reviewer | Team 2 or Team 7 representative; assignment and final review pending |
+| Shared agreement | [Joint decision memo][memo], version 4, October 28, 2026; staff access needs verification |
+| Shared contract revision | [calendar-contract v0.1.0-rc.1][shared-tag], commit `1c1cad7a0732ddb242a05400d8833d94e4422424`; installed distribution version `0.1.0` |
+| Python / HTTP contracts | [Python interface][python-contract] and [HTTP contract][http-contract] at the shared revision above |
+| Implementation work | [Design #40][design-pr], [local PUT #41][put-pr], [package adoption #43][adoption-pr], [conformance #44][conformance-pr] |
 | Inspected HW1 baseline | `143be358c1c6086c47035b4088d967895d7f9ebb` |
-
-This draft uses the supplied Markdown and plain-text exports of the joint
-contract. Their substantive rules match. Neither export is committed here.
-The canonical memo URL above comes from the coordination email; Kristie will confirm its
-revision and staff access. The linked
-[coordination email record](https://drive.google.com/file/d/1qE08aNXGlD3jSa44s1nrngVPM_KyZNqR/view?usp=drive_link)
-is supporting material, not the Python package specification.
-
-This document records current behavior separately from proposals. No shared
-package adoption, PUT implementation, or HW2 live verification has occurred as
-part of this documentation change.
 
 ## Context, goals, and non-goals
 
 A consumer should create, retrieve, replace, and delete a timed event against
-Teams 2, 5, and 7 using the same request shapes and outcome handling. Today,
-Team 5 uses `start_time` and `end_time`, while the joint contract uses `start`
-and `end`. A client switching to Team 5 must change its serialization. Team 5
-also lacks PUT, ignores unknown body fields, and returns 422 for malformed JSON.
-These differences prevent the common workflow from working consistently.
+Teams 2, 5, and 7 using the same request shapes and outcome handling. HW1 Team 5
+used `start_time` and `end_time`; callers moving between teams had to change
+serialization. It also ignored unknown body fields and returned 422 for
+malformed JSON. These differences could hide client mistakes or require
+service-specific error handling.
 
-The goals are to implement the four shared operations, adopt a tagged shared
-Python package, and pass the same vertical conformance suite as the other
-implementations. By November 4 before class, at least one operation must use
-that package end to end against Google Calendar. PUT is the proposed early
-operation because it closes an existing gap and exercises request models,
-provider translation, errors, and response models together.
+By November 4 before class, the team must preserve a reviewed design in its
+repository and demonstrate at least one Google-backed operation through a tagged
+shared package. PUT was selected as the early integration operation because it
+exercises replacement requests, the provider boundary, translation, and errors.
+Full required conformance and deployment remain November 11 checkpoints.
 
-Listing, all-day event support, extra editable fields, data migration, and
-runtime provider switching are outside this redesign. Existing calendar
-metadata and PATCH endpoints remain extensions. Their compatibility consequences
-must be reviewed rather than assumed away. Full shared-operation conformance
-and infrastructure delivery remain required by November 11 before class.
+The current integration branch already contains local PUT and its live evidence
+from #41. Jim's #43 merged shared-package adoption into `hw2/milestone-2`
+on November 4 at commit `b088ad9c182f4de823f728038a724fdb6b88675e`.
+Ka Pui's #44 adds shared conformance wiring on top of adoption and remains open.
+Observed runs apply to their recorded commits; adoption is integrated into
+`hw2/milestone-2`, while `main` and formal conformance integration remain separate.
 
-## Current implementation and proposed architecture
+Listing, all-day support, extra editable fields, data migration, and runtime
+provider switching are excluded from this redesign. Calendar metadata and PATCH
+remain extensions. PATCH keeps full-field replacement behavior. No local event
+mirror is introduced; Google Calendar owns persistent event state.
 
-[app/main.py](app/main.py) owns HTTP routes and maps operation failures to the
-shared local error envelope. [app/models.py](app/models.py) defines event and
-request models. Operation-specific protocols and dependency factories select
-Google adapters. Google SDK calls and field translation stay in those adapters.
-There is no local event mirror; Google Calendar owns persistent event state.
+## Architecture and request flow
 
-The proposed flow is:
+This section describes the implementation merged through
+[adoption #43][adoption-pr] into `hw2/milestone-2`. The shared package supplies `Event`, `CreateEvent`,
+`ReplaceEvent`, `CalendarService`, `CalendarError`, `ErrorCode`, and validation.
+Team 5 retains FastAPI, dependency injection, OAuth, Google SDK calls, HTTP
+translation, and logging. The package remains provider-independent.
 
 ```text
 HTTP caller
-  -> FastAPI route and shared request validation
-  -> application/provider boundary using shared Python types
-  -> Google adapter: field conversion and SDK operation
-  -> authenticated user's primary Google Calendar
-  -> shared response model or domain failure
-  -> HTTP response and one sanitized failure log when applicable
+  -> FastAPI route + shared request-model validation
+  -> injected CalendarService (GoogleCalendarService)
+  -> operation-specific Google adapter
+  -> authenticated account's primary Google Calendar
+  -> shared Event, or adapter error translated to CalendarError
+  -> HTTP response + one sanitized failure log when applicable
 ```
 
-The shared Python proposal defines `calendar_contract.service.CalendarService`
-with these synchronous methods:
+`app/calendar_service.py` implements `CalendarService` structurally by composing
+the existing four adapters, rather than duplicating their SDK code:
 
-```python
-class CalendarService(Protocol):
-    def create(self, request: CreateEvent) -> Event: ...
-    def get(self, event_id: str) -> Event: ...
-    def replace(self, event_id: str, request: ReplaceEvent) -> Event: ...
-    def delete(self, event_id: str) -> None: ...
-```
+| Shared method | Team 5 adapter |
+| --- | --- |
+| `create(CreateEvent) -> Event` | `GoogleEventCreator.create_event` |
+| `get(event_id) -> Event` | `GoogleEventReader.get_event` |
+| `replace(event_id, ReplaceEvent) -> Event` | `GoogleEventUpdater.update_event` |
+| `delete(event_id) -> None` | `GoogleEventDeleter.delete_event` |
 
-`Event`, `CreateEvent`, `ReplaceEvent`, `CalendarError`, and `ErrorCode` come
-from the shared package. [PR #15](https://github.com/Airbus-A330/OSPSD-Calendar/pull/15)
-proposes public package-root imports and documents the interface used by
-[conformance PR #14](https://github.com/Airbus-A330/OSPSD-Calendar/pull/14).
-These are review proposals, not a released or accepted Python API.
+`get_calendar_service` in `app/calendar_service_dependencies.py` receives the
+existing operation factories as FastAPI subdependencies and constructs the
+composition object. POST, event GET, PUT, and DELETE receive the shared protocol.
+PATCH delegates to `replace`. Tests can substitute the complete service or an
+operation subdependency. This composition has one concrete responsibility:
+exposing the common methods and translating existing adapter failures.
 
-Team 5 will retain FastAPI HTTP translation, dependency selection, credential
-handling, and Google SDK details. Jim and Ka Pui must agree on the concrete
-implementation of `CalendarService` and how it connects to the existing
-operation-specific adapters. Jim owns package adoption; Ka Pui owns PUT.
-Whether existing adapters satisfy the boundary directly or need a thin
-composition adapter remains pending. Local protocol names are not an agreed
-shared API.
+Adapters create and close Google clients per operation using context management.
+They translate Google fields and validate returned data before constructing the
+shared Event. SDK outcomes become operation-specific errors inside adapters;
+`GoogleCalendarService` converts those errors to `CalendarError`. The HTTP
+handler then selects the public response and emits one sanitized failure log.
+Programming errors propagate rather than being presented as known provider errors.
 
-Dependency factories currently construct lightweight adapter objects. Adapters
-create Google clients for operations and close them with context management.
-Preserve that ownership for PUT. Request validation happens before the provider
-operation. Provider responses are converted and validated inside adapters;
-known SDK failures become domain failures, then HTTP responses in the route
-and shared handlers. No additional service layer is proposed without a concrete
-responsibility that existing components cannot cover.
+Before requests, a developer runs `scripts/google_calendar_auth.py`. Routes never
+launch browser authorization. Local credential loading and refresh remain in
+`app/google_auth.py` and the existing shared write-authorization helper. Both
+setup scopes are retained. Calendar metadata keeps its existing separate reader
+and dependency injection.
 
-Local startup continues to select Google through existing dependencies. Before
-requests, a developer performs browser authorization with
-[scripts/google_calendar_auth.py](scripts/google_calendar_auth.py). Routes must
-never start interactive authorization. Deployment startup configuration and
-credential storage are a separate proposed change below.
+### Successful replacement
 
-### Successful PUT trace
+FastAPI validates a `ReplaceEvent` containing all of `title/start/end` and rejects
+unknown fields before a provider operation. The route calls `service.replace`.
+`GoogleEventUpdater` reads the event to detect missing/cancelled state, then
+patches `summary`, `start`, and `end`. It checks the returned ID and converts
+Google's result to Event. The route returns 200 with that same ID. The patch
+preserves unrelated Google fields, including description.
 
-FastAPI validates required `title`, `start`, and `end`, rejects unknown fields,
-and checks ordering by instant. The injected replacement implementation receives
-the shared input type. The proposed Google path checks that the event exists,
-then patches all three shared editable fields, preserving unrelated fields.
-It translates Google's result into `id`, `title`, `start`, and `end` and returns
-200. Tests must verify that the returned ID is unchanged.
+### Expected failure
 
-### Expected failure trace
+If the patch is sent but its response is lost, the updater raises
+`EventUpdateUnconfirmedError`. The service converts it to `CalendarError` with
+`PROVIDER_ERROR` and `retryable=False`; the HTTP handler returns 502 and logs one
+sanitized entry. Neither layer retries the uncertain write. The response does
+not establish whether Google changed the event.
 
-If the patch response is lost after Google may have accepted the write, the
-adapter raises an unconfirmed-write domain failure. The HTTP boundary returns
-502 `provider_error` with `retryable: false`; the shared handler emits one
-sanitized log. The service does not retry or fall back to local state. A 502
-does not establish whether the event changed.
+## API, data model, and compatibility
 
-## API and data model
+The linked memo and versioned Python/HTTP contracts define the shared agreement.
+This section records Team 5's migration choices rather than duplicating that
+agreement. The integration branch inherited #43's former `v0.1.0` source pin.
+Jim must update the source pin and lock metadata to the published
+`v0.1.0-rc.1` tag before final submission.
+Both names have referred to commit `1c1cad7`; the current published tag is the
+reproducible reference. The distribution's internal version remains `0.1.0`.
 
-The authoritative shared rules are in the linked joint memo. The Python
-interface is proposed in shared PR #15 and the HTTP reference in shared PR #11.
-Record their accepted revision and the exact adopted package tag before
-claiming reproducible integration.
+| Operation | Success | Adoption behavior |
+| --- | --- | --- |
+| POST `/events` | 201 + Event | `CreateEvent`; Google assigns the opaque ID |
+| GET `/events/{event_id}` | 200 + Event | Shared response fields; empty title allowed for untitled provider events |
+| PUT `/events/{event_id}` | 200 + Event | `ReplaceEvent`; same ID, complete replacement of shared editable fields |
+| DELETE `/events/{event_id}` | 204, no body | Missing or repeated deletion returns 404 |
+| PATCH `/events/{event_id}` (extension) | 200 + Event | Same shared fields and full-field replacement path as PUT |
 
-| Operation | Shared route | Success | Team 5 change |
-| --- | --- | --- | --- |
-| Create | `POST /events` | 201 with event | Adopt shared names and validation |
-| Read | `GET /events/{event_id}` | 200 with event | Adopt shared response names |
-| Replace | `PUT /events/{event_id}` | 200 with event | Add route and shared-boundary implementation |
-| Delete | `DELETE /events/{event_id}` | 204, empty body | Verify existing behavior against common checks |
+Requests and Event responses use string `start` and `end`. Legacy
+`start_time/end_time` inputs are rejected with 422, including when canonical
+fields are also supplied. Unknown fields are rejected. There are no temporary
+aliases. Existing clients, tests, tutorial examples, and scripts must migrate
+together. Calendar metadata retains `id/title/time_zone`.
 
-The shared event contains a provider-generated string `id`, string `title`, and
-RFC 3339 `start` and `end` timestamps. IDs identify events in the configured
-primary calendar; callers must not assume an ID identifies an event in another
-account. Team 5 currently validates IDs with a bounded character pattern in
-`app/main.py`; its compatibility with the shared Python contract needs review.
+POST, PUT, and PATCH require non-null string `title/start/end`. The shared models
+check RFC 3339 timestamps, explicit offsets, and `end > start` by instant. Team 5
+passes timestamp strings without deliberately truncating fractions; provider
+precision and equivalent output offsets can differ. Whole-second timestamps are
+the portable consumer choice. Accepted memo rule 14 requires ordering validation
+after truncation if an implementation truncates. Team 2's October 28 acceptance
+resolved the old approval question.
 
-POST and PUT require all three editable fields, reject nulls and unknown fields,
-and require an explicit timestamp offset and an end strictly after the start.
-PUT replaces shared fields, never the ID. Team 5 will preserve non-shared
-Google fields. Titles remain trimmed on writes, with no new application maximum
-proposed. Reads of untitled provider events continue returning an empty title.
+Write titles must be nonblank after trimming. The package preserves submitted
+text, while Team 5 trims before writing to Google. Reads of untitled provider
+events return an empty title. No new application title-length maximum is added.
 
-Team 5 does not promise preservation of timestamp formatting or request offsets;
-responses follow provider-returned instants. Under accepted rule 14,
-implementations may drop sub-seconds; if they do,
-they must validate `end > start` after truncation. Whole-second inputs are the
-portable choice. The October 28 coordination email records Team 2 accepting
-this clarification; the old pending-approval question is resolved. Team 5
-still needs to document its concrete precision policy. Numeric timestamps
-and offset-free values must fail before a provider call. Existing
-ISO 8601 validation must be checked against the narrower RFC 3339 agreement.
+IDs identify events in the configured primary calendar, not globally across
+accounts. The shared model treats them as opaque. Team 5 retains HTTP ID
+validation of 1-1024 letters, digits, underscores, or hyphens. Whether that
+restriction is portable under the shared contract remains a contract-review
+question; do not add that Google-oriented restriction to the shared model.
 
-Illustrative request and expected response, not observed HW2 evidence:
+Illustrative expected request/response, not an observed event:
 
 ```http
 PUT /events/example-provider-id
 Content-Type: application/json
 
-{"title":"Design review","start":"2026-11-03T15:00:00Z","end":"2026-11-03T15:30:00Z"}
+{"title":"Design review","start":"2026-11-04T15:00:00Z","end":"2026-11-04T15:30:00Z"}
 ```
 
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
 
-{"id":"example-provider-id","title":"Design review","start":"2026-11-03T15:00:00Z","end":"2026-11-03T15:30:00Z"}
+{"id":"example-provider-id","title":"Design review","start":"2026-11-04T15:00:00Z","end":"2026-11-04T15:30:00Z"}
 ```
 
-The shared model omits Google fields such as description, attendees, recurrence,
-and location. This narrows the public representation without requiring those
-provider fields to be deleted. All-day events and unsupported provider shapes
-need explicit Team 5 failure semantics consistent with the shared agreement;
-the current GET policy is documented in [README.md](README.md).
+The shared representation omits description, location, attendees, recurrence,
+and other Google fields without requiring those fields to be deleted. All-day
+and unsupported provider shapes remain outside the timed-event model. The
+adoption code maps unsupported reads to `INVALID_INPUT`; explicit all-day and
+recurring-series replacement policy still needs owner and contract-facing review.
+[Observed verification][adoption-evidence] records actual sanitized results and
+reproduction steps for the adopted shared commit.
 
 ## Alternatives and tradeoffs
 
-**Proposed PUT implementation: reuse the existing Google patch mechanism.**
-[app/google_update_events.py](app/google_update_events.py) already performs an
-existence read followed by a patch of title and both times. Requiring all shared
-fields at the HTTP boundary gives replacement semantics for those fields while
-preserving unrelated Google state. Reusing the mechanism reduces duplicated
-SDK and cleanup paths, but shared failure classification must still be reviewed.
+**Reuse Google's patch operation for common-field replacement.** Requiring every
+shared editable field at the HTTP boundary supplies full common-model
+replacement while retaining non-shared Google state. Reusing the updater avoids
+a second SDK/authentication path. Controlled tests inspect its payload, and the
+live workflow independently checks that description survives replacement.
 
-The alternative is Google's full update operation. That would require obtaining
-and preserving unrelated fields or accepting their removal, which contradicts
-Team 5's stated preservation commitment. Before accepting this choice, verify
-preservation with controlled adapter tests and a live event containing a
-non-shared field. Revisit it if the shared contract requires whole-provider
-replacement or a tested Google behavior prevents the guarantee. No atomic
-read-and-write or concurrent-edit guarantee is proposed.
+Google's full update operation is the alternative. It would require copying
+unrelated fields or accepting their removal, conflicting with Team 5's
+preservation choice. Revisit patching if the common contract requires replacing
+provider extensions or provider evidence contradicts preservation. There is no
+atomic read/write or concurrent-edit guarantee.
 
-**Proposed migration: shared models at the common API boundary.** Maintaining
-separate local and shared models would reduce immediate edits but require
-ongoing conversion and risk validation drift. Adopting the shared types more
-directly changes more tests now but makes conformance easier to inspect. The
-final choice depends on the actual package API. Do not duplicate validation
-merely to preserve existing class names.
+**Use shared models directly and compose existing adapters.** Separate local
+models would reduce initial edits but introduce ongoing conversions and risk
+validation drift. Direct adoption changes more callers now, while a small
+composition object retains operation ownership and existing provider tests.
+Revisit this choice if a required extension cannot be represented without
+breaking the shared boundary.
 
-For old field names, a direct rename gives one unambiguous public shape but
-breaks existing callers. Temporary aliases or a versioned compatibility route
-could reduce that disruption but add ambiguity and tests. Jim must propose
-a policy for team and contract-facing review before implementation; this draft
-does not approve accepting old names alongside unknown-field rejection.
+**Reject legacy field names.** Aliases or versioned compatibility routes would
+reduce immediate client disruption but add ambiguous mixed-name cases and more
+validation paths. A direct rename makes unknown-field rejection predictable;
+its cost is a documented client migration. Revisit compatibility support only
+with a concrete consumer requirement and cross-team review.
 
-## Failure behavior and operational concerns
+## Failures and operational concerns
 
-| Outcome | Public response | Retry policy |
+Request construction can raise Pydantic `ValidationError` before a service call.
+FastAPI request validation renders invalid client input in the common envelope;
+manually constructed models need equivalent handling at their HTTP boundary.
+Known operation failures instead cross the service boundary as `CalendarError`.
+
+| Outcome | HTTP/code | Retry advice |
 | --- | --- | --- |
-| Malformed JSON | 400 `invalid_input` | False; fix the request |
-| Invalid valid-JSON body or parameter | 422 `invalid_input` | False; fix the request |
-| Missing event, including repeated DELETE | 404 `not_found` | False |
-| Provider identity lacks permission | 403 `access_denied` | False; fix permissions |
+| Malformed or empty JSON | 400 `invalid_input` | False; correct input |
+| Invalid valid-JSON input or HTTP ID | 422 `invalid_input` | False |
+| Missing/cancelled/deleted event | 404 `not_found` | False |
+| Confirmed permission denial | 403 `access_denied` | False |
+| Missing/unusable OAuth or rejected authorization | 503 `provider_unavailable` | False; repair setup |
+| Temporary pre-write failure or explicit rate-limit rejection | 503 `provider_unavailable` | True; wait before caller retry |
 | Invalid provider response or uncertain POST/PUT | 502 `provider_error` | False for uncertain writes |
-| Temporary provider unavailability | 503 `provider_unavailable` | Operation-specific; meaningful `Retry-After` when known |
-| Missing or unusable local authorization | Existing 503 `provider_unavailable` | False; repair setup |
+| Unconfirmed DELETE | 502 `provider_error` | True; a completed deletion is subsequently 404 |
 
-Errors use `{"error":{"code":"...","message":"...","retryable":false}}`.
-The Boolean is selected for the actual outcome. Constructing an invalid shared
-Pydantic request model raises `ValidationError` before a service operation;
-The HTTP boundary must map invalid client input to the shared validation
-response, including FastAPI request-validation failures. If integration
-constructs a request model manually, it must handle that validation path too. Operation-level failures instead use shared
-`CalendarError` and `ErrorCode`. Team 5 must translate its existing
-operation-specific provider exceptions before they cross the shared interface,
-then map `CalendarError` to the public response and one sanitized log entry.
-The exact adapter and handler wiring remains a Jim/Ka Pui integration decision.
-Existing local handlers map
-`invalid_input` only to 422, so malformed-JSON handling requires an explicit
-change. Existing update classification also needs examination so confirmed
-temporary failures and uncertain writes are not conflated. Only confirmed-safe
-retry advice is allowed; automatic uncertain writes remain disabled.
+A PUT existence-read failure occurs before a write and can safely be classified
+as temporary unavailability. A transport failure after sending POST/PUT preserves
+write uncertainty. Automatic uncertain writes remain disabled. No meaningful
+retry delay is currently known; do not invent `Retry-After`. Supply it if a
+meaningful wait becomes available.
 
-Preserve the one-log policy in [app/errors.py](app/errors.py): operation, public
-code, status, and provider involvement. Never include tokens, raw bodies, event
-titles, authorization headers, or raw SDK exception text. Credential files stay
-out of Git and artifacts. Preserve both setup scopes and noninteractive token
-refresh; document where refreshed credentials are stored in deployment.
+The common error envelope is `{"error":{"code":"...","message":"...","retryable":false}}`.
+The service supplies safe messages and a Boolean provider-involvement flag.
+`app/errors.py` logs operation, code, status, and that flag once; it does not
+expose raw exception messages, request bodies, titles, tokens, or authorization
+headers. Credential files stay outside Git and evidence. Deployment must define
+secret injection, refresh-token persistence, and write permissions separately.
 
-For proposed PUT, normal local work parses and serializes a bounded number of
-fields, with work proportional to their encoded size. It performs one existence
-read and one patch, plus possible authorization refresh calls. It does not scan
-the calendar. Network latency is not evidence of Google's internal complexity.
-Tests must detect extra writes or retries. Every live test must delete data it
-creates, recording cleanup failures rather than silently leaving events behind.
+PUT's local work is proportional to the encoded field sizes. Its normal provider
+path performs one existence read and one patch, with possible credential refresh.
+It does not scan the calendar; network timing does not establish Google's
+internal complexity. Tests check that failures do not cause extra writes.
+
+Every live run owns its created data and records cleanup results. The workflow
+script keeps an obtained ID and cleans up in `finally`, attempting its remaining
+checks after failures. If creation is uncertain without an ID, inspect the
+calendar using the printed run marker before another POST. The shared live
+suite's cleanup gaps remain a separate review concern described below.
 
 ### Deployment planning for November 11
 
-Hosting, Infrastructure as Code tooling, registry, protected state storage,
-runtime secret store, deployment pipeline, and telemetry backend are undecided.
-The team must assign a deployment proposal owner; this work is not implicitly
-assigned through shared-package coordination. Account owners, expected cost,
-and teardown date must be named before acceptance of that portion of the plan.
-This is a dependency for Milestone 3, not a claim of deployed infrastructure.
+Hosting, infrastructure tooling, image registry, protected state storage, secret
+store, pipeline, and telemetry backend remain undecided. The team must assign
+a proposal owner and name account owners, expected costs, and teardown date.
+These are unresolved design dependencies, not claims of deployed infrastructure.
 
-The plan must support locked builds, startup configuration validation, separate
-readiness reporting, repeatable provisioning and teardown, automated deployment
-and rollback verification, and the required observability and operational
-documentation. A temporary provider outage should not cause restart loops.
-Review token refresh persistence and write access before choosing hosting.
-
-## Migration, ownership, and branch workflow
-
-The owners below reflect the team's claimed Milestone 2 roles. Juno is also
-helping Kristie with the initial interface draft. Each implementation owner
-must agree on a different reviewer; reviewer assignments and remaining Team 5
-implementation issue/PR links are still pending.
-
-| Member | Owns | Deliverable |
-| --- | --- | --- |
-| Kristie Lee | Shared-contract coordination and interface finalization | Coordinate memo links, interface review with Teams 2 and 7, conformance responsibilities, and readiness for Team 7's shared-package release. Initial draft supported by Juno in shared PR #15. |
-| Juno Lee | Team 5's `DESIGN.md` and initial shared-interface draft | Maintain this design and obtain complete-design and cross-team reviews; prepare shared interface documentation, exports, and typing check in shared PR #15 for Kristie's review/finalization. |
-| Jim Lo | Shared-package adoption and models | Install and lock the agreed tagged dependency; adapt shared field names, strict input validation, and agreed compatibility behavior; update affected routes, tests, examples, and configuration. |
-| Ka Pui Cheung | PUT implementation | Implement PUT through the agreed Python boundary and Google adapter, preserve non-shared fields, classify failures, and add HTTP and provider tests. |
-| Ka Pui Cheung | Conformance and real verification | Contribute shared tests, run them against Team 5, verify real PUT/read-back and cleanup through the tagged package, and record sanitized reproducible evidence. |
-
-`hw2/milestone-2` is the integration branch created from the inspected baseline.
-`doc/design.md` branches from it for this document. Other work branches should
-also target the integration branch through small reviewed PRs. Dependent work
-must state which merged change it requires. The combined milestone PR targets
-`main` after design review, passing checks, and initial provider verification.
-After merge, create the later milestone branch from the resulting `main`.
-
-Before the November 4 submission checkpoint:
-
-1. Kristie records the accepted interface, package tag, and shared review outcomes.
-2. Juno updates design PR #40 and records team and external review outcomes.
-3. Jim adopts the released package and updates common boundary models.
-4. Ka Pui implements PUT using that boundary and completes offline checks.
-5. Ka Pui records real PUT evidence at an exact commit and verifies cleanup.
-
-Open issues for each remaining change with owner, dependency, and verification
-criteria. Work not required for the initial operation remains visible and must
-finish before November 11. These checkpoint dates do not imply implementation
-or reviews are complete.
-
-If the shared contract changes incompatibly, Kristie coordinates with affected
-Teams 2, 5, and 7 and their consumers, circulates examples and migration consequences,
-and obtains review before a replacement version is published. Update the memo,
-package, tests, and this design together. Do not move an existing published tag.
+The proposal must cover locked builds, startup configuration validation,
+readiness, reproducible provisioning/teardown, deployment and rollback checks,
+and observability. A provider outage should not cause restart loops. Credential
+refresh persistence and filesystem permissions must be checked before hosting
+is accepted. Record an owner and proposal before design acceptance; implementation
+remains due at the November 11 milestone.
 
 ## Testing and verification
 
-Existing HW1 tests and [verification records](docs/WORK_PLAN.md) provide regression
-coverage, not evidence that the new package or PUT works. Keep fast controlled
-tests independent of Google credentials, network access, and live fixtures.
-
-| Guarantee | Planned check and what it establishes |
+| Guarantee | Check and what it establishes |
 | --- | --- |
-| Shared input rules | Model/HTTP tests for missing/null/unknown fields, wrong types, numeric or offset-free times, malformed JSON, and ordering; assert no provider operation on rejection. |
-| Shared success and errors | Controlled implementations injected through FastAPI; assert exact statuses, response fields, retry advice, and restored dependency overrides. |
-| Google replacement semantics | Adapter tests inspect the patch payload and unchanged ID; failure cases cover missing/cancelled events, permissions, bad responses, and an accepted write with a lost response and no retry. |
-| Sanitized failure context | HTTP log assertions verify one failure entry and absence of sensitive inputs or raw provider exceptions. |
-| Cross-service behavior | Proposed `calendar_contract.conformance.CalendarServiceConformance` in shared PR #14 runs the same service-operation checks using an implementation-supplied `service` fixture; Team 5 fixture wiring and invocation are pending. |
-| Real shared-package path | Live HTTP PUT, read-back, independent Google confirmation, non-shared-field preservation, and cleanup at a recorded commit. |
+| Shared validation and migration | `test_shared_model_migration.py` and HTTP validation tests: required/unknown/legacy fields, malformed JSON, ordering, and no provider operation on rejection |
+| Shared interface and DI | `test_calendar_service.py` and `test_shared_calendar_http.py`: composition, service substitution, statuses/errors, and restored overrides |
+| Google translation and write phases | Adapter tests and `test_shared_provider_failures.py`: controlled SDK outcomes, unchanged replacement ID, before/after-write classification, no retry |
+| Sanitized logs | Controlled HTTP log assertions: one failure entry without sensitive payloads |
+| Same vertical suite | #44's `test_shared_conformance.py`: tagged `CalendarServiceConformance` against Team 5's implementation |
+| Real persistence and extension preservation | Workflow script and recorded live conformance: actual Google reads/writes, description preservation, cleanup |
 
-At the Python boundary, each team subclasses `CalendarServiceConformance` in
-its own test module and supplies a fresh `service` fixture returning its
-`CalendarService` implementation. Ka Pui will connect Team 5's implementation
-to controlled provider state so this suite runs offline. The fixture may vary
-by team; the shared operation logic must remain unchanged. Its Team 5 test-file
-location and exact invocation must be recorded before integration is accepted.
+In #44, the offline `service` fixture constructs `GoogleCalendarService` using
+real adapters backed by the isolated fake Google client. `failing_service`
+receives `ProviderFailure` and builds the real composition object with adapters
+raising controlled Team 5 errors. The suite therefore checks shared error
+translation; Google-to-adapter classification is covered separately by offline
+provider tests. Failure hooks remain in tests, not the production protocol.
 
-These Python checks do not establish HTTP statuses, malformed-JSON handling,
-Google translation, or live persistence. Keep separate controlled HTTP tests,
-Google adapter tests, and real provider verification. A run against the shared
-suite's in-memory reference service validates the suite, not Team 5's adapter.
+Adoption #43 is integrated. After #44 is integrated, run the shared suite
+offline with:
 
-The common HTTP consumer workflow is POST, GET, PUT, GET, DELETE, then GET
-expecting 404; repeated DELETE also expects 404. Only base URL and
-implementation-specific setup may change between services. Compare timestamp
-instants rather than string formatting. Use whole-second timestamps for portable cases.
+```sh
+uv run pytest tests/test_shared_conformance.py -v -k 'not Live'
+```
 
-Shared fixtures should create uniquely identifiable disposable events, keep
-their IDs, and clean up in `finally`, treating a confirmed 404 as already gone.
-For uncertain creation without an ID, automatic cleanup through the core alone
-is insufficient; avoid blind creation retries and record manual provider
-inspection obligations. Controlled tests, rather than deliberately ambiguous
-live writes, should exercise that failure mode.
+An explicit live run uses real Google adapters for success/not-found behavior:
 
-A failing missing-field or unknown-field test reveals validation drift; a PUT
-read-back mismatch reveals incomplete replacement; repeated DELETE returning
-204 reveals missing-event policy drift. Preservation of non-shared fields is a
-Team 5-specific check because the joint agreement permits team differences.
+```sh
+CALENDAR_LIVE_CONFORMANCE=1 uv run pytest tests/test_shared_conformance.py -v -k Live
+```
 
-Ka Pui will add sanitized observed requests/responses, exact commit and package
-tag, commands, environment prerequisites, and cleanup results to a linked HW2
-verification record. Existing HW1 live evidence cannot substitute for this run.
+Its failure groups still use controlled adapters, and invalid-input cases test
+request models. They do not induce real Google failures. This distinction also
+applies to the recorded 24-test live run. Passing Python conformance alone does
+not prove HTTP serialization, statuses, malformed-JSON handling, or deployment.
 
-Implementation PRs use Python 3.14 and the README commands: `uv sync --frozen`,
-`uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`,
-`uv run pytest -v`, and `git diff --check`. Add the shared controlled checks to
-CI once their invocation is agreed. Passing unit tests alone does not establish
-live provider or cross-service compatibility.
+The consumer workflow remains POST, GET, PUT, GET, DELETE, GET expecting 404,
+then repeated DELETE expecting 404. Only base URL and setup vary between
+services. Compare instants rather than timestamp strings. An ignored start
+update must be caught with a replacement start representing a different instant;
+the tagged suite currently has a gap here, so retain Team 5's separate
+replacement checks.
 
-### Shared-package progress and release dependencies
+The tagged suite also does not register `missing_id` fallback cleanup and stops
+cleanup after its first unexpected deletion failure. Ka Pui owns a local fixture
+override or corrected shared release before final live-suite approval. Track IDs
+immediately, attempt every cleanup, and test both failure paths offline. A prior
+successful live run does not establish cleanup behavior during failures.
 
-As of November 3, shared PR #15 contains the initial interface documentation,
-exports, and a structural typing check; shared PR #14 contains the proposed
-reusable suite. Neither establishes Team 5 integration or full conformance.
+### Observed evidence and limits
 
-- Team 2 completed strict write-model handling in
-  [PR #12](https://github.com/Airbus-A330/OSPSD-Calendar/pull/12), merged into
-  `team2-models-errors`. [Timestamp validation #5](https://github.com/Airbus-A330/OSPSD-Calendar/issues/5)
-  and [Event/read-model #7](https://github.com/Airbus-A330/OSPSD-Calendar/issues/7)
-  remain open. Timestamp helpers still accept invalid strings; passing current
-  model tests does not establish the full timestamp contract.
-- Team 7's [PR #13](https://github.com/Airbus-A330/OSPSD-Calendar/pull/13)
-  proposes Python 3.12-3.14 compatibility, needed by Team 5's Python 3.14 setup.
-  [PR #11](https://github.com/Airbus-A330/OSPSD-Calendar/pull/11) proposes HTTP
-  documentation, release guidance, and the `py.typed` marker needed by external
-  strict-mypy consumers. Combined integration must preserve Pydantic and the
-  widened Python requirement, regenerate the lockfile, and rerun checks.
-- PR #14's replacement start currently represents the original instant, so a
-  service that ignores start changes can pass. Its `missing_id` fixture does
-  not register fallback cleanup, and cleanup stops on the first unexpected
-  deletion failure. Ka Pui owns the conformance follow-up: change the start
-  instant, track every created ID, attempt all cleanup, and test those paths
-  before relying on the suite for replacement/cleanup guarantees.
-- Provider permission, availability, unexpected-response, and uncertain-write
-  conformance checks remain deferred. Kristie and Ka Pui must agree on
-  controlled failure hooks without adding test-control methods to the public
-  protocol; record the approach by November 4 and complete required conformance
-  by November 11. HTTP validation remains separately exercised.
-- No adopted shared tag is recorded. Kristie coordinates readiness with Teams
-  2 and 7; Jim installs and locks the reviewed tag after publication. Open PRs
-  and development branches do not substitute for that milestone requirement.
+- [Local PUT evidence][put-evidence] from #41 uses HW1 field names and establishes
+  local PUT before adoption; it is not shared-package evidence.
+- [Adoption evidence][adoption-evidence] records Jim's November 4 real Google
+  workflow at clean service commit `327e8bc`, using shared commit `1c1cad7`.
+  POST/GET/PUT/GET, independent Google checks, description preservation, and
+  DELETE/404 checks passed. Requests use TestClient in-process HTTP through
+  normal dependencies; the run does not establish a Uvicorn listener, restart,
+  or deployment. Its original tag label requires clarification to the currently
+  published `v0.1.0-rc.1` without rewriting historical observations.
+- [Conformance evidence][conformance-evidence] records Ka Pui's November 4 run
+  at adoption base `aa11f9c` plus the conformance test content committed in #44:
+  24 passed, exit 0, followed by a Google search reporting no remaining test
+  events. It identifies controlled failure cases separately from real Google.
+- Independent review of `aa11f9c` passed 433 offline tests; review of #44 at
+  `86fd81e` passed 457 with 24 live tests skipped, plus lint, formatting, and
+  strict typing. These counts belong to those revisions, not every later head.
+  Adoption head `6d1611f` also has [passing CI][adoption-ci] and was merged via
+  #43 at `b088ad9`. The earlier live run remains tied to `327e8bc`; it is not
+  relabeled as a new run at the merge commit.
 
-## Open questions and review record
+Before final integration, repeat the README checks at the selected commit:
 
-| Question or concern | Consequence | Proposed owner | Resolution checkpoint |
-| --- | --- | --- | --- |
-| Accepted shared API revision and tag; repo/proposals now linked | Adoption cannot be implemented reproducibly without a reviewed tag | Kristie with Teams 2/7; Jim for adoption | Before November 4 integration |
-| Team 5 service fixture, suite invocation, and deferred failure hooks | Shared suite cannot yet establish Team 5 conformance | Kristie and Ka Pui | Record strategy by November 4; full conformance by November 11 |
-| Team 5 precision policy under accepted rule 14 | Truncation could collapse an otherwise positive interval | Jim and Ka Pui | Before model/PUT behavior is accepted |
-| Old field names and PATCH compatibility | Existing callers and extension tests may break | Jim Lo | Before model changes are approved |
-| Unsupported all-day/recurring cases and ID syntax | Implementations may disagree on public outcomes | Ka Pui with Kristie | Before PUT behavior is accepted |
-| Partial failure and temporary-outage classification | Unsafe retry advice or inconsistent public errors | Ka Pui Cheung | Before PUT review completes |
-| Hosting, credentials, state, costs, and teardown | Deployment may not be reproducible or suitable for token refresh | Deployment proposal/account owners pending; team to assign | Proposal reviewed by November 4; implemented by November 11 |
-| Team 5 implementation issue links and named reviewers | Claimed owners are recorded, but review and execution remain untracked | Juno and team | Before implementation review and November 4 submission |
+```sh
+uv sync --frozen
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run mypy scripts/verify_put_live.py
+uv run pytest -v
+git diff --check
+```
 
-No design approvals or resolved reviewer comments are recorded yet. A different
-Team 5 member must review the complete design, and Team 2 or Team 7 must review
-contract-facing behavior. Record links, substantive concerns, responses, accepted
-risks, and the scope of approval here. Required behaviors cannot be deferred
-beyond their milestone. The shared package and conformance placeholders are
-assignment requirements, not optional additions.
+Match CI and recorded evidence to the submitted revisions. Initial installation
+needs network access; fast controlled tests require neither network nor Google
+credentials. Historical HW1 results cannot substitute for HW2 checks.
+
+## Ownership, coordination, and checkpoints
+
+| Owner | Output | Dependency and checkpoint |
+| --- | --- | --- |
+| Juno Lee | This design and initial shared-interface contribution | Consolidate #42 into #40, resolve feedback, obtain reviews before November 4 submission |
+| Niriti Pahadi | Complete-design review and verification support | Review the consolidated revision and record concerns/outcomes; help reproduce adoption as needed |
+| Kristie Lee | Shared-contract and contract-facing coordination | Record accepted revision, cross-team review, and release references before submission |
+| Jim Lo | #43 adoption merged; migration, models/errors, examples | Follow up on the inherited tag pin/lock/current references before final submission |
+| Ka Pui Cheung | #41 PUT, #44 conformance and real verification | Resolve live cleanup concern; update #44 on the reviewed #43 base and verify before integration |
+| Team assignment pending | Deployment proposal, account/cost/teardown owners | Name owner and proposal before design acceptance; deliver infrastructure by November 11 |
+
+`hw2/milestone-2` is the integration branch. This document stays on
+`doc/design.md` in #40; Niriti's #42 revisions are consolidated here to avoid
+parallel final documents. #43 merged into the integration branch. #44 still
+targets the adoption branch and should now be updated/retargeted to
+`hw2/milestone-2`, checking that its diff contains only the conformance changes.
+The combined milestone PR targets `main` after review, passing checks, and
+recorded tagged-provider evidence. No merge approval is implied by this plan.
+
+If a common contract change is incompatible, Kristie coordinates Teams 2, 5,
+and 7 and their consumers before publication. Explain changed requests/outcomes,
+update memo, package, tests, and service migration together, and obtain affected
+team review. Publish a new tag rather than moving an existing published tag.
+
+## Review record and unresolved decisions
+
+| Concern | Disposition / next step | Owner / checkpoint |
+| --- | --- | --- |
+| Stale progress and missing local PUT | Incorporated Niriti's #42 corrections and #41 evidence; shared release, merged #43, and open #44 distinguished | Juno; this revision |
+| Concrete CalendarService/error boundary | Documented #43's composition, DI, and adapter-to-CalendarError translation | Jim/Ka Pui; confirm during implementation/design review |
+| Old names and PATCH behavior | Documented #43's rejection of legacy names and full-field PATCH with `start/end` | Jim; review with affected callers before integration |
+| Shared tag pin | Published tag is `v0.1.0-rc.1`; merged #43 still declares removed `v0.1.0` | Jim; fix source/lock/current references before final submission |
+| Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; review #44 before integration |
+| Replacement-start and live cleanup gaps | Keep separate start-change tests; fix cleanup fixtures locally or via a new shared release | Ka Pui; before relying on those guarantees/live-suite approval |
+| HTTP ID restriction and unsupported event shapes | Confirm contract portability and all-day/series replacement behavior; document outcomes | Jim/Ka Pui with Kristie; before final acceptance |
+| Hosting and credential persistence | Owner/platform/tooling/cost decisions remain open | Team to assign; proposal before acceptance, implementation November 11 |
+| Final complete-design and contract-facing reviews | Review the consolidated revision, link substantive comments/resolutions and scope of approval | Niriti and Team 2/7 reviewer; before submission |
+
+Niriti's #42 provides review revisions; it does not approve this later revision.
+Kristie's feedback supplied in team coordination requested fresh progress notes,
+concrete architecture/error conversion, compatibility policy, suite execution,
+and final revision/evidence links. This document now incorporates the known code
+and evidence for those items; final review and unresolved dispositions remain
+explicit. Kristie's coordination feedback is not a substitute for the required
+outside-team review. No final design approval is claimed.
 
 ## Submission and change record
 
-For November 4, submit one Brightspace entry with team name, Calendar vertical,
-all members, `DESIGN.md` at the reviewed commit, and relevant PR links. Include
-links to package adoption and real-operation evidence and owned remaining-work
-issues. Check staff access to each linked artifact. A reviewed design is not
-proof of a working implementation.
+Before submission, record the final reviewed design commit, package tag and
+commit, integrated service revision, matching CI, implementation PRs, provider
+evidence, reviewer outcomes, and owned remaining-work issues. Verify staff can
+access every artifact and submit the team/vertical/member details required by
+the assignment. A reviewed plan and a successful provider run are separate
+requirements.
 
-- November 2, 2026: initial draft based on the supplied joint agreement and
-  inspected HW1 code. Shared-package details, ownership, reviews, deployment
-  choices, and HW2 verification remain open.
-- November 3, 2026: linked the shared repo and open contract/packaging PRs;
-  recorded claimed owners, the proposed `CalendarService`, validation/error
-  boundaries, and conformance integration strategy. Resolved the stale rule 14
-  approval question using the October 28 email. Recorded unfinished validation,
-  packaging, suite coverage, cleanup, and release dependencies; concrete wiring,
-  compatibility, hosting, reviewer assignments, and live evidence remain pending.
-- Codex assisted with drafting and repository inspection. Students must verify
-  technical claims and own the decisions and submitted work.
+- November 2: initial design proposal against the inspected HW1 baseline.
+- November 3: added shared links, claimed owners, interface proposal, validation
+  boundaries, and conformance strategy; resolved stale rule 14 approval note.
+- November 3: Niriti's #42 recorded local PUT/#41 evidence and began the complete
+  design review; those revisions are incorporated in this document.
+- November 4: consolidated #42 into #40's document, linked the released contract,
+  described #43/#44 implementation choices and observed evidence, and replaced
+  stale progress notes with current review dependencies. Adoption merged via
+  #43 at `b088ad9`; #44 integration, final reviews, and hosting decisions remain
+  pending. The merged source pin still needs the published tag correction.
+- Codex assisted with drafting, repository inspection, and review checks.
+  Students must understand, verify, and own their submitted work.
+
+[memo]: https://docs.google.com/document/d/1bVv6tLLtfGKt75HH1OPBTuJ3d1kkMdkEgzz9ef3UcOI/edit
+[shared-tag]: https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1
+[python-contract]: https://github.com/Airbus-A330/OSPSD-Calendar/blob/1c1cad7a0732ddb242a05400d8833d94e4422424/docs/PYTHON_INTERFACE.md
+[http-contract]: https://github.com/Airbus-A330/OSPSD-Calendar/blob/1c1cad7a0732ddb242a05400d8833d94e4422424/docs/HTTP_CONTRACT.md
+[design-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/40
+[design-review]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/42
+[put-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41
+[adoption-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/43
+[conformance-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/44
+[put-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/e52d656/docs/PUT_LIVE_VERIFICATION.md
+[adoption-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/aa11f9ccbd75dd66fd280aa22a06186a29a47564/docs/SHARED_CONTRACT_VERIFICATION.md
+[conformance-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/86fd81e250543610d7a51bbe7197a95236b5b08b/docs/SHARED_CONTRACT_VERIFICATION.md
+
+[adoption-ci]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/41897518692
