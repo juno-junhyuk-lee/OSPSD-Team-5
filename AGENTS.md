@@ -2,7 +2,7 @@
 
 ## Code and setup
 
-HW2 uses calendar-contract tag `v0.1.0`, commit
+HW2 uses calendar-contract tag `v0.1.0-rc.1`, commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424`. Import shared Event, CreateEvent,
 ReplaceEvent, CalendarService, CalendarError, and ErrorCode from that package.
 Use start/end string fields; reject legacy start_time/end_time and unknown
@@ -17,6 +17,8 @@ HW1 field-name and per-route error wiring descriptions in historical evidence.
 - `tests/test_calendar_service.py` and `tests/test_shared_calendar_http.py`:
   direct shared-boundary checks and whole-service HTTP substitution.
 - `tests/test_shared_provider_failures.py`: controlled adapter failure phases.
+- `tests/test_event_shape_policy.py`: offline HTTP ID checks, pre-write rejection
+  of all-day/series replacements, and timed-instance preservation.
 - `tests/test_shared_conformance.py`: the shared `CalendarServiceConformance`
   suite against `GoogleCalendarService`, offline on the fake Google client;
   `CALENDAR_LIVE_CONFORMANCE=1` also runs it against real Google.

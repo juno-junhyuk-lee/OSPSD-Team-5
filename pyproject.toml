@@ -64,7 +64,7 @@ dev = []
 package = false
 
 [tool.uv.sources]
-calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar", tag = "v0.1.0" }
+calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar", tag = "v0.1.0-rc.1" }
 
 [tool.ruff]
 target-version = "py314"

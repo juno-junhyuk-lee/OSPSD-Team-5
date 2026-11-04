@@ -33,6 +33,10 @@ class EventUpdateProviderError(Exception):
     """The provider returned an unexpected update response."""
 
 
+class EventUpdateUnsupportedError(Exception):
+    """Replacing this event shape is unsupported; no write occurred."""
+
+
 class EventUpdater(Protocol):
     """Update timed events in the configured calendar."""
 
@@ -42,6 +46,7 @@ class EventUpdater(Protocol):
         Return the same id with the refreshed title and start/end instants.
         Raise EventUpdateNotFoundError when the event is absent or cancelled,
         EventUpdateDeniedError when the provider refuses access,
+        EventUpdateUnsupportedError before writing an all-day event or series,
         EventUpdateUnavailableError if authorization is unusable or rejected
         (provider flag records remote authorization involvement), or
         EventUpdateUnconfirmedError when the result is uncertain.

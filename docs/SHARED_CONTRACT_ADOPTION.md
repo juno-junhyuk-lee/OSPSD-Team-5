@@ -2,9 +2,9 @@
 
 ## Scope and status
 
-Team 5 uses `calendar-contract` tag `v0.1.0`, pointing to commit
+Team 5 uses `calendar-contract` tag `v0.1.0-rc.1`, pointing to commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424` in
-[OSPSD-Calendar](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0).
+[OSPSD-Calendar](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1).
 The package supplies provider-independent models, validation, errors, the
 four-operation interface, and reusable conformance tests. Google SDK, OAuth,
 FastAPI, and configuration remain in this repository.
@@ -35,7 +35,7 @@ git status --short
 ```
 
 The installed package version must be `0.1.0`. `pyproject.toml` selects tag
-`v0.1.0`, and `uv.lock` pins the commit above. Initial installation needs network
+`v0.1.0-rc.1`, and `uv.lock` pins the commit above. Initial installation needs network
 access; the fast test suite does not. Do not replace the tag with a moving branch
 or run a dependency update merely to reproduce this revision.
 
@@ -136,14 +136,19 @@ Google adapters on the offline fake Google client from `tests/conftest.py`.
 Its `failing_service` fixture receives a `ProviderFailure` and wires
 `GoogleCalendarService` to adapters raising Team 5's matching operation errors,
 so the suite checks the translation to shared `CalendarError` codes. Keep
-failure hooks in tests, not in the production protocol. To run the success
-cases against the real primary calendar (each test deletes what it creates):
+failure hooks in tests, not in the production protocol.
+
+To run the live test class against the real primary calendar:
 
 ```sh
-CALENDAR_LIVE_CONFORMANCE=1 uv run pytest tests/test_shared_conformance.py -v
+CALENDAR_LIVE_CONFORMANCE=1 uv run pytest tests/test_shared_conformance.py -v -k Live
 ```
 
-See the tag's [Python interface guide](https://github.com/Airbus-A330/OSPSD-Calendar/blob/v0.1.0/docs/PYTHON_INTERFACE.md).
+Success and not-found cases use real Google; provider-failure cases still use
+controlled adapters. Tests attempt cleanup of created events; the inherited
+cleanup failure paths remain a separate review concern.
+
+See the tag's [Python interface guide](https://github.com/Airbus-A330/OSPSD-Calendar/blob/v0.1.0-rc.1/docs/PYTHON_INTERFACE.md).
 Running against the package's in-memory reference service alone does not test
 Team 5's Google adapters. Offline, live, and cross-team checks remain distinct.
 
@@ -197,9 +202,31 @@ script against the reviewed adoption commit. Juno/Niriti maintain DESIGN.md,
 and Kristie coordinates interface/design review and accepted revisions.
 
 Real Google verification of the four common operations passed on November 4
-at clean commit `327e8bc`, with package `v0.1.0`. The
+at clean commit `327e8bc`, with shared commit `1c1cad7`. Its historical output
+used the former tag label `v0.1.0`; that commit is now published as
+`v0.1.0-rc.1`. The
 [verification record](SHARED_CONTRACT_VERIFICATION.md) contains environment,
 provenance, exact commands, sanitized output, exit status, and cleanup results.
 Formal shared conformance wiring, another teammate's reproduction, and adoption
 PR/CI approval remain open. Future runs must record their own revisions and
 observed results; HW1 evidence does not establish this shared-package path.
+
+## Local event-shape policy
+
+Team 5 retains the HTTP ID policy: 1-1024 letters, digits, underscores, or
+hyphens, forwarded unchanged. The shared package keeps IDs opaque. Tests cover
+ordinary and recurring-instance IDs and invalid character/length rejection
+before provider calls. Recurrence is determined from Google metadata, not IDs.
+
+GET retains 422 `invalid_input` for all-day events; timed series/instances can
+be read through the four-field representation. PUT/PATCH read the target first
+and reject all-day events and recurring-series parents with 400 `invalid_input`
+and `retryable=false`, without patching. Individual timed instances are allowed;
+only summary/start/end are patched, leaving series metadata and unrelated fields
+untouched. DELETE behavior is unchanged. Malformed provider time structures are
+502 `provider_error`. Body-validation errors remain 422.
+
+`tests/test_event_shape_policy.py` verifies these behaviors using controlled
+provider state; it does not establish real Google recurrence behavior. See
+[Google's recurrence guide](https://developers.google.com/workspace/calendar/api/guides/recurringevents)
+for the distinction between series parents and instances.
