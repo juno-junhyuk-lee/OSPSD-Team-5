@@ -2,16 +2,16 @@
 
 | Item | Value |
 | --- | --- |
-| Status | Draft; proposed implementation, not approved or integrated |
-| Author | Juno Lee, with team input pending |
+| Status | Draft under Team 5 review; shared package not yet adopted |
+| Author | Juno Lee, with team input |
 | Team / vertical | Team 5 / Calendar |
 | Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
 | Last updated | November 3, 2026 |
-| Complete-design reviewer | Another Team 5 member; assignment pending |
+| Complete-design reviewer | Niriti Pahadi (in progress on this revision) |
 | Contract-facing reviewer | Representative from Team 2 or Team 7; assignment pending |
 | Shared agreement | [Calendar API joint decision memo](https://docs.google.com/document/d/1bVv6tLLtfGKt75HH1OPBTuJ3d1kkMdkEgzz9ef3UcOI/edit), version 4, October 28, 2026; staff access needs verification |
-| Shared Python / HTTP contract revision | [calendar-contract repository](https://github.com/Airbus-A330/OSPSD-Calendar); Python proposal [#15](https://github.com/Airbus-A330/OSPSD-Calendar/pull/15), HTTP reference proposal [#11](https://github.com/Airbus-A330/OSPSD-Calendar/pull/11); adopted release tag pending |
-| Implementation work | Team 5 design [#40](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/40); shared interface/conformance [issue #2](https://github.com/Airbus-A330/OSPSD-Calendar/issues/2), suite [#14](https://github.com/Airbus-A330/OSPSD-Calendar/pull/14), interface draft [#15](https://github.com/Airbus-A330/OSPSD-Calendar/pull/15); Team 5 adoption/PUT PR links pending |
+| Shared Python / HTTP contract revision | [calendar-contract repository](https://github.com/Airbus-A330/OSPSD-Calendar); interface docs merged via [#15](https://github.com/Airbus-A330/OSPSD-Calendar/pull/15) into conformance [#14](https://github.com/Airbus-A330/OSPSD-Calendar/pull/14); HTTP reference [#11](https://github.com/Airbus-A330/OSPSD-Calendar/pull/11); adopted release tag pending |
+| Implementation work | Design [#40](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/40); PUT + live verify [#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41) on `hw2/milestone-2`; shared suite [#14](https://github.com/Airbus-A330/OSPSD-Calendar/pull/14); package adoption PR pending (Jim) |
 | Inspected HW1 baseline | `143be358c1c6086c47035b4088d967895d7f9ebb` |
 
 This draft uses the supplied Markdown and plain-text exports of the joint
@@ -21,18 +21,24 @@ revision and staff access. The linked
 [coordination email record](https://drive.google.com/file/d/1qE08aNXGlD3jSa44s1nrngVPM_KyZNqR/view?usp=drive_link)
 is supporting material, not the Python package specification.
 
-This document records current behavior separately from proposals. No shared
-package adoption, PUT implementation, or HW2 live verification has occurred as
-part of this documentation change.
+This document records current behavior separately from proposals. As of
+`hw2/milestone-2` merge `e52d656` (PR [#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41)),
+Team 5 has a local `PUT /events/{event_id}` and recorded live PUT → read-back →
+cleanup evidence in [docs/PUT_LIVE_VERIFICATION.md](docs/PUT_LIVE_VERIFICATION.md).
+That path still uses Team 5's own models (`start_time` / `end_time`) and does
+**not** yet depend on a tagged shared Calendar package. Shared-package adoption
+and re-verification through that package remain open for the November 4 bar.
 
 ## Context, goals, and non-goals
 
 A consumer should create, retrieve, replace, and delete a timed event against
 Teams 2, 5, and 7 using the same request shapes and outcome handling. Today,
 Team 5 uses `start_time` and `end_time`, while the joint contract uses `start`
-and `end`. A client switching to Team 5 must change its serialization. Team 5
-also lacks PUT, ignores unknown body fields, and returns 422 for malformed JSON.
-These differences prevent the common workflow from working consistently.
+and `end`. A client switching to Team 5 must change its serialization. Local
+PUT now exists on `hw2/milestone-2`, but Team 5 still ignores unknown body
+fields and returns 422 for malformed JSON. Until field names and the tagged
+shared package are adopted, the common workflow still does not match the other
+teams' serialization.
 
 The goals are to implement the four shared operations, adopt a tagged shared
 Python package, and pass the same vertical conformance suite as the other
@@ -134,7 +140,7 @@ claiming reproducible integration.
 | --- | --- | --- | --- |
 | Create | `POST /events` | 201 with event | Adopt shared names and validation |
 | Read | `GET /events/{event_id}` | 200 with event | Adopt shared response names |
-| Replace | `PUT /events/{event_id}` | 200 with event | Add route and shared-boundary implementation |
+| Replace | `PUT /events/{event_id}` | 200 with event | Local route merged in [#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41); still needs shared-boundary types after package adoption |
 | Delete | `DELETE /events/{event_id}` | 204, empty body | Verify existing behavior against common checks |
 
 The shared event contains a provider-generated string `id`, string `title`, and
@@ -279,8 +285,9 @@ implementation issue/PR links are still pending.
 | Kristie Lee | Shared-contract coordination and interface finalization | Coordinate memo links, interface review with Teams 2 and 7, conformance responsibilities, and readiness for Team 7's shared-package release. Initial draft supported by Juno in shared PR #15. |
 | Juno Lee | Team 5's `DESIGN.md` and initial shared-interface draft | Maintain this design and obtain complete-design and cross-team reviews; prepare shared interface documentation, exports, and typing check in shared PR #15 for Kristie's review/finalization. |
 | Jim Lo | Shared-package adoption and models | Install and lock the agreed tagged dependency; adapt shared field names, strict input validation, and agreed compatibility behavior; update affected routes, tests, examples, and configuration. |
-| Ka Pui Cheung | PUT implementation | Implement PUT through the agreed Python boundary and Google adapter, preserve non-shared fields, classify failures, and add HTTP and provider tests. |
-| Ka Pui Cheung | Conformance and real verification | Contribute shared tests, run them against Team 5, verify real PUT/read-back and cleanup through the tagged package, and record sanitized reproducible evidence. |
+| Ka Pui Cheung | PUT implementation | Local PUT merged in [#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41) (preserves Google-only fields; offline + live checks). Rewire through shared package types after Jim's adoption. |
+| Ka Pui Cheung | Conformance and real verification | Shared suite draft in calendar-contract [#14](https://github.com/Airbus-A330/OSPSD-Calendar/pull/14); Team 5 live PUT evidence in [docs/PUT_LIVE_VERIFICATION.md](docs/PUT_LIVE_VERIFICATION.md). Still need suite wiring against Team 5 and re-verify through a tagged package. |
+| Niriti Pahadi | Complete-design review and leftover support | Review/update this design against current `hw2/milestone-2` work; help with remaining Member 4/5 follow-ups and package-adoption verification once the tag exists. |
 
 `hw2/milestone-2` is the integration branch created from the inspected baseline.
 `doc/design.md` branches from it for this document. Other work branches should
@@ -292,10 +299,10 @@ After merge, create the later milestone branch from the resulting `main`.
 Before the November 4 submission checkpoint:
 
 1. Kristie records the accepted interface, package tag, and shared review outcomes.
-2. Juno updates design PR #40 and records team and external review outcomes.
-3. Jim adopts the released package and updates common boundary models.
-4. Ka Pui implements PUT using that boundary and completes offline checks.
-5. Ka Pui records real PUT evidence at an exact commit and verifies cleanup.
+2. Juno updates design PR #40; Niriti records Team 5 complete-design review outcomes.
+3. Ka Pui's local PUT and live verification landed first on `hw2/milestone-2` ([#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41)) ahead of the shared tag.
+4. Jim adopts the released package and updates common boundary models (`start`/`end`, strict unknown fields).
+5. Ka Pui (with Niriti helping as needed) rewires PUT through that boundary, reruns live PUT → read-back → cleanup, and records package tag + commit.
 
 Open issues for each remaining change with owner, dependency, and verification
 criteria. Work not required for the initial operation remains visible and must
@@ -431,5 +438,9 @@ proof of a working implementation.
   approval question using the October 28 email. Recorded unfinished validation,
   packaging, suite coverage, cleanup, and release dependencies; concrete wiring,
   compatibility, hosting, reviewer assignments, and live evidence remain pending.
+- November 3, 2026 (evening): Ka Pui merged local PUT + live verification
+  ([#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41)). Niriti began
+  complete-design review and refreshed this draft so it no longer claims PUT is
+  missing; shared-package adoption and contract-facing review remain open.
 - Codex assisted with drafting and repository inspection. Students must verify
   technical claims and own the decisions and submitted work.
