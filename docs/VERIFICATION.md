@@ -1,5 +1,14 @@
 # Verification and integration notes
 
+## HW2 tagged shared-package workflow
+
+Use the [adoption and reproduction guide](SHARED_CONTRACT_ADOPTION.md) for the
+`v0.1.0` dependency, canonical start/end fields, offline checks, and the live
+workflow command. The verification script has controlled offline tests for
+failed checks and cleanup; these are not real Google results. Observed Google
+evidence for this adoption remains pending. Historical HW1 records below keep
+their original field names, commands, revisions, and outcomes.
+
 ## Event GET Level 5 verification
 
 On October 17, 2026, implementation `9fad9af` passed locked environment setup,
