@@ -130,11 +130,19 @@ controlled Google responses, including before/after-write failures.
 `tests/test_verify_put_live.py` verifies the script with controlled providers;
 it does not contact Google or establish live persistence.
 
-Ka Pui owns the formal shared-suite wiring in `tests/test_shared_conformance.py`.
-That file is not supplied by this adoption change. The tagged suite requires
-both `service` and `failing_service` fixtures; the latter receives a
-`ProviderFailure` and returns the real implementation wired to a controlled
-failing provider. Keep failure hooks in tests, not in the production protocol.
+`tests/test_shared_conformance.py` runs the tagged `CalendarServiceConformance`
+suite against `GoogleCalendarService`. Its `service` fixture uses the real
+Google adapters on the offline fake Google client from `tests/conftest.py`.
+Its `failing_service` fixture receives a `ProviderFailure` and wires
+`GoogleCalendarService` to adapters raising Team 5's matching operation errors,
+so the suite checks the translation to shared `CalendarError` codes. Keep
+failure hooks in tests, not in the production protocol. To run the success
+cases against the real primary calendar (each test deletes what it creates):
+
+```sh
+CALENDAR_LIVE_CONFORMANCE=1 uv run pytest tests/test_shared_conformance.py -v
+```
+
 See the tag's [Python interface guide](https://github.com/Airbus-A330/OSPSD-Calendar/blob/v0.1.0/docs/PYTHON_INTERFACE.md).
 Running against the package's in-memory reference service alone does not test
 Team 5's Google adapters. Offline, live, and cross-team checks remain distinct.
