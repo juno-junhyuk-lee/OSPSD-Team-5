@@ -23,7 +23,7 @@ is supporting material, not the Python package specification.
 
 This document records current behavior separately from proposals. As of
 `hw2/milestone-2` merge `e52d656` (PR [#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41)),
-Team 5 has a local `PUT /events/{event_id}` and recorded live PUT → read-back →
+Team 5 has a local `PUT /events/{event_id}` and recorded live PUT, read-back,
 cleanup evidence in [docs/PUT_LIVE_VERIFICATION.md](docs/PUT_LIVE_VERIFICATION.md).
 That path still uses Team 5's own models (`start_time` / `end_time`) and does
 **not** yet depend on a tagged shared Calendar package. Shared-package adoption
@@ -302,7 +302,7 @@ Before the November 4 submission checkpoint:
 2. Juno updates design PR #40; Niriti records Team 5 complete-design review outcomes.
 3. Ka Pui's local PUT and live verification landed first on `hw2/milestone-2` ([#41](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41)) ahead of the shared tag.
 4. Jim adopts the released package and updates common boundary models (`start`/`end`, strict unknown fields).
-5. Ka Pui (with Niriti helping as needed) rewires PUT through that boundary, reruns live PUT → read-back → cleanup, and records package tag + commit.
+5. Ka Pui (with Niriti helping as needed) rewires PUT through that boundary, reruns live PUT, read-back, and cleanup, and records package tag + commit.
 
 Open issues for each remaining change with owner, dependency, and verification
 criteria. Work not required for the initial operation remains visible and must
