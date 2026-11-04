@@ -11,8 +11,11 @@ Jim's branch `feature/hw2-calendar-contract-adoption` starts from
 
 - `cb1d112`: tagged dependency, shared models, and canonical start/end fields.
 - `9a71587`: CalendarService composition, shared errors, and HTTP validation.
-- Current documentation/script work prepares reproduction; live Google evidence
-  for this adoption remains pending.
+- `327e8bc`: migration documentation and reproducible verification script.
+- Real Google workflow passed on November 4 at clean `327e8bc`; the
+  [evidence](SHARED_CONTRACT_VERIFICATION.md) records the shared tag, statuses,
+  independent provider comparison, and cleanup. Adoption review/CI and formal
+  shared-suite wiring remain open.
 - Ka Pui owns the shared conformance-suite fixture wiring and provider
   re-verification after adoption. Juno/Niriti maintain DESIGN.md; Kristie
   coordinates its review and the accepted shared revision.

@@ -21,6 +21,8 @@ HW1 field-name and per-route error wiring descriptions in historical evidence.
   independent Google checks and cleanup. This command changes Google state.
 - `tests/test_verify_put_live.py`: controlled script checks; not live evidence.
 - [Shared adoption guide](docs/SHARED_CONTRACT_ADOPTION.md): migration and setup.
+- [Tagged Google evidence](docs/SHARED_CONTRACT_VERIFICATION.md): successful
+  normal workflow at clean `327e8bc`; conformance/review/CI remain separate.
 
 - `GET /calendars/{calendar_id}`: Google-backed primary calendar metadata operation.
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.

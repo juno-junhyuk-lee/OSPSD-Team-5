@@ -13,8 +13,10 @@ Implementation checkpoints:
 
 - `cb1d112`: install the tagged dependency and adopt shared event/request models.
 - `9a71587`: connect the shared service, dependency injection, and HTTP errors.
-- This guide and the verification script prepare reproduction. They do not
-  establish a real Google run, teammate verification, PR approval, or release.
+- `327e8bc`: migration documentation and the verification script. A successful
+  real Google workflow was then recorded at this clean commit; see the
+  [observed verification record](SHARED_CONTRACT_VERIFICATION.md). Teammate
+  execution, shared conformance wiring, review, and CI remain separate work.
 
 Work targets `hw2/milestone-2`. The existing `main` branch does not yet contain
 this adoption work. Use the adoption PR's checkout instructions when available.
@@ -139,7 +141,9 @@ Team 5's Google adapters. Offline, live, and cross-team checks remain distinct.
 
 ## Real Google reproduction
 
-The following are instructions and expected results, not an observed HW2 run.
+This section gives reproduction instructions and expected results. The
+[observed run](SHARED_CONTRACT_VERIFICATION.md) records the actual November 4
+Google workflow and cleanup at `327e8bc`.
 The command creates and deletes one disposable event in the authenticated
 account's primary calendar. Obtain local `credentials.json`, follow the
 [authentication instructions](../README.md#shared-google-calendar-authentication),
@@ -184,8 +188,10 @@ conformance wiring and real-operation re-verification; they can reproduce this
 script against the reviewed adoption commit. Juno/Niriti maintain DESIGN.md,
 and Kristie coordinates interface/design review and accepted revisions.
 
-Real Google verification of this adoption is **pending**. The next evidence
-record must include the service commit and any uncommitted diff, package tag
-and commit, setup/environment, exact commands, sanitized observed output, exit
-status, and cleanup results. Also record remaining review and conformance work.
-Do not reuse HW1 Google results as proof of the new shared-package path.
+Real Google verification of the four common operations passed on November 4
+at clean commit `327e8bc`, with package `v0.1.0`. The
+[verification record](SHARED_CONTRACT_VERIFICATION.md) contains environment,
+provenance, exact commands, sanitized output, exit status, and cleanup results.
+Formal shared conformance wiring, another teammate's reproduction, and adoption
+PR/CI approval remain open. Future runs must record their own revisions and
+observed results; HW1 evidence does not establish this shared-package path.

@@ -55,6 +55,9 @@ installation, ownership, reproducible checks, and remaining evidence. The
 [manual tutorial](TUTORIAL.md) uses the current fields. Level 1–5 subsections
 below retain HW1 implementation history; their historical verification records
 refer to their recorded commits and do not prove tagged HW2 verification.
+The [November 4 real Google record](docs/SHARED_CONTRACT_VERIFICATION.md)
+separately verifies the tagged normal workflow at clean commit `327e8bc`;
+shared conformance wiring and adoption review/CI remain open.
 
 ### Installation
 
@@ -349,7 +352,8 @@ for check results, real-provider verification, and remaining review requirements
 owns this operation, including its implementation, tests, and documentation
 through Levels 1–5. HW2 renames the time fields to match the common contract. Local authorization
 is required; follow Shared Google Calendar authentication below. Historical HW1
-runs are recorded separately from the pending tagged HW2 verification.
+runs are separate from the [tagged HW2 verification](docs/SHARED_CONTRACT_VERIFICATION.md)
+recorded on November 4 at `327e8bc`.
 
 The request uses `Content-Type: application/json` and requires three body fields:
 
