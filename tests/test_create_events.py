@@ -18,8 +18,8 @@ from app import google_create_events
 def event_payload() -> dict[str, object]:
     return {
         "title": "Team Meeting",
-        "start_time": "2026-10-05T10:00:00-04:00",
-        "end_time": "2026-10-05T11:00:00-04:00",
+        "start": "2026-10-05T10:00:00-04:00",
+        "end": "2026-10-05T11:00:00-04:00",
     }
 
 
@@ -31,16 +31,16 @@ def test_create_and_retrieve_event(
 
     assert response.status_code == 201
     event = response.json()
-    assert set(event) == {"id", "title", "start_time", "end_time"}
+    assert set(event) == {"id", "title", "start", "end"}
     assert isinstance(event["id"], str)
     assert event["id"]
     assert event["id"] != "test-event"
     assert event["id"] == "google-event-1"
     assert event["title"] == "Team Meeting"
-    assert datetime.fromisoformat(event["start_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["start"]) == datetime.fromisoformat(
         "2026-10-05T10:00:00-04:00"
     )
-    assert datetime.fromisoformat(event["end_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["end"]) == datetime.fromisoformat(
         "2026-10-05T11:00:00-04:00"
     )
     retrieved = client.get(f"/events/{event['id']}")
@@ -70,7 +70,7 @@ def test_repeated_creation_has_distinct_ids(
         assert client.get(f"/events/{event['id']}").json() == event
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_preserves_state(
     client: TestClient,
     event_payload: dict[str, object],
@@ -97,16 +97,16 @@ def test_missing_field_preserves_state(
         ("title", " \t\n "),
         ("title", None),
         ("title", 123),
-        ("start_time", "not-a-date"),
-        ("end_time", "not-a-date"),
-        ("start_time", "2026-10-05T10:00:00"),
-        ("end_time", "2026-10-05T11:00:00"),
-        ("start_time", 1791208800),
-        ("start_time", "1791208800"),
-        ("end_time", None),
-        ("end_time", "2026-10-05T10:00:00-04:00"),
-        ("end_time", "2026-10-05T09:59:59-04:00"),
-        ("end_time", "2026-10-05T15:00:00+02:00"),
+        ("start", "not-a-date"),
+        ("end", "not-a-date"),
+        ("start", "2026-10-05T10:00:00"),
+        ("end", "2026-10-05T11:00:00"),
+        ("start", 1791208800),
+        ("start", "1791208800"),
+        ("end", None),
+        ("end", "2026-10-05T10:00:00-04:00"),
+        ("end", "2026-10-05T09:59:59-04:00"),
+        ("end", "2026-10-05T15:00:00+02:00"),
     ],
 )
 def test_invalid_field_preserves_state(
@@ -132,7 +132,7 @@ def test_invalid_field_preserves_state(
 def test_time_order_compares_instants(
     client: TestClient, event_payload: dict[str, object]
 ) -> None:
-    event_payload["end_time"] = "2026-10-05T09:00:00-06:00"
+    event_payload["end"] = "2026-10-05T09:00:00-06:00"
 
     response = client.post("/events", json=event_payload)
 
@@ -178,7 +178,7 @@ def test_missing_authorization_returns_503_without_provider_write(
         OSError("Private connection details"),
     ],
 )
-def test_provider_failure_returns_502_without_retry(
+def test_provider_failure_is_classified_without_retry(
     client: TestClient,
     event_payload: dict[str, object],
     google_service: MagicMock,
@@ -191,13 +191,16 @@ def test_provider_failure_returns_502_without_retry(
 
     response = client.post("/events", json=event_payload)
 
-    assert response.status_code == 502
+    rate_limited = isinstance(error, HttpError) and error.resp.status == 429
+    assert response.status_code == (503 if rate_limited else 502)
     assert response.json() == {
         "error": {
-            "code": "provider_error",
-            "message": "Google Calendar creation could not be confirmed. "
+            "code": "provider_unavailable" if rate_limited else "provider_error",
+            "message": "Calendar provider temporarily unavailable. Retry later."
+            if rate_limited
+            else "Google Calendar creation could not be confirmed. "
             "Check the calendar before retrying.",
-            "retryable": False,
+            "retryable": rate_limited,
         }
     }
     assert provider_events == before

@@ -2,24 +2,15 @@
 
 import json
 import logging
-from enum import StrEnum
 
+from calendar_contract import CalendarError
+from calendar_contract import ErrorCode as ErrorCode
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger("calendar_service")
-
-
-class ErrorCode(StrEnum):
-    """Public error codes; each has one HTTP status."""
-
-    INVALID_INPUT = "invalid_input"
-    NOT_FOUND = "not_found"
-    ACCESS_DENIED = "access_denied"
-    PROVIDER_ERROR = "provider_error"
-    PROVIDER_UNAVAILABLE = "provider_unavailable"
 
 
 class ErrorDetails(BaseModel):
@@ -52,6 +43,7 @@ class ServiceError(Exception):
         operation: str,
         retryable: bool,
         provider: bool,
+        status: int | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
@@ -60,10 +52,11 @@ class ServiceError(Exception):
         self.retryable = retryable
         # provider = the provider was called or caused the failure
         self.provider = provider
+        self.http_status = STATUS_BY_CODE[code] if status is None else status
 
     @property
     def status(self) -> int:
-        return STATUS_BY_CODE[self.code]
+        return self.http_status
 
 
 def log_failure(error: ServiceError) -> None:
@@ -98,10 +91,35 @@ def service_error_handler(_request: Request, error: Exception) -> JSONResponse:
     )
 
 
-def request_validation_handler(request: Request, _error: Exception) -> JSONResponse:
+def calendar_error_handler(request: Request, error: Exception) -> JSONResponse:
+    """Add HTTP/log context to an already sanitized shared operation failure."""
+    assert isinstance(error, CalendarError)
+    operation = getattr(request.scope.get("route"), "name", "calendar_operation")
+    provider = error.code != ErrorCode.INVALID_INPUT
+    if error.details is not None and isinstance(error.details.get("provider"), bool):
+        provider = bool(error.details["provider"])
+    return service_error_handler(
+        request,
+        ServiceError(
+            error.code,
+            error.message,
+            operation=operation,
+            retryable=error.retryable,
+            provider=provider,
+        ),
+    )
+
+
+async def request_validation_handler(
+    request: Request, _error: Exception
+) -> JSONResponse:
     """Reject invalid requests without exposing validation inputs or bodies."""
     assert isinstance(_error, RequestValidationError)
     operation = getattr(request.scope.get("route"), "name", "request_validation")
+    errors = _error.errors()
+    malformed_json = any(error["type"] == "json_invalid" for error in errors)
+    if any(error["loc"] == ("body",) for error in errors):
+        malformed_json = malformed_json or not (await request.body()).strip()
     return service_error_handler(
         request,
         ServiceError(
@@ -110,5 +128,6 @@ def request_validation_handler(request: Request, _error: Exception) -> JSONRespo
             operation=operation,
             retryable=False,
             provider=False,
+            status=400 if malformed_json else 422,
         ),
     )

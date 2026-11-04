@@ -40,16 +40,21 @@ def validation_client() -> Iterator[tuple[TestClient, Mock, Mock]]:
     ("method", "path", "operation"),
     [
         ("POST", "/events", "create_event"),
+        ("PUT", "/events/private-event-id", "replace_event"),
         ("PATCH", "/events/private-event-id", "update_event"),
     ],
 )
 @pytest.mark.parametrize(
-    "body",
+    ("body", "status"),
     [
-        "",
-        '{"title": "private-title",',
-        '{"title": "private-title"}',
-        '{"title":"private-title", "start_time":"private-invalid-time", "end_time":null}',
+        ("", 400),
+        ("   ", 400),
+        ('{"title": "private-title",', 400),
+        ('{"title": "private-title"}', 422),
+        ('{"title":"private-title", "start":"private-invalid-time", "end":null}', 422),
+        ("null", 422),
+        ("[]", 422),
+        ('"private-string"', 422),
     ],
 )
 def test_validation_uses_shared_errors_without_leaking_inputs(
@@ -59,6 +64,7 @@ def test_validation_uses_shared_errors_without_leaking_inputs(
     path: str,
     operation: str,
     body: str,
+    status: int,
 ) -> None:
     client, creator, updater = validation_client
 
@@ -73,7 +79,7 @@ def test_validation_uses_shared_errors_without_leaking_inputs(
             },
         )
 
-    assert response.status_code == 422
+    assert response.status_code == status
     assert response.json() == {
         "error": {
             "code": "invalid_input",
@@ -88,7 +94,7 @@ def test_validation_uses_shared_errors_without_leaking_inputs(
         "operation": operation,
         "error": "invalid_input",
         "provider": False,
-        "status": 422,
+        "status": status,
     }
     assert record.levelno == logging.WARNING
     assert record.exc_info is None
@@ -101,8 +107,13 @@ def test_openapi_documents_the_shared_validation_response(
     client, _, _ = validation_client
     schema = client.get("/openapi.json").json()
 
-    for path, method in [("/events", "post"), ("/events/{event_id}", "patch")]:
-        response = schema["paths"][path][method]["responses"]["422"]
-        assert response["content"]["application/json"]["schema"] == {
-            "$ref": "#/components/schemas/ErrorResponse"
-        }
+    for path, method in [
+        ("/events", "post"),
+        ("/events/{event_id}", "put"),
+        ("/events/{event_id}", "patch"),
+    ]:
+        for status in ("400", "422"):
+            response = schema["paths"][path][method]["responses"][status]
+            assert response["content"]["application/json"]["schema"] == {
+                "$ref": "#/components/schemas/ErrorResponse"
+            }

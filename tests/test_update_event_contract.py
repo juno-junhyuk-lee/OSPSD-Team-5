@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from datetime import datetime
 
 import pytest
+from calendar_contract import Event, ReplaceEvent
 from fastapi.testclient import TestClient
 
 from app.event_update_dependencies import get_event_updater
@@ -16,23 +17,22 @@ from app.event_update_provider import (
 )
 from app.google_update_events import GoogleEventUpdater
 from app.main import app
-from app.models import Event, UpdateEventRequest
 
 
 class ControlledEventUpdater:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, UpdateEventRequest]] = []
+        self.calls: list[tuple[str, ReplaceEvent]] = []
         self.error: Exception | None = None
 
-    def update_event(self, event_id: str, request: UpdateEventRequest) -> Event:
+    def update_event(self, event_id: str, request: ReplaceEvent) -> Event:
         self.calls.append((event_id, request))
         if self.error is not None:
             raise self.error
         return Event(
             id=event_id,
             title=request.title,
-            start_time=request.start_time,
-            end_time=request.end_time,
+            start=request.start,
+            end=request.end,
         )
 
 
@@ -68,8 +68,8 @@ OPERATIONS = {"PATCH": "update_event", "PUT": "replace_event"}
 def payload() -> dict[str, object]:
     return {
         "title": "  Updated Meeting  ",
-        "start_time": "2026-10-13T11:00:00-04:00",
-        "end_time": "2026-10-13T12:00:00-04:00",
+        "start": "2026-10-13T11:00:00-04:00",
+        "end": "2026-10-13T12:00:00-04:00",
     }
 
 
@@ -88,16 +88,20 @@ def test_update_event_contract(
     assert response.status_code == 200
     assert response.json() == {
         "id": "test-event",
-        "title": "Updated Meeting",
-        "start_time": "2026-10-13T11:00:00-04:00",
-        "end_time": "2026-10-13T12:00:00-04:00",
+        "title": "  Updated Meeting  ",
+        "start": "2026-10-13T11:00:00-04:00",
+        "end": "2026-10-13T12:00:00-04:00",
     }
     assert len(updater.calls) == 1
     event_id, request = updater.calls[0]
     assert event_id == "test-event"
-    assert request.title == "Updated Meeting"
-    assert request.start_time == datetime.fromisoformat("2026-10-13T11:00:00-04:00")
-    assert request.end_time == datetime.fromisoformat("2026-10-13T12:00:00-04:00")
+    assert request.title == "  Updated Meeting  "
+    assert datetime.fromisoformat(request.start) == datetime.fromisoformat(
+        "2026-10-13T11:00:00-04:00"
+    )
+    assert datetime.fromisoformat(request.end) == datetime.fromisoformat(
+        "2026-10-13T12:00:00-04:00"
+    )
 
 
 def test_success_does_not_log_failure(
@@ -115,7 +119,7 @@ def test_success_does_not_log_failure(
     assert not [r for r in caplog.records if r.name == "calendar_service"]
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_does_not_call_updater(
     client: TestClient,
     method: str,
@@ -139,7 +143,7 @@ def test_equal_times_does_not_call_updater(
     updater: ControlledEventUpdater,
     payload: dict[str, object],
 ) -> None:
-    payload["end_time"] = payload["start_time"]
+    payload["end"] = payload["start"]
 
     response = client.request(method, "/events/test-event", json=payload)
 

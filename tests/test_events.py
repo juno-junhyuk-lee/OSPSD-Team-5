@@ -1,9 +1,9 @@
 import json
 import logging
 from collections.abc import Iterator
-from datetime import datetime
 
 import pytest
+from calendar_contract import Event
 from fastapi.testclient import TestClient
 
 from app.event_dependencies import get_event_reader
@@ -17,7 +17,6 @@ from app.event_provider import (
     UnsupportedEventError,
 )
 from app.main import app
-from app.models import Event
 
 
 class ControlledEventReader:
@@ -34,8 +33,8 @@ class ControlledEventReader:
         return Event(
             id="test-event",
             title="Example Event",
-            start_time=datetime.fromisoformat("2026-10-05T18:00:00Z"),
-            end_time=datetime.fromisoformat("2026-10-05T19:00:00Z"),
+            start="2026-10-05T18:00:00Z",
+            end="2026-10-05T19:00:00Z",
         )
 
 
@@ -70,8 +69,8 @@ def test_get_known_event(
     assert response.json() == {
         "id": "test-event",
         "title": "Example Event",
-        "start_time": "2026-10-05T18:00:00Z",
-        "end_time": "2026-10-05T19:00:00Z",
+        "start": "2026-10-05T18:00:00Z",
+        "end": "2026-10-05T19:00:00Z",
     }
     assert event_reader.requested_ids == ["test-event"]
     assert not [
@@ -247,8 +246,8 @@ def test_successful_recurring_instance_read(
         return Event(
             id=event_id,
             title="Instance",
-            start_time=datetime.fromisoformat("2026-10-16T15:00:00Z"),
-            end_time=datetime.fromisoformat("2026-10-16T16:00:00Z"),
+            start="2026-10-16T15:00:00Z",
+            end="2026-10-16T16:00:00Z",
         )
 
     monkeypatch.setattr(event_reader, "get_event", get_instance)

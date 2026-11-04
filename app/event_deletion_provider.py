@@ -12,11 +12,19 @@ class EventDeletionDeniedError(Exception):
 
 
 class EventDeletionUnavailableError(Exception):
-    """Local authorization is unavailable; no provider call was attempted."""
+    """Authorization is unavailable or rejected; deletion was not authorized."""
+
+    def __init__(self, message: str = "", *, provider: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
 
 
 class EventDeletionUnconfirmedError(Exception):
     """Deletion could not be confirmed; the provider may have deleted the event."""
+
+
+class EventDeletionProviderUnavailableError(Exception):
+    """A temporary failure prevented or explicitly rejected deletion."""
 
 
 class EventDeleter(Protocol):
