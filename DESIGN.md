@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | In review; adoption merged into integration branch, conformance PR open |
+| Status | In review; adoption and conformance merged into integration branch |
 | Author | Juno Lee, with team input and Niriti Pahadi's review revisions |
 | Team / vertical | Team 5 / Calendar |
 | Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
@@ -33,9 +33,10 @@ Full required conformance and deployment remain November 11 checkpoints.
 The current integration branch already contains local PUT and its live evidence
 from #41. Jim's #43 merged shared-package adoption into `hw2/milestone-2`
 on November 4 at commit `b088ad9c182f4de823f728038a724fdb6b88675e`.
-Ka Pui's #44 adds shared conformance wiring on top of adoption and remains open.
-Observed runs apply to their recorded commits; adoption is integrated into
-`hw2/milestone-2`, while `main` and formal conformance integration remain separate.
+Ka Pui's #44 merged shared conformance wiring into `hw2/milestone-2` on
+November 4 at commit `671b63a913a7275e4cce29f04a283a30077db0cd`.
+Observed runs still apply to their recorded commits; both changes are integrated
+into `hw2/milestone-2`, while the combined PR to `main` remains separate.
 
 Listing, all-day support, extra editable fields, data migration, and runtime
 provider switching are excluded from this redesign. Calendar metadata and PATCH
@@ -370,8 +371,8 @@ raising controlled Team 5 errors. The suite therefore checks shared error
 translation; Google-to-adapter classification is covered separately by offline
 provider tests. Failure hooks remain in tests, not the production protocol.
 
-Adoption #43 is integrated. After #44 is integrated, run the shared suite
-offline with:
+Adoption #43 and conformance #44 are integrated into `hw2/milestone-2`.
+Run the shared suite offline with:
 
 ```sh
 uv run pytest tests/test_shared_conformance.py -v -k 'not Live'
@@ -453,14 +454,15 @@ credentials. Historical HW1 results cannot substitute for HW2 checks.
 | Niriti Pahadi | Complete-design review and verification support | Review the consolidated revision and record concerns/outcomes; help reproduce adoption as needed |
 | Kristie Lee | Shared-contract and contract-facing coordination | Record accepted revision, cross-team review, and release references before submission |
 | Jim Lo | #43 adoption merged; migration, models/errors, examples | Review #40's tag-reference correction and unchanged shared commit before integration |
-| Ka Pui Cheung | #41 PUT, #44 conformance and real verification | Resolve live cleanup concern; update #44 on the reviewed #43 base and verify before integration |
+| Ka Pui Cheung | #41 PUT and #44 conformance merged; real verification recorded | Follow up on inherited live cleanup concerns and verify the combined submission revision |
 | Juno Lee | Render/Docker/Blueprint proposal, credential persistence, budget and teardown plan | Proposal supplied for Milestone 2 review; agree accounts/budget before provisioning, implement by November 11 |
 
 `hw2/milestone-2` is the integration branch. This document stays on
 `doc/design.md` in #40; Niriti's #42 revisions are consolidated here to avoid
-parallel final documents. #43 merged into the integration branch. #44 still
-targets the adoption branch and should now be updated/retargeted to
-`hw2/milestone-2`, checking that its diff contains only the conformance changes.
+parallel final documents. #43 and #44 are merged into `hw2/milestone-2`;
+#44's merge commit is `671b63a`. Update this design branch against the integration
+branch and preserve both conformance instructions and the corrected package tag
+when resolving documentation conflicts.
 The combined milestone PR targets `main` after review, passing checks, and
 recorded tagged-provider evidence. No merge approval is implied by this plan.
 
@@ -473,11 +475,11 @@ team review. Publish a new tag rather than moving an existing published tag.
 
 | Concern | Disposition / next step | Owner / checkpoint |
 | --- | --- | --- |
-| Stale progress and missing local PUT | Incorporated Niriti's #42 corrections and #41 evidence; shared release, merged #43, and open #44 distinguished | Juno; this revision |
+| Stale progress and missing local PUT | Incorporated Niriti's #42 corrections and #41 evidence; shared release and merged #43/#44 recorded | Juno; this revision |
 | Concrete CalendarService/error boundary | Documented #43's composition, DI, and adapter-to-CalendarError translation | Jim/Ka Pui; confirm during implementation/design review |
 | Old names and PATCH behavior | Documented #43's rejection of legacy names and full-field PATCH with `start/end` | Jim; review with affected callers before integration |
 | Shared tag pin | Corrected source/lock/current references to `v0.1.0-rc.1` in this revision; shared commit unchanged, historical output retained with clarification | Juno implements; Jim reviews before #40 integration |
-| Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; review #44 before integration |
+| Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; verify the combined submission revision |
 | Replacement-start and live cleanup gaps | Keep separate start-change tests; fix cleanup fixtures locally or via a new shared release | Ka Pui; before relying on those guarantees/live-suite approval |
 | HTTP IDs and unsupported event shapes | Local policy implemented and checked in `tests/test_event_shape_policy.py`: ID forwarding/rejection, no unsupported writes, instance metadata preserved | Juno implements; Jim/Ka Pui review with the consolidated design before final acceptance |
 | Hosting and credential persistence | Proposed tools/hosting and assumptions supplied for section 4.6; local account/budget details remain open and do not change the common Calendar contract | Juno; review design assumptions now, resolve local setup before provisioning, implement by November 11 |
@@ -508,8 +510,8 @@ requirements.
 - November 4: consolidated #42 into #40's document, linked the released contract,
   described #43/#44 implementation choices and observed evidence, and replaced
   stale progress notes with current review dependencies. Adoption merged via
-  #43 at `b088ad9`; #44 integration, final reviews, and hosting decisions remain
-  pending. The source-pin correction is supplied in the subsequent revision below.
+  #43 at `b088ad9`; #44 subsequently merged at `671b63a`. Final reviews and
+  hosting decisions remain pending. The source-pin correction is supplied in the subsequent revision below.
 - November 4: Juno took deployment-proposal ownership. Added local pre-write
   shape guards and controlled policy checks; preserved the shared interface and
   existing GET/ID behavior. Runtime policy changes still require teammate review.
@@ -518,6 +520,9 @@ requirements.
   and teardown; team approval and actual provisioning remain pending. Corrected
   the shared source tag to `v0.1.0-rc.1` without changing its locked commit and
   clarified historical verification labels.
+- November 4: recorded #44 as merged at `671b63a`, removed stale retargeting
+  instructions, and retained historical test/live-run revisions. Integration
+  does not establish that the inherited cleanup concerns are resolved.
 - Codex assisted with drafting, repository inspection, and review checks.
   Students must understand, verify, and own their submitted work.
 
