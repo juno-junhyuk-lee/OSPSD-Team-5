@@ -90,7 +90,7 @@ resource "google_cloud_run_v2_service" "calendar" {
 
       startup_probe {
         http_get {
-          path = "/readyz"
+          path = "/ready"
         }
         period_seconds    = 5
         timeout_seconds   = 2
@@ -99,7 +99,7 @@ resource "google_cloud_run_v2_service" "calendar" {
 
       liveness_probe {
         http_get {
-          path = "/healthz"
+          path = "/health"
         }
         period_seconds  = 30
         timeout_seconds = 2

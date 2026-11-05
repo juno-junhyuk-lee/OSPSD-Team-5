@@ -275,7 +275,7 @@ billing through February 28, 2027, then tear down the deployment.
 | Secrets | Mount pinned Secret Manager versions for Google OAuth and the demo bearer key. Terraform records references only |
 | Authorization | The Google refresh token survives instance replacement in Secret Manager. All hosted Google adapters share in-memory credentials. Rotate a durable refresh token by adding a secret version and deploying that version |
 | Access | Cloud Run serves HTTPS. The application authenticates requests before routing, with only the health and readiness endpoints exempt |
-| Health | `/readyz` confirms hosted startup checks passed and gates startup. `/healthz` checks process health. The live workflow checks provider connectivity separately |
+| Health | `/ready` confirms hosted startup checks passed and gates startup. `/health` checks process health. The live workflow checks provider connectivity separately |
 | Handoff | Level 2 automates deployments using immutable image digests and verified release manifests. Rollback restores application code and configuration. Google Calendar writes need separate cleanup |
 
 A hosted service does not require a persistent disk. Google Calendar remains

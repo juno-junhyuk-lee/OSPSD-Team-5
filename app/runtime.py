@@ -51,7 +51,7 @@ def validate_hosted_config() -> bytes:
 async def require_hosted_access(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    if hosted() and request.url.path not in {"/healthz", "/readyz"}:
+    if hosted() and request.url.path not in {"/health", "/ready"}:
         expected = getattr(request.app.state, "demo_bearer", None)
         headers = request.headers.getlist("authorization")
         if expected is not None and len(headers) == 1:

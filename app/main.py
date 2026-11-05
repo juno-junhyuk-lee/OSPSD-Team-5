@@ -50,12 +50,12 @@ app.add_exception_handler(CalendarError, calendar_error_handler)
 app.add_exception_handler(RequestValidationError, request_validation_handler)
 
 
-@app.get("/healthz", include_in_schema=False)
+@app.get("/health", include_in_schema=False)
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/readyz", include_in_schema=False)
+@app.get("/ready", include_in_schema=False)
 def ready() -> Response:
     if hosted() and getattr(app.state, "demo_bearer", None) is None:
         return Response(status_code=503)

@@ -109,8 +109,8 @@ image digests and usable secret versions for rollback.
 
 ```sh
 URL=$(terraform -chdir=infra output -raw service_url)
-curl -fsS "$URL/healthz"
-curl -fsS -o /dev/null -w '%{http_code}\n' "$URL/readyz"
+curl -fsS "$URL/health"
+curl -fsS -o /dev/null -w '%{http_code}\n' "$URL/ready"
 curl -sS -o /dev/null -w '%{http_code}\n' "$URL/calendars/primary"
 CALENDAR_VERIFY_URL="$URL" CALENDAR_VERIFY_BEARER_FILE="$DEMO_KEY_FILE" \
   uv run python -m scripts.verify_put_live

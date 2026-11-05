@@ -38,8 +38,8 @@ def hosted_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_hosted_health_and_authentication(hosted_files: Path) -> None:
     with TestClient(app) as client:
-        assert client.get("/healthz").status_code == 200
-        assert client.get("/readyz").status_code == 204
+        assert client.get("/health").status_code == 200
+        assert client.get("/ready").status_code == 204
         unauthorized = client.post("/events", json={})
         assert unauthorized.status_code == 401
         assert unauthorized.headers["WWW-Authenticate"] == "Bearer"
