@@ -168,6 +168,22 @@ def test_known_id_is_cleaned_up_even_when_post_response_is_invalid(
     assert google.mock_calls == []
 
 
+def test_first_delete_must_succeed_even_if_event_is_already_gone(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    client = Mock(spec=TestClient)
+    client.request.side_effect = [Response(404), Response(404), Response(404)]
+    result = verification.Verification()
+
+    verification.clean_up(client, "known-event", result)
+
+    assert result.finish() == 1
+    steps = evidence(capsys)
+    assert steps["delete"]["passed"] is False
+    assert steps["get_after_delete"]["passed"] is True
+    assert steps["repeat_delete"]["passed"] is True
+
+
 def test_uncertain_post_without_id_requires_inspection_and_is_not_retried(
     script_google: MagicMock,
     provider_events: dict[str, dict[str, object]],

@@ -105,15 +105,15 @@ def check_event(
 def clean_up(client: Client, event_id: str, verification: Verification) -> None:
     """Attempt every cleanup check even when an earlier request fails."""
     path = f"/events/{quote(event_id, safe='')}"
-    for step, method, statuses in (
-        ("delete", "DELETE", (204, 404)),
-        ("get_after_delete", "GET", (404,)),
-        ("repeat_delete", "DELETE", (404,)),
+    for step, method, expected in (
+        ("delete", "DELETE", 204),
+        ("get_after_delete", "GET", 404),
+        ("repeat_delete", "DELETE", 404),
     ):
         try:
             response = client.request(method, path)
             verification.check(
-                step, response.status_code in statuses, status=response.status_code
+                step, response.status_code == expected, status=response.status_code
             )
         except Exception as error:
             verification.check(step, False, error=type(error).__name__)

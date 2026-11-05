@@ -7,7 +7,7 @@ when idle. Monitor billing and registry storage to stay within free allowances.
 Install Docker with Buildx, Terraform 1.13.x, Google Cloud CLI, uv, jq, and OpenSSL.
 Use a deployer that can manage the resources in `infra/`, act as the runtime
 service account, and push images. For independent verification, use a fresh
-checkout and set `CALENDAR_ENV=verify` to select a separate state prefix.
+checkout and select the `verify` environment in Step 2.
 
 ## 1. Bootstrap once per project
 
@@ -18,7 +18,6 @@ if it already exists.
 ```sh
 export PROJECT_ID=ospsd-team5
 export STATE_BUCKET=your-globally-unique-state-bucket
-export CALENDAR_ENV=demo
 
 gcloud auth login --update-adc
 gcloud auth application-default set-quota-project "$PROJECT_ID"
@@ -40,13 +39,17 @@ and saved plans out of Git and CI artifacts.
 Start from a clean checkout of the selected commit. Review each saved plan
 before applying it.
 
+Set `CALENDAR_ENV=demo` for the main deployment or `CALENDAR_ENV=verify` for
+the independent walkthrough. Use the same environment and state prefix through
+teardown.
+
 ```sh
 export TF_VAR_project_id="$PROJECT_ID"
-export TF_VAR_environment="$CALENDAR_ENV"
+export TF_VAR_environment="${CALENDAR_ENV:?Set CALENDAR_ENV to demo or verify}"
 
 terraform -chdir=infra init \
   -backend-config="bucket=$STATE_BUCKET" \
-  -backend-config="prefix=calendar/$CALENDAR_ENV"
+  -backend-config="prefix=calendar/${CALENDAR_ENV:?Set CALENDAR_ENV to demo or verify}"
 terraform -chdir=infra plan -out=foundation.tfplan
 terraform -chdir=infra apply foundation.tfplan
 ```
@@ -126,7 +129,10 @@ results for Level 2.
 
 ## 6. Tear down
 
-Clean up tagged events, then review the destroy plan for the intended state prefix.
+Clean up tagged events, then review the destroy plan for the intended state
+prefix. For the independent walkthrough, confirm the backend prefix is
+`calendar/verify` and every resource to be removed belongs to
+`team5-calendar-verify`. Stop if the plan includes demo resources.
 
 ```sh
 terraform -chdir=infra plan -destroy -var-file="$RELEASE_VARS" -out=destroy.tfplan
