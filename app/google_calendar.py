@@ -15,6 +15,8 @@ from app.calendar_provider import (
     CalendarMetadataProviderError,
     CalendarMetadataUnavailableError,
 )
+from app.event_provider import CalendarAuthenticationError
+from app.google_auth import hosted, load_hosted_credentials
 from app.models import Calendar
 
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
@@ -26,7 +28,14 @@ class GoogleCalendarReader:
     def get_primary_calendar(self) -> Calendar:
         """Read Google metadata and translate it into the public calendar model."""
         try:
-            credentials = Credentials.from_authorized_user_file(str(TOKEN_PATH))
+            if hosted():
+                credentials = load_hosted_credentials()
+            else:
+                credentials = Credentials.from_authorized_user_file(str(TOKEN_PATH))
+        except CalendarAuthenticationError as error:
+            raise CalendarMetadataAuthenticationError(provider=error.provider) from None
+        except TransportError:
+            raise CalendarMetadataUnavailableError from None
         except (OSError, ValueError, GoogleAuthError) as error:
             raise CalendarMetadataAuthenticationError from error
         try:

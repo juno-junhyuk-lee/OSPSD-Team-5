@@ -29,10 +29,13 @@ from app.errors import (
     request_validation_handler,
     service_error_handler,
 )
+from app.google_auth import hosted
 from app.models import Calendar
+from app.runtime import lifespan, require_hosted_access
 
 app = FastAPI(
     title="Calendar Service",
+    lifespan=lifespan,
     responses={
         400: {
             "model": ErrorResponse,
@@ -41,9 +44,23 @@ app = FastAPI(
         422: {"model": ErrorResponse, "description": "Invalid request"},
     },
 )
+app.middleware("http")(require_hosted_access)
 app.add_exception_handler(ServiceError, service_error_handler)
 app.add_exception_handler(CalendarError, calendar_error_handler)
 app.add_exception_handler(RequestValidationError, request_validation_handler)
+
+
+@app.get("/healthz", include_in_schema=False)
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/readyz", include_in_schema=False)
+def ready() -> Response:
+    if hosted() and getattr(app.state, "demo_bearer", None) is None:
+        return Response(status_code=503)
+    return Response(status_code=204)
+
 
 # Google event IDs, including recurring instances, use only these characters.
 EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,1024}")
