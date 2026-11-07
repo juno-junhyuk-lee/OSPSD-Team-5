@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+TRUSTED_BRANCHES = {"hw2/milestone-3-level-2", "hw2/milestone-3", "main"}
+
 
 @dataclass(frozen=True)
 class Release:
@@ -112,6 +114,93 @@ def check_service(
     return revision
 
 
+def select_rollback_artifact(
+    run: dict[str, Any], artifacts: dict[str, Any], repository: str, environment: str
+) -> dict[str, Any]:
+    """Accept evidence only from a successful trusted deployment workflow."""
+    if (
+        environment not in {"demo", "verify"}
+        or run.get("status") != "completed"
+        or run.get("conclusion") != "success"
+        or run.get("event") not in {"push", "workflow_dispatch"}
+        or run.get("head_branch") not in TRUSTED_BRANCHES
+        or str(run.get("path", "")).split("@", 1)[0] != ".github/workflows/deploy.yml"
+        or run.get("repository", {}).get("full_name") != repository
+        or run.get("head_repository", {}).get("full_name") != repository
+    ):
+        raise ValueError("Rollback requires a successful trusted deployment run")
+    for field in ("id", "run_attempt"):
+        if type(run.get(field)) is not int or run[field] < 1:
+            raise ValueError("Invalid source run identity")
+    if not re.fullmatch(r"[0-9a-f]{40}", run["head_sha"]):
+        raise ValueError("Invalid source workflow commit")
+    entries = artifacts["artifacts"]
+    if artifacts["total_count"] != len(entries):
+        raise ValueError("A complete source artifact listing is required")
+    name = f"verified-release-{environment}-{run['head_sha']}-{run['run_attempt']}"
+    matches = [artifact for artifact in entries if artifact.get("name") == name]
+    if len(matches) != 1:
+        raise ValueError("Exactly one verified release artifact must match the run")
+    artifact = matches[0]
+    if (
+        artifact.get("expired") is not False
+        or type(artifact.get("id")) is not int
+        or artifact["id"] < 1
+        or not 0 < artifact.get("size_in_bytes", 0) <= 65536
+    ):
+        raise ValueError("The source artifact must be available and bounded in size")
+    return {
+        "artifact_name": name,
+        "artifact_id": artifact["id"],
+        "run_id": run["id"],
+        "run_attempt": run["run_attempt"],
+        "workflow_commit": run["head_sha"],
+    }
+
+
+def prepare_rollback(
+    document: dict[str, Any], selection: dict[str, Any], project: str, environment: str
+) -> tuple[Release, str]:
+    """Restore release inputs and configuration source without trusting artifact code."""
+    release = Release(**document["release"])
+    name = f"team5-calendar-{environment}"
+    if (
+        environment not in {"demo", "verify"}
+        or document.get("verified") is not True
+        or document.get("project") != project
+        or document.get("environment") != environment
+        or document.get("image")
+        != f"us-central1-docker.pkg.dev/{project}/{name}/calendar@{release.digest}"
+        or not str(document.get("revision", "")).startswith(f"{name}-")
+        or any(
+            document.get(field) != selection[field]
+            for field in ("run_id", "run_attempt", "workflow_commit")
+        )
+    ):
+        raise ValueError("The verified artifact must match its source run and target")
+    configuration_commit = document["configuration_commit"]
+    if not isinstance(configuration_commit, str) or not re.fullmatch(
+        r"[0-9a-f]{40}", configuration_commit
+    ):
+        raise ValueError("A pinned configuration commit is required")
+    operation = document.get("operation")
+    if operation == "deploy":
+        if (
+            release.commit != selection["workflow_commit"]
+            or configuration_commit != selection["workflow_commit"]
+        ):
+            raise ValueError("A deployment artifact must match its checked commit")
+    elif operation == "rollback":
+        if (
+            type(document.get("rollback_source_run_id")) is not int
+            or document["rollback_source_run_id"] < 1
+        ):
+            raise ValueError("A rollback artifact must record its source run")
+    else:
+        raise ValueError("Unknown source release operation")
+    return release, configuration_commit
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -131,6 +220,18 @@ def main() -> int:
     running.add_argument("--release", type=Path, required=True)
     running.add_argument("--project", required=True)
     running.add_argument("--environment", choices=["demo", "verify"], required=True)
+    select = commands.add_parser("select-rollback")
+    select.add_argument("--run", type=Path, required=True)
+    select.add_argument("--artifacts", type=Path, required=True)
+    select.add_argument("--repository", required=True)
+    select.add_argument("--environment", choices=["demo", "verify"], required=True)
+    select.add_argument("--output", type=Path, required=True)
+    rollback = commands.add_parser("prepare-rollback")
+    rollback.add_argument("--artifact", type=Path, required=True)
+    rollback.add_argument("--selection", type=Path, required=True)
+    rollback.add_argument("--project", required=True)
+    rollback.add_argument("--environment", choices=["demo", "verify"], required=True)
+    rollback.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
         if args.command == "prepare":
@@ -148,7 +249,7 @@ def main() -> int:
                 args.project,
                 args.environment,
             )
-        else:
+        elif args.command == "check-service":
             print(
                 check_service(
                     json.loads(args.service.read_text(encoding="utf-8")),
@@ -157,7 +258,34 @@ def main() -> int:
                     args.environment,
                 )
             )
-    except (ValueError, TypeError, KeyError, IndexError, OSError) as error:
+        elif args.command == "select-rollback":
+            selection = select_rollback_artifact(
+                json.loads(args.run.read_text(encoding="utf-8")),
+                json.loads(args.artifacts.read_text(encoding="utf-8")),
+                args.repository,
+                args.environment,
+            )
+            args.output.write_text(json.dumps(selection) + "\n", encoding="utf-8")
+        else:
+            release, configuration_commit = prepare_rollback(
+                json.loads(args.artifact.read_text(encoding="utf-8")),
+                json.loads(args.selection.read_text(encoding="utf-8")),
+                args.project,
+                args.environment,
+            )
+            args.output.write_text(
+                json.dumps({"release": asdict(release)}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            print(configuration_commit)
+    except (
+        ValueError,
+        TypeError,
+        KeyError,
+        IndexError,
+        AttributeError,
+        OSError,
+    ) as error:
         # Do not echo malformed plan values, state, or provider responses.
         parser.exit(1, f"Release deployment rejected ({type(error).__name__}).\n")
     return 0

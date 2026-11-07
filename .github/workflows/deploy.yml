@@ -14,6 +14,11 @@ on:
         options: [verify, demo]
         default: verify
         required: true
+      rollback_run_id:
+        description: Successful Deploy run ID to restore (leave empty for a new deployment)
+        type: string
+        default: ""
+        required: false
 
 permissions:
   contents: read
@@ -25,13 +30,15 @@ jobs:
   deploy:
     needs: checks
     if: >-
-      vars.CALENDAR_DEPLOY_ENABLED == 'true' &&
+      (vars.CALENDAR_DEPLOY_ENABLED == 'true' ||
+        (github.event_name == 'workflow_dispatch' && inputs.rollback_run_id != '')) &&
       github.repository == 'juno-junhyuk-lee/OSPSD-Team-5' &&
       contains(fromJSON('["refs/heads/hw2/milestone-3-level-2","refs/heads/hw2/milestone-3","refs/heads/main"]'), github.ref)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read
       id-token: write
     environment:
       name: calendar-${{ inputs.environment || (github.ref_name == 'hw2/milestone-3-level-2' && 'verify' || 'demo') }}
@@ -46,6 +53,9 @@ jobs:
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       OAUTH_SECRET_VERSION: ${{ vars.OAUTH_SECRET_VERSION }}
       BEARER_SECRET_VERSION: ${{ vars.BEARER_SECRET_VERSION }}
+      ROLLBACK_RUN_ID: ${{ inputs.rollback_run_id }}
+      DEPLOYMENT_OPERATION: ${{ inputs.rollback_run_id && 'rollback' || 'deploy' }}
+      TF_DIRECTORY: ${{ github.workspace }}/${{ inputs.rollback_run_id && 'rollback-source/infra' || 'infra' }}
       TF_IN_AUTOMATION: "true"
       DOCKER_BUILD_SUMMARY: "false"
       DOCKER_BUILD_RECORD_UPLOAD: "false"
@@ -62,7 +72,7 @@ jobs:
           CONFIGURED_ENVIRONMENT: ${{ vars.CALENDAR_ENV }}
         run: |
           set -euo pipefail
-          for name in GCP_PROJECT_ID GCP_WORKLOAD_IDENTITY_PROVIDER GCP_DEPLOYER_SERVICE_ACCOUNT TF_STATE_BUCKET OAUTH_SECRET_VERSION BEARER_SECRET_VERSION; do
+          for name in GCP_PROJECT_ID GCP_WORKLOAD_IDENTITY_PROVIDER GCP_DEPLOYER_SERVICE_ACCOUNT TF_STATE_BUCKET; do
             if [[ -z "${!name}" ]]; then
               echo "::error::Missing GitHub Environment variable: $name"
               exit 1
@@ -73,16 +83,61 @@ jobs:
           [[ "$TF_STATE_BUCKET" =~ ^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$ ]]
           [[ "$GCP_DEPLOYER_SERVICE_ACCOUNT" == "team5-calendar-${CALENDAR_ENV}-ci@${GCP_PROJECT_ID}.iam.gserviceaccount.com" ]]
           [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[0-9]+/locations/global/workloadIdentityPools/team5-github-${CALENDAR_ENV}/providers/github$ ]]
-          [[ "$OAUTH_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
-          [[ "$BEARER_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+          if [[ -n "$ROLLBACK_RUN_ID" ]]; then
+            [[ "$ROLLBACK_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          else
+            [[ "$OAUTH_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+            [[ "$BEARER_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+          fi
       - name: Install smoke test runtime
         uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.14"
       - name: Install locked smoke test dependencies
         run: uv sync --frozen
+      - name: Select a trusted verified release
+        id: rollback_source
+        if: inputs.rollback_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ROLLBACK_RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ROLLBACK_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/source-artifacts.json"
+          python3 -m scripts.deploy_release select-rollback \
+            --run "$RUNNER_TEMP/source-run.json" --artifacts "$RUNNER_TEMP/source-artifacts.json" \
+            --repository "$GITHUB_REPOSITORY" --environment "$CALENDAR_ENV" \
+            --output "$RUNNER_TEMP/rollback-selection.json"
+          echo "artifact_name=$(jq -r .artifact_name "$RUNNER_TEMP/rollback-selection.json")" >> "$GITHUB_OUTPUT"
+      - name: Download verified release references
+        if: inputs.rollback_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.rollback_source.outputs.artifact_name }}
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.rollback_run_id }}
+          path: ${{ runner.temp }}/rollback-artifact
+      - name: Prepare rollback release inputs
+        id: rollback
+        if: inputs.rollback_run_id != ''
+        run: |
+          set -euo pipefail
+          configuration_commit=$(python3 -m scripts.deploy_release prepare-rollback \
+            --artifact "$RUNNER_TEMP/rollback-artifact/verified-release.json" \
+            --selection "$RUNNER_TEMP/rollback-selection.json" \
+            --project "$GCP_PROJECT_ID" --environment "$CALENDAR_ENV" \
+            --output "$RUNNER_TEMP/release.tfvars.json")
+          echo "configuration_commit=$configuration_commit" >> "$GITHUB_OUTPUT"
+      - name: Restore the verified Terraform configuration
+        if: inputs.rollback_run_id != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.rollback.outputs.configuration_commit }}
+          path: rollback-source
+          persist-credentials: false
       - name: Authenticate for the image push
         id: registry-auth
+        if: inputs.rollback_run_id == ''
         uses: google-github-actions/auth@v3
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
@@ -92,6 +147,7 @@ jobs:
           create_credentials_file: false
           export_environment_variables: false
       - uses: docker/login-action@v3
+        if: inputs.rollback_run_id == ''
         with:
           registry: us-central1-docker.pkg.dev
           username: oauth2accesstoken
@@ -101,6 +157,7 @@ jobs:
           terraform_version: "1.13.5"
           terraform_wrapper: false
       - uses: docker/setup-buildx-action@v3
+        if: inputs.rollback_run_id == ''
       - name: Configure image repository
         id: image
         run: |
@@ -108,6 +165,7 @@ jobs:
           echo "repository=us-central1-docker.pkg.dev/$GCP_PROJECT_ID/team5-calendar-$CALENDAR_ENV/calendar" >> "$GITHUB_OUTPUT"
       - name: Build and push the commit image
         id: build
+        if: inputs.rollback_run_id == ''
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -124,6 +182,7 @@ jobs:
           service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3
       - name: Prepare release manifest
+        if: inputs.rollback_run_id == ''
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
@@ -132,41 +191,65 @@ jobs:
             --commit "$GITHUB_SHA" --digest "$IMAGE_DIGEST" \
             --oauth-version "$OAUTH_SECRET_VERSION" --bearer-version "$BEARER_SECRET_VERSION" \
             --output "$RUNNER_TEMP/release.tfvars.json"
+      - name: Select release identity and pinned secrets
+        id: release
+        run: |
+          set -euo pipefail
+          echo "commit=$(jq -r .release.commit "$RUNNER_TEMP/release.tfvars.json")" >> "$GITHUB_OUTPUT"
+          echo "digest=$(jq -r .release.digest "$RUNNER_TEMP/release.tfvars.json")" >> "$GITHUB_OUTPUT"
+          echo "OAUTH_SECRET_VERSION=$(jq -r .release.oauth_version "$RUNNER_TEMP/release.tfvars.json")" >> "$GITHUB_ENV"
+          echo "BEARER_SECRET_VERSION=$(jq -r .release.bearer_version "$RUNNER_TEMP/release.tfvars.json")" >> "$GITHUB_ENV"
       - name: Initialize deployment state
         run: |
-          terraform -chdir=infra init -input=false -lockfile=readonly \
+          terraform -chdir="$TF_DIRECTORY" init -input=false -lockfile=readonly \
             -backend-config="bucket=$TF_STATE_BUCKET" \
             -backend-config="prefix=calendar/$CALENDAR_ENV"
+          terraform -chdir="$TF_DIRECTORY" validate -no-color
       - name: Plan and check deployment scope
         env:
           TF_VAR_project_id: ${{ env.GCP_PROJECT_ID }}
           TF_VAR_environment: ${{ env.CALENDAR_ENV }}
         run: |
           set -euo pipefail
-          terraform -chdir=infra plan -input=false -lock-timeout=5m \
+          terraform -chdir="$TF_DIRECTORY" plan -input=false -lock-timeout=5m \
             -var-file="$RUNNER_TEMP/release.tfvars.json" -out="$RUNNER_TEMP/deploy.tfplan"
-          terraform -chdir=infra show -json "$RUNNER_TEMP/deploy.tfplan" > "$RUNNER_TEMP/deploy-plan.json"
+          terraform -chdir="$TF_DIRECTORY" show -json "$RUNNER_TEMP/deploy.tfplan" > "$RUNNER_TEMP/deploy-plan.json"
           python3 -m scripts.deploy_release check-plan \
             --plan "$RUNNER_TEMP/deploy-plan.json" --release "$RUNNER_TEMP/release.tfvars.json" \
             --project "$GCP_PROJECT_ID" --environment "$CALENDAR_ENV"
       - name: Apply the checked plan
-        run: terraform -chdir=infra apply -input=false -lock-timeout=5m "$RUNNER_TEMP/deploy.tfplan"
+        run: terraform -chdir="$TF_DIRECTORY" apply -input=false -lock-timeout=5m "$RUNNER_TEMP/deploy.tfplan"
       - name: Record deployed artifact
         id: deployed
         env:
           IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+          CONFIGURATION_COMMIT: ${{ steps.rollback.outputs.configuration_commit || github.sha }}
         run: |
           set -euo pipefail
-          url=$(terraform -chdir=infra output -raw service_url)
+          url=$(terraform -chdir="$TF_DIRECTORY" output -raw service_url)
           echo "url=$url" >> "$GITHUB_OUTPUT"
           jq --arg project "$GCP_PROJECT_ID" --arg environment "$CALENDAR_ENV" \
             --arg image "$IMAGE_REPOSITORY@$IMAGE_DIGEST" --arg url "$url" \
-            '. + {project: $project, environment: $environment, image: $image, url: $url, verified: false}' \
+            --arg workflow_commit "$GITHUB_SHA" --arg configuration_commit "$CONFIGURATION_COMMIT" \
+            --arg operation "$DEPLOYMENT_OPERATION" --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$GITHUB_RUN_ATTEMPT" --arg rollback_source "$ROLLBACK_RUN_ID" \
+            '. + {project: $project, environment: $environment, image: $image, url: $url, verified: false,
+              workflow_commit: $workflow_commit, configuration_commit: $configuration_commit,
+              operation: $operation, run_id: $run_id, run_attempt: $run_attempt,
+              rollback_source_run_id: (if $rollback_source == "" then null else ($rollback_source | tonumber) end)}' \
             "$RUNNER_TEMP/release.tfvars.json" > "$RUNNER_TEMP/deployed-release.json"
           {
             echo "### Deployment candidate"
-            echo "Commit: $GITHUB_SHA"
+            echo "Operation: $DEPLOYMENT_OPERATION"
+            echo "Release commit: $RELEASE_COMMIT"
+            echo "Configuration commit: $CONFIGURATION_COMMIT"
+            echo "Workflow commit: $GITHUB_SHA"
+            if [[ "$DEPLOYMENT_OPERATION" == "rollback" ]]; then
+              echo "Restored verified release from Deploy run: $ROLLBACK_RUN_ID"
+              echo "Existing Calendar writes are not undone by restoring code and configuration."
+            fi
             echo "Image: $IMAGE_REPOSITORY@$IMAGE_DIGEST"
             echo "Environment: $CALENDAR_ENV"
             echo "URL: $url"
@@ -210,7 +293,7 @@ jobs:
           CALENDAR_VERIFY_BEARER_FILE: ${{ runner.temp }}/calendar-smoke/bearer
         run: |
           set -euo pipefail
-          uv run --no-sync python -m scripts.verify_put_live | tee "$RUNNER_TEMP/smoke.jsonl"
+          uv run --no-sync python -u -m scripts.verify_put_live | tee "$RUNNER_TEMP/smoke.jsonl"
       - name: Mark the release verified
         env:
           READY_REVISION: ${{ steps.identity.outputs.revision }}
@@ -253,4 +336,6 @@ jobs:
           rm -f -- "$RUNNER_TEMP/deploy.tfplan" "$RUNNER_TEMP/deploy-plan.json" \
             "$RUNNER_TEMP/release.tfvars.json" "$RUNNER_TEMP/deployed-release.json" \
             "$RUNNER_TEMP/verified-release.json" "$RUNNER_TEMP/running-service.json" \
+            "$RUNNER_TEMP/source-run.json" "$RUNNER_TEMP/source-artifacts.json" \
+            "$RUNNER_TEMP/rollback-selection.json" "$RUNNER_TEMP/rollback-artifact/verified-release.json" \
             "$RUNNER_TEMP/calendar-smoke/token.json" "$RUNNER_TEMP/calendar-smoke/bearer"
