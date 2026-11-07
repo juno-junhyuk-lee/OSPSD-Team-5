@@ -1,0 +1,28 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Existing deployment environment
+        type: choice
+        options: [verify, demo]
+        default: verify
+        required: true
+      rollback_run_id:
+        description: Successful Deploy run ID to restore (leave empty for a new deployment)
+        type: string
+        default: ""
+        required: false
+
+permissions: {}
+
+jobs:
+  registration-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Explain how to run the implementation
+        run: |
+          echo "This main-branch workflow only registers manual dispatch. It does not deploy."
+          echo "Select hw2/milestone-3-level-2 in Run workflow to use the implementation."
