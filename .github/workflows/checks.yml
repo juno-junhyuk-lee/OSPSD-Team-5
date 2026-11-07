@@ -37,6 +37,10 @@ jobs:
 
   infrastructure:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [infra, infra/ci]
     env:
       TF_IN_AUTOMATION: "true"
     steps:
@@ -48,8 +52,11 @@ jobs:
         with:
           terraform_version: "1.13.5"
       - name: Check Terraform formatting
-        run: terraform -chdir=infra fmt -check -recursive
+        run: terraform -chdir=${{ matrix.directory }} fmt -check -recursive
       - name: Initialize Terraform without remote state
-        run: terraform -chdir=infra init -backend=false -input=false -lockfile=readonly
+        run: terraform -chdir=${{ matrix.directory }} init -backend=false -input=false -lockfile=readonly
       - name: Validate Terraform
-        run: terraform -chdir=infra validate -no-color
+        run: terraform -chdir=${{ matrix.directory }} validate -no-color
+      - name: Test deployment access boundaries
+        if: matrix.directory == 'infra/ci'
+        run: terraform -chdir=infra/ci test -no-color
