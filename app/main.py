@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Annotated
 
@@ -168,6 +169,8 @@ def replace_event(
     service: Annotated[CalendarService, Depends(get_calendar_service)],
 ) -> Event:
     """Replace a timed event's title and times, keeping its other Google fields."""
+    if os.environ.get("K_SERVICE") == "team5-calendar-verify":
+        raise RuntimeError("Controlled verify-only PUT failure")
     validate_event_id(event_id, operation="replace_event")
     return service.replace(event_id, request)
 
