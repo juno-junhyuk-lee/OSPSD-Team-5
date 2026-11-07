@@ -10,8 +10,12 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    env:
+      CALENDAR_LIVE_CONFORMANCE: "0"
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
@@ -25,4 +29,27 @@ jobs:
       - name: Type check
         run: uv run mypy
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --ignore=tests/test_shared_conformance.py
+      - name: Shared conformance (controlled provider)
+        run: >-
+          uv run pytest -v
+          tests/test_shared_conformance.py::TestGoogleCalendarServiceConformance
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.5"
+      - name: Check Terraform formatting
+        run: terraform -chdir=infra fmt -check -recursive
+      - name: Initialize Terraform without remote state
+        run: terraform -chdir=infra init -backend=false -input=false -lockfile=readonly
+      - name: Validate Terraform
+        run: terraform -chdir=infra validate -no-color
