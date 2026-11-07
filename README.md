@@ -57,7 +57,16 @@ below retain HW1 implementation history; their historical verification records
 refer to their recorded commits and do not prove tagged HW2 verification.
 The [November 4 real Google record](docs/SHARED_CONTRACT_VERIFICATION.md)
 separately verifies the tagged normal workflow at clean commit `327e8bc`;
-shared conformance wiring and adoption review/CI remain open.
+shared conformance wiring is integrated. Historical run evidence remains tied
+to its recorded commit, while final deployed verification remains separate.
+
+### Milestone 3 deployment and pipeline
+
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for manual deployment and the
+[Level 2 pipeline/recovery procedure](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery).
+**Verify deployment, failure detection, and recovery are verified**, including
+real Google smoke and cleanup. Merged-revision automatic deployment remains
+pending. Execution evidence is tracked in the PR.
 
 ### Installation
 
@@ -855,6 +864,7 @@ uv sync --frozen
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
+uv run mypy scripts/deploy_release.py scripts/verify_put_live.py
 uv run pytest -v
 git diff --check
 ```
@@ -864,6 +874,10 @@ Configuration is in pyproject.toml and pytest.ini. GitHub Actions runs these
 uv-based lint, formatting, type, and test checks on pushes and pull requests
 using Python 3.14 on Linux. For intentional formatting changes, run
 `uv run ruff format .` and review the diff.
+
+CI also checks controlled shared conformance and both Terraform roots without
+live Google calls or deployment credentials. See [DEPLOYMENT.md](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
+for deployment and recovery.
 
 The fast suite runs without Google credentials or external network access.
 It covers HTTP contracts, provider translation, event authentication,
