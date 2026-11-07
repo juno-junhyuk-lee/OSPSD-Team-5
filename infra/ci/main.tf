@@ -1,10 +1,15 @@
 locals {
   name               = "team5-calendar-${var.environment}"
   github_environment = "calendar-${var.environment}"
-  github_subject     = "repo:${var.github_repository}:environment:${local.github_environment}"
-  state_prefix       = "calendar/${var.environment}/"
-  state_object_path  = "projects/_/buckets/${var.state_bucket}/objects/${local.state_prefix}"
-  secret_roles       = toset(["roles/secretmanager.viewer", "roles/secretmanager.secretAccessor"])
+  github_subject = format(
+    "repo:%s@%s/%s@%s:environment:%s",
+    split("/", var.github_repository)[0], var.github_owner_id,
+    split("/", var.github_repository)[1], var.github_repository_id,
+    local.github_environment,
+  )
+  state_prefix      = "calendar/${var.environment}/"
+  state_object_path = "projects/_/buckets/${var.state_bucket}/objects/${local.state_prefix}"
+  secret_roles      = toset(["roles/secretmanager.viewer", "roles/secretmanager.secretAccessor"])
   secret_grants = {
     for grant in setproduct(["oauth", "bearer"], local.secret_roles) :
     "${grant[0]}:${grant[1]}" => { secret = grant[0], role = grant[1] }
