@@ -75,6 +75,12 @@ jobs:
           [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[0-9]+/locations/global/workloadIdentityPools/team5-github-${CALENDAR_ENV}/providers/github$ ]]
           [[ "$OAUTH_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
           [[ "$BEARER_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+      - name: Install smoke test runtime
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.14"
+      - name: Install locked smoke test dependencies
+        run: uv sync --frozen
       - name: Authenticate for the image push
         id: registry-auth
         uses: google-github-actions/auth@v3
@@ -159,22 +165,92 @@ jobs:
             '. + {project: $project, environment: $environment, image: $image, url: $url, verified: false}' \
             "$RUNNER_TEMP/release.tfvars.json" > "$RUNNER_TEMP/deployed-release.json"
           {
-            echo "### Deployment applied — provider verification pending"
+            echo "### Deployment candidate"
             echo "Commit: $GITHUB_SHA"
             echo "Image: $IMAGE_REPOSITORY@$IMAGE_DIGEST"
             echo "Environment: $CALENDAR_ENV"
             echo "URL: $url"
             echo "This artifact is not yet recorded as a known-good release."
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Save non-secret release references
+      - name: Check running release and traffic
+        id: identity
+        run: |
+          set -euo pipefail
+          gcloud run services describe "team5-calendar-$CALENDAR_ENV" \
+            --project="$GCP_PROJECT_ID" --region=us-central1 --format=json \
+            > "$RUNNER_TEMP/running-service.json"
+          revision=$(python3 -m scripts.deploy_release check-service \
+            --service "$RUNNER_TEMP/running-service.json" --release "$RUNNER_TEMP/release.tfvars.json" \
+            --project "$GCP_PROJECT_ID" --environment "$CALENDAR_ENV")
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - name: Authenticate for smoke test secrets
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      - name: Load pinned smoke test secrets
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/calendar-smoke"
+          gcloud secrets versions access "$OAUTH_SECRET_VERSION" \
+            --project="$GCP_PROJECT_ID" --secret="team5-calendar-$CALENDAR_ENV-oauth" \
+            --out-file="$RUNNER_TEMP/calendar-smoke/token.json" --quiet
+          gcloud secrets versions access "$BEARER_SECRET_VERSION" \
+            --project="$GCP_PROJECT_ID" --secret="team5-calendar-$CALENDAR_ENV-bearer" \
+            --out-file="$RUNNER_TEMP/calendar-smoke/bearer" --quiet
+      - name: Verify deployed API against real Google Calendar
+        id: smoke
+        timeout-minutes: 10
+        env:
+          CALENDAR_MODE: hosted
+          CALENDAR_TOKEN_FILE: ${{ runner.temp }}/calendar-smoke/token.json
+          CALENDAR_VERIFY_URL: ${{ steps.deployed.outputs.url }}
+          CALENDAR_VERIFY_BEARER_FILE: ${{ runner.temp }}/calendar-smoke/bearer
+        run: |
+          set -euo pipefail
+          uv run --no-sync python -m scripts.verify_put_live | tee "$RUNNER_TEMP/smoke.jsonl"
+      - name: Mark the release verified
+        env:
+          READY_REVISION: ${{ steps.identity.outputs.revision }}
+        run: |
+          set -euo pipefail
+          jq --arg revision "$READY_REVISION" \
+            '. + {verified: true, revision: $revision}' \
+            "$RUNNER_TEMP/deployed-release.json" > "$RUNNER_TEMP/verified-release.json"
+          {
+            echo "### Release verified"
+            echo "Real-provider smoke and cleanup passed."
+            echo "Ready revision: $READY_REVISION"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save verified release references
         uses: actions/upload-artifact@v4
         with:
-          name: deployed-release-${{ env.CALENDAR_ENV }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/deployed-release.json
+          name: verified-release-${{ env.CALENDAR_ENV }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verified-release.json
           retention-days: 14
           if-no-files-found: error
+      - name: Save sanitized smoke results
+        if: always() && (steps.smoke.outcome == 'success' || steps.smoke.outcome == 'failure')
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results-${{ env.CALENDAR_ENV }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/smoke.jsonl
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Report failed release verification
+        if: always() && (steps.identity.outcome == 'failure' || steps.smoke.outcome == 'failure')
+        run: |
+          {
+            echo "### Release not verified"
+            echo "The candidate may still be deployed; it is not a known-good release."
+            echo "Inspect the smoke run marker for any uncertain Calendar write before retrying."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Remove temporary plans and manifests
         if: always()
         run: |
           rm -f -- "$RUNNER_TEMP/deploy.tfplan" "$RUNNER_TEMP/deploy-plan.json" \
-            "$RUNNER_TEMP/release.tfvars.json" "$RUNNER_TEMP/deployed-release.json"
+            "$RUNNER_TEMP/release.tfvars.json" "$RUNNER_TEMP/deployed-release.json" \
+            "$RUNNER_TEMP/verified-release.json" "$RUNNER_TEMP/running-service.json" \
+            "$RUNNER_TEMP/calendar-smoke/token.json" "$RUNNER_TEMP/calendar-smoke/bearer"

@@ -7,7 +7,13 @@ from typing import Any
 
 import pytest
 
-from scripts.deploy_release import Release, check_plan, main, read_release
+from scripts.deploy_release import (
+    Release,
+    check_plan,
+    check_service,
+    main,
+    read_release,
+)
 
 COMMIT = "a" * 40
 DIGEST = "sha256:" + "b" * 64
@@ -256,3 +262,114 @@ def test_cli_rejects_malformed_plan_without_echoing_contents(
         main()
     assert error.value.code == 1
     assert "private-provider-response" not in capsys.readouterr().err
+
+
+@pytest.fixture
+def running_service() -> dict[str, Any]:
+    revision = "team5-calendar-verify-00002-abc"
+    return {
+        "metadata": {"name": "team5-calendar-verify"},
+        "spec": {
+            "template": {
+                "spec": {
+                    "containers": [
+                        {
+                            "image": "us-central1-docker.pkg.dev/ospsd-team5/"
+                            f"team5-calendar-verify/calendar@{DIGEST}",
+                            "env": [{"name": "CALENDAR_RELEASE", "value": COMMIT}],
+                        }
+                    ]
+                }
+            }
+        },
+        "status": {
+            "latestCreatedRevisionName": revision,
+            "latestReadyRevisionName": revision,
+            "traffic": [{"revisionName": revision, "percent": 100}],
+        },
+    }
+
+
+def test_accepts_matching_running_release(running_service: dict[str, Any]) -> None:
+    assert check_service(running_service, RELEASE, "ospsd-team5", "verify") == (
+        "team5-calendar-verify-00002-abc"
+    )
+
+
+@pytest.mark.parametrize(
+    "defect", ["target", "image", "commit", "not-ready", "traffic"]
+)
+def test_rejects_stale_or_misdirected_smoke_target(
+    running_service: dict[str, Any], defect: str
+) -> None:
+    if defect == "target":
+        running_service["metadata"]["name"] = "team5-calendar-demo"
+    elif defect == "image":
+        running_service["spec"]["template"]["spec"]["containers"][0]["image"] = "other"
+    elif defect == "commit":
+        running_service["spec"]["template"]["spec"]["containers"][0]["env"][0][
+            "value"
+        ] = "c" * 40
+    elif defect == "not-ready":
+        running_service["status"]["latestCreatedRevisionName"] = (
+            "new-not-ready-revision"
+        )
+    else:
+        running_service["status"]["traffic"] = [
+            {
+                "revisionName": "team5-calendar-verify-00001-old",
+                "percent": 100,
+            }
+        ]
+    with pytest.raises(ValueError):
+        check_service(running_service, RELEASE, "ospsd-team5", "verify")
+
+
+@pytest.mark.parametrize("percent", [0, 50])
+def test_rejects_incomplete_traffic_allocation(
+    running_service: dict[str, Any], percent: int
+) -> None:
+    running_service["status"]["traffic"][0]["percent"] = percent
+    with pytest.raises(ValueError, match="All service traffic"):
+        check_service(running_service, RELEASE, "ospsd-team5", "verify")
+
+
+def test_running_service_cli(
+    running_service: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    release_path = tmp_path / "release.json"
+    release_path.write_text(
+        json.dumps(
+            {
+                "release": {
+                    "commit": COMMIT,
+                    "digest": DIGEST,
+                    "oauth_version": 2,
+                    "bearer_version": 3,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    service_path = tmp_path / "service.json"
+    service_path.write_text(json.dumps(running_service), encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "deploy_release",
+            "check-service",
+            "--service",
+            str(service_path),
+            "--release",
+            str(release_path),
+            "--project",
+            "ospsd-team5",
+            "--environment",
+            "verify",
+        ],
+    )
+    assert main() == 0
+    assert capsys.readouterr().out.strip() == "team5-calendar-verify-00002-abc"

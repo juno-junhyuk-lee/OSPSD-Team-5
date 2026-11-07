@@ -80,6 +80,38 @@ def check_plan(
             raise ValueError("The service secret references do not match the release")
 
 
+def check_service(
+    service: dict[str, Any], release: Release, project: str, environment: str
+) -> str:
+    """Check Cloud Run v1 describe output before trusting a smoke result."""
+    if environment not in {"demo", "verify"}:
+        raise ValueError("Unsupported deployment environment")
+    name = f"team5-calendar-{environment}"
+    status = service["status"]
+    revision = status["latestReadyRevisionName"]
+    if (
+        service["metadata"]["name"] != name
+        or not isinstance(revision, str)
+        or not revision.startswith(f"{name}-")
+        or status["latestCreatedRevisionName"] != revision
+    ):
+        raise ValueError("The selected service's latest revision must be ready")
+    containers = service["spec"]["template"]["spec"]["containers"]
+    expected = f"us-central1-docker.pkg.dev/{project}/{name}/calendar@{release.digest}"
+    if len(containers) != 1 or containers[0]["image"] != expected:
+        raise ValueError("The running template must use the selected image digest")
+    settings = {entry["name"]: entry.get("value") for entry in containers[0]["env"]}
+    if settings.get("CALENDAR_RELEASE") != release.commit:
+        raise ValueError("The running release must match the selected commit")
+    traffic = status["traffic"]
+    if sum(route.get("percent", 0) for route in traffic) != 100 or any(
+        route.get("percent", 0) > 0 and route.get("revisionName") != revision
+        for route in traffic
+    ):
+        raise ValueError("All service traffic must reach the selected ready revision")
+    return revision
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -94,6 +126,11 @@ def main() -> int:
     check.add_argument("--release", type=Path, required=True)
     check.add_argument("--project", required=True)
     check.add_argument("--environment", choices=["demo", "verify"], required=True)
+    running = commands.add_parser("check-service")
+    running.add_argument("--service", type=Path, required=True)
+    running.add_argument("--release", type=Path, required=True)
+    running.add_argument("--project", required=True)
+    running.add_argument("--environment", choices=["demo", "verify"], required=True)
     args = parser.parse_args()
     try:
         if args.command == "prepare":
@@ -104,12 +141,21 @@ def main() -> int:
                 json.dumps({"release": asdict(release)}, indent=2) + "\n",
                 encoding="utf-8",
             )
-        else:
+        elif args.command == "check-plan":
             check_plan(
                 json.loads(args.plan.read_text(encoding="utf-8")),
                 read_release(args.release),
                 args.project,
                 args.environment,
+            )
+        else:
+            print(
+                check_service(
+                    json.loads(args.service.read_text(encoding="utf-8")),
+                    read_release(args.release),
+                    args.project,
+                    args.environment,
+                )
             )
     except (ValueError, TypeError, KeyError, IndexError, OSError) as error:
         # Do not echo malformed plan values, state, or provider responses.

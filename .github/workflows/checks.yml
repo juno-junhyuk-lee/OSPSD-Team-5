@@ -31,6 +31,7 @@ jobs:
         run: |
           uv run mypy
           uv run mypy scripts/deploy_release.py
+          uv run mypy scripts/verify_put_live.py
       - name: Test
         run: uv run pytest --ignore=tests/test_shared_conformance.py
       - name: Shared conformance (controlled provider)

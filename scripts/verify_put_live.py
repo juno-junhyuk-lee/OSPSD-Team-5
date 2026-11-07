@@ -123,6 +123,21 @@ def google_time(value: object) -> object:
     return value.get("dateTime") if isinstance(value, dict) else None
 
 
+def check_readiness(client: Client, verification: Verification) -> bool:
+    """Fail before creating provider data if the service is not ready."""
+    passed = True
+    for step, expected in (("health", 200), ("ready", 204)):
+        try:
+            response = client.get(f"/{step}")
+            success = response.status_code == expected
+            verification.check(step, success, status=response.status_code)
+        except Exception as error:
+            success = False
+            verification.check(step, False, error=type(error).__name__)
+        passed = passed and success
+    return passed
+
+
 def verify_workflow(
     client: Client, google: Any, verification: Verification, run_id: str
 ) -> None:
@@ -229,6 +244,7 @@ def verification_client() -> Client:
         headers={"Authorization": f"Bearer {bearer}"},
         timeout=100,
         trust_env=False,
+        follow_redirects=False,
     )
 
 
@@ -245,7 +261,8 @@ def main() -> int:
             verification_client() as client,
             build("calendar", "v3", credentials=credentials) as google,
         ):
-            verify_workflow(client, google, verification, run_id)
+            if check_readiness(client, verification):
+                verify_workflow(client, google, verification, run_id)
     except Exception as error:
         verification.check("setup", False, error=type(error).__name__)
     return verification.finish()
