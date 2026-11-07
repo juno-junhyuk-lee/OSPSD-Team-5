@@ -2,11 +2,11 @@
 
 | Item | Value |
 | --- | --- |
-| Status | In review; adoption and conformance merged into integration branch |
-| Author | Juno Lee, with team input and Niriti Pahadi's review revisions |
+| Status | In review; adoption integrated, Level 2 automation implemented, live pipeline acceptance pending |
+| Author | Juno Lee, with team input, Niriti Pahadi's review revisions, and Kristie Lee's Level 2 updates |
 | Team / vertical | Team 5 / Calendar |
 | Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
-| Last updated | November 4, 2026 |
+| Last updated | November 6, 2026 |
 | Complete-design reviewer | Niriti Pahadi; [review revisions #42][design-review], final review of this revision pending |
 | Contract-facing reviewer | Team 2 or Team 7 representative; assignment and final review pending |
 | Shared agreement | [Joint decision memo][memo], version 4, October 28, 2026; staff access needs verification |
@@ -114,8 +114,8 @@ The linked memo and versioned Python/HTTP contracts define the shared agreement.
 This section records Team 5's migration choices rather than duplicating that
 agreement. This revision corrects the inherited `v0.1.0` source pin to the
 published `v0.1.0-rc.1` tag, updates lock metadata and current references, and
-keeps the shared commit unchanged. The correction still needs review and merge
-through #40 before it is part of `hw2/milestone-2`.
+keeps the shared commit unchanged. The correction was integrated through #40;
+historical output retains its original labels with the clarification below.
 Both names have referred to commit `1c1cad7`; the current published tag is the
 reproducible reference. The distribution's internal version remains `0.1.0`.
 
@@ -290,6 +290,25 @@ See [the deployment runbook](docs/DEPLOYMENT.md) for bootstrap, plan/apply,
 verification, and teardown. An independent teammate must reproduce the steps in
 a disposable environment. Keep the review evidence separate from the design.
 
+### Level 2: release pipeline and recovery
+
+Kristie's `deploy.yml` reuses Checks before deploying an immutable image digest.
+An administrator bootstraps environment-scoped OIDC permissions in `infra/ci`;
+CI cannot administer its own IAM or bootstrap state. The checked Terraform plan
+permits only an update/no-op of the existing service. Deployment and recovery
+share environment concurrency and state locking.
+
+The ready revision and traffic must match, then deployed HTTP operations,
+independent Google read-back, and cleanup must pass before a verified release
+artifact is published. Manual recovery validates a successful trusted artifact,
+restores its original Terraform configuration, image, and secret versions without
+rebuilding, and repeats the same checks. It does not undo Calendar writes.
+
+See [the deployment runbook](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
+for setup and recovery. Implementation/local checks are complete; **actual
+pipeline deployment and recovery remain unverified**. Track execution evidence
+and handoff follow-ups in the PR.
+
 ## Testing and verification
 
 | Guarantee | Check and what it establishes |
@@ -301,6 +320,8 @@ a disposable environment. Keep the review evidence separate from the design.
 | Sanitized logs | Controlled HTTP log assertions: one failure entry without sensitive payloads |
 | Same vertical suite | #44's `test_shared_conformance.py`: tagged `CalendarServiceConformance` against Team 5's implementation |
 | Real persistence and extension preservation | Workflow script and recorded live conformance: actual Google reads/writes, description preservation, cleanup |
+| Deployment and rollback guards | `test_deploy_release.py` and `test_rollback_release.py`: immutable references, service-only plans, ready revision/traffic, trusted artifact provenance, and original configuration inputs |
+| Smoke failure/cleanup behavior | `test_verify_put_live.py`: controlled remote HTTP transport, readiness before writes, faulty PUT detection, cleanup, and no uncertain-create retry; not live pipeline evidence |
 
 In #44, the offline `service` fixture constructs `GoogleCalendarService` using
 real adapters backed by the isolated fake Google client. `failing_service`
@@ -394,15 +415,11 @@ credentials. Historical HW1 results cannot substitute for HW2 checks.
 | Jim Lo | #43 adoption merged; migration, models/errors, examples | Review #40's tag-reference correction and unchanged shared commit before integration |
 | Ka Pui Cheung | #41 PUT and #44 conformance merged; real verification recorded | Follow up on inherited live cleanup concerns and verify the combined submission revision |
 | Juno Lee | Level 1 Cloud Run runtime, Terraform, billing, and teardown | Verify provisioning, repeat apply, and teardown independently before Level 2 handoff |
+| Kristie Lee | Level 2 CI, deployment, and recovery | Implementation complete; live pipeline verification pending |
 
-`hw2/milestone-2` is the integration branch. This document stays on
-`doc/design.md` in #40; Niriti's #42 revisions are consolidated here to avoid
-parallel final documents. #43 and #44 are merged into `hw2/milestone-2`;
-#44's merge commit is `671b63a`. Update this design branch against the integration
-branch and preserve both conformance instructions and the corrected package tag
-when resolving documentation conflicts.
-The combined milestone PR targets `main` after review, passing checks, and
-recorded tagged-provider evidence. No merge approval is implied by this plan.
+Milestone 3 uses `hw2/milestone-3`. Level 2 work on
+`hw2/milestone-3-level-2` targets that branch; the combined milestone PR targets
+`main` after review and verification.
 
 If a common contract change is incompatible, Kristie coordinates Teams 2, 5,
 and 7 and their consumers before publication. Explain changed requests/outcomes,
@@ -464,6 +481,8 @@ requirements.
 - November 5: selected Cloud Run and Terraform for Level 1. Added the container,
   hosted runtime, infrastructure configuration, and deployment runbook. Live
   provisioning and independent verification remain separate evidence.
+- November 6: added Level 2 CI, OIDC bootstrap, immutable deployment, smoke
+  gating, and manual recovery. Local checks pass; live pipeline verification pending.
 - Codex assisted with drafting, repository inspection, and review checks.
   Students must understand, verify, and own their submitted work.
 
