@@ -98,6 +98,20 @@ resource "google_project_iam_member" "quota" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# Operation polling is project-scoped even when service updates use service IAM.
+resource "google_project_iam_custom_role" "operations" {
+  project     = var.project_id
+  role_id     = "calendar_${var.environment}_operation_reader"
+  title       = "Calendar ${var.environment} operation reader"
+  permissions = ["run.operations.get"]
+}
+
+resource "google_project_iam_member" "operations" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.operations.name
+  member  = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 resource "google_storage_bucket_iam_member" "state_objects" {
   bucket = var.state_bucket
   role   = "roles/storage.objectAdmin"

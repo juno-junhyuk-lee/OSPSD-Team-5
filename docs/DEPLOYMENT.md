@@ -230,6 +230,8 @@ terraform -chdir=infra/ci output -json github_environment_variables
 ```
 
 The subject uses GitHub's immutable owner/repository ID format for this repository.
+Terraform operation polling uses a project-level custom role granting only
+`run.operations.get`; service update permissions remain scoped to the service.
 WIF restricts access to the trusted repository, owner, environment, branches,
 and push/manual events. No service-account JSON key is required. Bootstrap
 `demo` separately before enabling its deployment branches.

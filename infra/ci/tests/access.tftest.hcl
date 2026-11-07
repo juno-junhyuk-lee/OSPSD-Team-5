@@ -34,6 +34,14 @@ run "verify_access_is_scoped" {
   }
 
   assert {
+    condition = (
+      google_project_iam_custom_role.operations.project == "ospsd-team5" &&
+      google_project_iam_custom_role.operations.permissions == toset(["run.operations.get"])
+    )
+    error_message = "Project-level operation access must grant only polling, not service administration."
+  }
+
+  assert {
     condition     = google_artifact_registry_repository_iam_member.images.repository == "team5-calendar-verify"
     error_message = "Verify CI must push only to the verify image repository."
   }
