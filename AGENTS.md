@@ -2,6 +2,33 @@
 
 ## Code and setup
 
+HW2 uses calendar-contract tag `v0.1.0-rc.1`, commit
+`1c1cad7a0732ddb242a05400d8833d94e4422424`. Import shared Event, CreateEvent,
+ReplaceEvent, CalendarService, CalendarError, and ErrorCode from that package.
+Use start/end string fields; reject legacy start_time/end_time and unknown
+request fields. PATCH remains full-field replacement. This migration supersedes
+HW1 field-name and per-route error wiring descriptions in historical evidence.
+
+- `app/calendar_service.py`: composes the four existing Google adapters and
+  translates operation-specific errors into CalendarError before the shared
+  interface returns. No provider errors or SDK types cross that boundary.
+- `app/calendar_service_dependencies.py`: get_calendar_service supplies the
+  shared protocol; existing operation factories remain its subdependencies.
+- `tests/test_calendar_service.py` and `tests/test_shared_calendar_http.py`:
+  direct shared-boundary checks and whole-service HTTP substitution.
+- `tests/test_shared_provider_failures.py`: controlled adapter failure phases.
+- `tests/test_event_shape_policy.py`: offline HTTP ID checks, pre-write rejection
+  of all-day/series replacements, and timed-instance preservation.
+- `tests/test_shared_conformance.py`: the shared `CalendarServiceConformance`
+  suite against `GoogleCalendarService`, offline on the fake Google client;
+  `CALENDAR_LIVE_CONFORMANCE=1` also runs it against real Google.
+- `scripts/verify_put_live.py`: tagged POST/GET/PUT/GET/DELETE workflow with
+  independent Google checks and cleanup. This command changes Google state.
+- `tests/test_verify_put_live.py`: controlled script checks; not live evidence.
+- [Shared adoption guide](docs/SHARED_CONTRACT_ADOPTION.md): migration and setup.
+- [Tagged Google evidence](docs/SHARED_CONTRACT_VERIFICATION.md): successful
+  normal workflow at clean `327e8bc`; conformance/review/CI remain separate.
+
 - `GET /calendars/{calendar_id}`: Google-backed primary calendar metadata operation.
 - `tests/test_calendars.py`: offline calendar success and missing-ID tests.
   The Calendar response model lives in `app/models.py`; its provider lookup is in `app/google_calendar.py`.
@@ -12,15 +39,16 @@
   substitute it through FastAPI dependency overrides.
 
 - `app/errors.py`: Level 5 shared error format (`ServiceError`, `ErrorCode`),
-  response schema, service/request-validation handlers, and sanitized failure
-  logs. DELETE, both GETs, POST, and PATCH use it.
-- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, and DELETE.
+  response schema, CalendarError/ServiceError/request-validation handlers, and
+  sanitized failure logs. DELETE, both GETs, POST, PUT, and PATCH use it.
+- `app/main.py`: FastAPI routes; Google-backed calendar GET, event GET, POST, PATCH, PUT, and DELETE.
+  PUT and PATCH share `EventUpdater` and its failure mapping; PUT keeps non-shared Google fields.
 - `app/google_auth.py`: noninteractive token loading and refresh for API requests.
 - `app/google_calendar.py`: Google calendar metadata retrieval and translation.
 - `app/google_create_events.py`: `GoogleEventCreator`, shared authorization,
   creation, response translation, and creation error translation.
 - `app/event_creation_provider.py`: `EventCreator` contract and creation service errors;
-  POST receives this interface through FastAPI injection.
+  the shared service receives it through a FastAPI subdependency.
 - `app/event_creation_dependencies.py`: selects the creator supplied to POST.
 - `tests/test_google_calendar.py`: offline calendar metadata translation tests.
 - `tests/test_google_create_events.py`: offline POST provider and token tests.
@@ -45,7 +73,8 @@
 - `app/google_events.py`: `GoogleEventReader` implementation and Google field translation.
 - `tests/test_google_events.py`: offline Google-backed HTTP contract and failure tests.
 - `tests/test_google_auth.py`: isolated token lifecycle tests.
-- `app/models.py`: Event response model and creation/update input validation.
+- `app/models.py`: local Calendar metadata model; event/request models come
+  directly from calendar_contract.
 - `tests/test_events.py`: controlled reader HTTP contract tests and dependency overrides.
 - `tests/test_create_events.py`: offline creation and validation contract tests.
 - `tests/test_create_event_contract.py`: controlled creator HTTP tests with
@@ -68,24 +97,26 @@ Fast tests must run without internet or Google credentials.
 Kristie owns event GET. It uses the shared account's primary Google Calendar;
 run scripts/google_calendar_auth.py before serving requests. Never start browser
 authorization in a route. Preserve the four-field Event response and existing 404.
-Event GET calls the typed `EventReader` boundary; SDK calls and translation
-stay inside `GoogleEventReader`. Service errors come from `app/event_provider.py`.
-Event GET receives its reader through `app/event_dependencies.py`. Contract tests
-use dependency overrides and restore prior overrides after each test. Keep Google
+The shared service delegates event GET to the typed `EventReader` boundary;
+SDK calls and translation stay inside `GoogleEventReader`. Adapter errors come from `app/event_provider.py`
+and become CalendarError in the shared service.
+The shared service receives the event reader through `app/event_dependencies.py`.
+Contract tests use dependency overrides and restore prior overrides after each test. Keep Google
 provider and CRUD fixtures separate from these controlled reader tests.
 Calendar GET already receives its reader through `app/calendar_dependencies.py`.
 Jim's POST writes to the same primary calendar and returns Google's event ID.
-POST calls the typed `EventCreator` boundary in `app/event_creation_provider.py`.
+The shared service delegates POST to EventCreator in app/event_creation_provider.py.
 Google calls, translation, and known failure handling stay in `GoogleEventCreator`.
-The POST handler maps permission, authorization, and unconfirmed creation errors
-to shared 403/503/502 responses with retryable=false. Use the shared handler for
-one sanitized failure log; do not add route/adapter logging or expose raw input.
-FastAPI request validation uses the shared 422 shape for POST and PATCH body
-errors. PATCH application failures use the shared `ServiceError` format with
-operation `update_event`. Preserve the shared `load_credentials` helper used by
-PATCH and DELETE while refactoring creation. `app/event_creation_dependencies.py` selects Google and
-supplies the creator through `Depends`; POST does not construct the concrete
-provider. Controlled creator HTTP tests override that dependency, use fresh
+GoogleCalendarService translates permission, authorization, temporary, and
+unconfirmed creation failures into CalendarError. The HTTP handler maps them
+to 403/503/502 and preserves operation-specific retry advice. Use the shared
+handler for one sanitized failure log; do not add route/adapter logging or expose raw input.
+FastAPI request validation uses the shared shape: malformed/empty JSON is 400,
+while invalid valid-JSON input is 422. POST, PUT, and PATCH use shared strict
+models. Preserve the shared `load_credentials` helper used by PATCH and DELETE.
+`app/event_creation_dependencies.py` selects Google for the service subdependency;
+POST receives CalendarService and does not construct the provider.
+Controlled creator HTTP tests override that dependency, use fresh
 creator state, and restore prior overrides in `finally`. Keep Google provider
 and CRUD fixtures separate from these interface-based tests.
 GET reads the provider directly; no local event mirror is used. Never fall back
@@ -117,7 +148,8 @@ Discuss contract changes together and update tests and docs with the code.
 Use Python 3.14 with uv and the locked dependencies in `uv.lock`. Run
 `uv sync --frozen`, then the README checks: `uv run ruff check .`,
 `uv run ruff format --check .`, `uv run mypy`, `uv run pytest -v`, and
-`git diff --check`. GitHub Actions runs the uv-based checks on pushes and PRs.
+`git diff --check`. Also run `uv run mypy scripts/verify_put_live.py` when editing
+the verification script. GitHub Actions runs the uv-based checks on pushes and PRs.
 Mypy currently covers
 app and tests in strict mode. Calendar metadata and event retrieval have offline
 tests using controlled provider responses.

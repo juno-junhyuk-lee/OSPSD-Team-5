@@ -1,8 +1,8 @@
 # Calendar service tutorial
 
-This walkthrough shows the full **Create → Read → Update → Delete** workflow
+This walkthrough shows the full **Create → Read → Replace → Read → Delete** workflow
 against a running local server, plus a few failure responses that use the shared
-Level 5 error shape. It is the team demo path for reviewers and teammates.
+Calendar contract error shape. It is the team demo path for reviewers and teammates.
 
 Use a unique title each run so leftover events are easy to find and clean up.
 
@@ -31,9 +31,9 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 Interactive API docs: http://127.0.0.1:8000/docs
 
-The `curl` examples below assume another terminal in the same repo. On Windows
-PowerShell you can paste the same commands if `curl` is available, or use
-Swagger UI and match the bodies.
+The `curl` examples below use POSIX shell syntax in another terminal in the
+same repo (macOS, Linux, or Git Bash on Windows). PowerShell users can use
+Swagger UI with the same bodies.
 
 ## 1. Create (POST)
 
@@ -42,8 +42,8 @@ curl -sS -i -X POST http://127.0.0.1:8000/events \
   -H "Content-Type: application/json" \
   -d "{
     \"title\": \"Team 5 tutorial event\",
-    \"start_time\": \"2026-10-22T10:00:00-04:00\",
-    \"end_time\": \"2026-10-22T11:00:00-04:00\"
+    \"start\": \"2030-01-07T10:00:00-05:00\",
+    \"end\": \"2030-01-07T11:00:00-05:00\"
   }"
 ```
 
@@ -59,15 +59,16 @@ Content-Type: application/json
 {
   "id": "dnmuq3jlnvb8v1cfh5aej2ou10",
   "title": "Team 5 tutorial event",
-  "start_time": "2026-10-22T10:00:00-04:00",
-  "end_time": "2026-10-22T11:00:00-04:00"
+  "start": "2030-01-07T10:00:00-05:00",
+  "end": "2030-01-07T11:00:00-05:00"
 }
 ```
 
-Save the `id` for the next steps. In bash:
+These examples describe expected behavior, not a recorded live run. Save the
+actual returned `id` for the next steps. In bash:
 
 ```sh
-EVENT_ID=dnmuq3jlnvb8v1cfh5aej2ou10
+EVENT_ID="PASTE_THE_ID_RETURNED_BY_POST"
 ```
 
 ## 2. Read (GET)
@@ -88,21 +89,26 @@ curl -sS -i "http://127.0.0.1:8000/events/$EVENT_ID"
 
 Expected: **200** with the same four fields as the POST response.
 
-## 3. Update (PATCH)
+## 3. Replace (PUT)
 
 ```sh
-curl -sS -i -X PATCH "http://127.0.0.1:8000/events/$EVENT_ID" \
+curl -sS -i -X PUT "http://127.0.0.1:8000/events/$EVENT_ID" \
   -H "Content-Type: application/json" \
   -d "{
     \"title\": \"Team 5 tutorial event (updated)\",
-    \"start_time\": \"2026-10-22T10:00:00-04:00\",
-    \"end_time\": \"2026-10-22T11:30:00-04:00\"
+    \"start\": \"2030-01-07T10:00:00-05:00\",
+    \"end\": \"2030-01-07T11:30:00-05:00\"
   }"
 ```
 
 Expected: **200** with the same `id` and refreshed title/times.
 
-Confirm with GET again; the body should match the PATCH response.
+Confirm with GET again. The ID and title must match; compare timestamp instants,
+not raw offset strings. PUT preserves non-shared Google fields.
+
+PATCH remains an extension using the same complete title/start/end body. It
+currently performs the same shared-field replacement; omitted fields are rejected.
+Old start_time/end_time inputs are rejected with 422 rather than accepted as aliases.
 
 ## 4. Delete (DELETE)
 
@@ -112,17 +118,17 @@ curl -sS -i -X DELETE "http://127.0.0.1:8000/events/$EVENT_ID"
 
 Expected: **204** with an empty body.
 
-Repeat DELETE (or GET / PATCH the same ID):
+Repeat DELETE (or GET / PUT the same ID):
 
 ```sh
 curl -sS -i -X DELETE "http://127.0.0.1:8000/events/$EVENT_ID"
 curl -sS -i "http://127.0.0.1:8000/events/$EVENT_ID"
-curl -sS -i -X PATCH "http://127.0.0.1:8000/events/$EVENT_ID" \
+curl -sS -i -X PUT "http://127.0.0.1:8000/events/$EVENT_ID" \
   -H "Content-Type: application/json" \
   -d "{
     \"title\": \"should fail\",
-    \"start_time\": \"2026-10-22T10:00:00-04:00\",
-    \"end_time\": \"2026-10-22T11:00:00-04:00\"
+    \"start\": \"2030-01-07T10:00:00-05:00\",
+    \"end\": \"2030-01-07T11:00:00-05:00\"
   }"
 ```
 
@@ -148,7 +154,8 @@ Failures use one public shape:
 
 | `code` | Typical status | Meaning |
 | --- | --- | --- |
-| `invalid_input` | 422 | Bad ID, body, or field values |
+| `invalid_input` | 400 | Malformed or empty JSON |
+| `invalid_input` | 422 | Invalid ID or valid JSON with missing, unknown, or invalid fields |
 | `not_found` | 404 | Missing or already deleted |
 | `access_denied` | 403 | Provider refused access |
 | `provider_unavailable` | 503 | Auth missing/rejected (`retryable: false`), or temporary outage/rate limit (`retryable: true`) |
@@ -161,12 +168,21 @@ curl -sS -i -X POST http://127.0.0.1:8000/events \
   -H "Content-Type: application/json" \
   -d "{
     \"title\": \"bad times\",
-    \"start_time\": \"2026-10-22T11:00:00-04:00\",
-    \"end_time\": \"2026-10-22T10:00:00-04:00\"
+    \"start\": \"2030-01-07T11:00:00-05:00\",
+    \"end\": \"2030-01-07T10:00:00-05:00\"
   }"
 ```
 
 Expected: **422** / `invalid_input` / `retryable: false`. No new Google event.
+
+### Malformed JSON
+
+```sh
+curl -sS -i -X POST http://127.0.0.1:8000/events \
+  -H "Content-Type: application/json" -d '{"title":'
+```
+
+Expected: **400** / `invalid_input` / `retryable: false`, before a provider operation.
 
 ### Invalid event ID
 
@@ -191,10 +207,13 @@ provider flag, status) with no tokens or request bodies.
 ## 6. Cleanup and stop
 
 If a create succeeded but you stopped early, delete that event ID with DELETE.
+If POST returns 502 without an ID, inspect the test calendar before creating
+again; the event may exist. Do not automatically resend an uncertain POST.
 Then stop the server with Ctrl+C.
 
 ## Related docs
 
+- Tagged package and migration: [adoption guide](docs/SHARED_CONTRACT_ADOPTION.md)
 - Setup, contracts, and auth: [README.md](README.md)
 - Shared error format: README “Error format”
 - Per-operation Level 5 evidence: `docs/*_LEVEL5_VERIFICATION.md`

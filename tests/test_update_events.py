@@ -10,14 +10,14 @@ from app import google_create_events, google_update_events
 
 EVENT = {
     "title": "Original Meeting",
-    "start_time": "2026-10-06T10:00:00-04:00",
-    "end_time": "2026-10-06T11:00:00-04:00",
+    "start": "2026-10-06T10:00:00-04:00",
+    "end": "2026-10-06T11:00:00-04:00",
 }
 
 UPDATE = {
     "title": "  Updated Meeting  ",
-    "start_time": "2026-10-06T11:00:00-04:00",
-    "end_time": "2026-10-06T12:00:00-04:00",
+    "start": "2026-10-06T11:00:00-04:00",
+    "end": "2026-10-06T12:00:00-04:00",
 }
 
 
@@ -28,13 +28,13 @@ def test_update_and_retrieve_event(client: TestClient) -> None:
 
     assert response.status_code == 200
     event = response.json()
-    assert set(event) == {"id", "title", "start_time", "end_time"}
+    assert set(event) == {"id", "title", "start", "end"}
     assert event["id"] == event_id
     assert event["title"] == "Updated Meeting"
-    assert datetime.fromisoformat(event["start_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["start"]) == datetime.fromisoformat(
         "2026-10-06T11:00:00-04:00"
     )
-    assert datetime.fromisoformat(event["end_time"]) == datetime.fromisoformat(
+    assert datetime.fromisoformat(event["end"]) == datetime.fromisoformat(
         "2026-10-06T12:00:00-04:00"
     )
     assert client.get(f"/events/{event_id}").json() == event
@@ -68,7 +68,7 @@ def test_update_unknown_event_preserves_state(
     assert provider_events == before
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_preserves_state(
     client: TestClient,
     provider_events: dict[str, dict[str, object]],
@@ -94,8 +94,8 @@ def test_equal_times_preserves_state(
     before = deepcopy(provider_events)
     payload = {
         "title": "Bad Times",
-        "start_time": "2026-10-06T11:00:00-04:00",
-        "end_time": "2026-10-06T11:00:00-04:00",
+        "start": "2026-10-06T11:00:00-04:00",
+        "end": "2026-10-06T11:00:00-04:00",
     }
 
     response = client.patch(f"/events/{event_id}", json=payload)
@@ -218,4 +218,59 @@ def test_missing_authorization_returns_unavailable(
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "provider_unavailable"
     assert response.json()["error"]["retryable"] is False
+    google_service.events.return_value.patch.assert_not_called()
+
+
+def test_put_replaces_shared_fields_and_keeps_google_fields(
+    client: TestClient, provider_events: dict[str, dict[str, object]]
+) -> None:
+    provider_events["rich-event"] = {
+        "id": "rich-event",
+        "summary": "Original",
+        "description": "Agenda",
+        "location": "Room 1",
+        "attendees": [{"email": "guest@example.com"}],
+        "start": {"dateTime": "2026-10-06T14:00:00Z"},
+        "end": {"dateTime": "2026-10-06T15:00:00Z"},
+    }
+
+    response = client.put("/events/rich-event", json=UPDATE)
+
+    assert response.status_code == 200
+    event = response.json()
+    assert set(event) == {"id", "title", "start", "end"}
+    assert event["id"] == "rich-event"
+    assert event["title"] == "Updated Meeting"
+    assert datetime.fromisoformat(event["start"]) == datetime.fromisoformat(
+        UPDATE["start"]
+    )
+    assert datetime.fromisoformat(event["end"]) == datetime.fromisoformat(UPDATE["end"])
+    stored = provider_events["rich-event"]
+    assert stored["description"] == "Agenda"
+    assert stored["location"] == "Room 1"
+    assert stored["attendees"] == [{"email": "guest@example.com"}]
+    assert client.get("/events/rich-event").json() == event
+
+
+def test_put_unknown_event_returns_not_found(
+    client: TestClient, provider_events: dict[str, dict[str, object]]
+) -> None:
+    before = deepcopy(provider_events)
+
+    response = client.put("/events/missing-event", json=UPDATE)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert provider_events == before
+
+
+def test_put_after_delete_returns_not_found(
+    client: TestClient, google_service: MagicMock
+) -> None:
+    event_id = client.post("/events", json=EVENT).json()["id"]
+    assert client.delete(f"/events/{event_id}").status_code == 204
+
+    response = client.put(f"/events/{event_id}", json=UPDATE)
+
+    assert response.status_code == 404
     google_service.events.return_value.patch.assert_not_called()

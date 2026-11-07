@@ -1,9 +1,11 @@
 import json
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from calendar_contract import CreateEvent
 from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
@@ -14,11 +16,11 @@ from requests.exceptions import RequestException
 from app import google_create_events
 from app.event_creation_provider import (
     EventCreationDeniedError,
+    EventCreationProviderUnavailableError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
     EventCreator,
 )
-from app.models import CreateEventRequest
 
 
 @pytest.fixture
@@ -27,12 +29,12 @@ def creator() -> EventCreator:
 
 
 @pytest.fixture
-def creation_request() -> CreateEventRequest:
-    return CreateEventRequest.model_validate(
+def creation_request() -> CreateEvent:
+    return CreateEvent.model_validate(
         {
             "title": "  Team Meeting  ",
-            "start_time": "2026-10-05T10:00:00-04:00",
-            "end_time": "2026-10-05T09:00:00-06:00",
+            "start": "2026-10-05T10:00:00-04:00",
+            "end": "2026-10-05T09:00:00-06:00",
         }
     )
 
@@ -63,7 +65,7 @@ def service(provider_response: dict[str, object]) -> Iterator[MagicMock]:
 
 
 def test_create_translates_google_fields(
-    creator: EventCreator, creation_request: CreateEventRequest, service: MagicMock
+    creator: EventCreator, creation_request: CreateEvent, service: MagicMock
 ) -> None:
     event = creator.create_event(creation_request)
 
@@ -78,16 +80,20 @@ def test_create_translates_google_fields(
     assert event.model_dump(mode="json") == {
         "id": "google-event-123",
         "title": "Team Meeting",
-        "start_time": "2026-10-05T14:00:00Z",
-        "end_time": "2026-10-05T15:00:00Z",
+        "start": "2026-10-05T14:00:00Z",
+        "end": "2026-10-05T15:00:00Z",
     }
-    assert event.start_time == creation_request.start_time
-    assert event.end_time == creation_request.end_time
+    assert datetime.fromisoformat(event.start) == datetime.fromisoformat(
+        creation_request.start
+    )
+    assert datetime.fromisoformat(event.end) == datetime.fromisoformat(
+        creation_request.end
+    )
 
 
 def test_repeated_creation_returns_provider_ids(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
     provider_response: dict[str, object],
 ) -> None:
@@ -117,7 +123,7 @@ def test_repeated_creation_returns_provider_ids(
 )
 def test_unusable_provider_response_is_not_a_success(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
     provider_response: dict[str, object],
     field: str,
@@ -132,27 +138,37 @@ def test_unusable_provider_response_is_not_a_success(
 
 
 @pytest.mark.parametrize(
-    "error",
+    ("error", "expected"),
     [
-        HttpError(Response({"status": "429"}), b'{"error": "rate limited"}'),
-        HttpError(Response({"status": "500"}), b'{"error": "provider failure"}'),
-        TimeoutError("Provider may have accepted the write."),
-        TransportError("Private transport details"),
-        HttpLib2Error("Private HTTP details"),
-        RequestException("Private request details"),
-        OSError("Private connection details"),
+        (
+            HttpError(Response({"status": "429"}), b'{"error": "rate limited"}'),
+            EventCreationProviderUnavailableError,
+        ),
+        (
+            HttpError(Response({"status": "500"}), b'{"error": "provider failure"}'),
+            EventCreationUnconfirmedError,
+        ),
+        (
+            TimeoutError("Provider may have accepted the write."),
+            EventCreationUnconfirmedError,
+        ),
+        (TransportError("Private transport details"), EventCreationUnconfirmedError),
+        (HttpLib2Error("Private HTTP details"), EventCreationUnconfirmedError),
+        (RequestException("Private request details"), EventCreationUnconfirmedError),
+        (OSError("Private connection details"), EventCreationUnconfirmedError),
     ],
 )
 def test_provider_failure_does_not_retry(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
     error: Exception,
+    expected: type[Exception],
 ) -> None:
     execute = service.events.return_value.insert.return_value.execute
     execute.side_effect = error
 
-    with pytest.raises(EventCreationUnconfirmedError) as raised:
+    with pytest.raises(expected) as raised:
         creator.create_event(creation_request)
 
     assert raised.value.__cause__ is error
@@ -162,7 +178,7 @@ def test_provider_failure_does_not_retry(
 
 def test_permission_denial_is_distinct_from_uncertain_creation(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
 ) -> None:
     error = HttpError(
@@ -185,7 +201,7 @@ def test_permission_denial_is_distinct_from_uncertain_creation(
 )
 def test_rate_limit_403_is_not_permission_denial(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
     reason: str,
 ) -> None:
@@ -198,7 +214,7 @@ def test_rate_limit_403_is_not_permission_denial(
     execute = service.events.return_value.insert.return_value.execute
     execute.side_effect = error
 
-    with pytest.raises(EventCreationUnconfirmedError) as raised:
+    with pytest.raises(EventCreationProviderUnavailableError) as raised:
         creator.create_event(creation_request)
 
     assert raised.value.__cause__ is error
@@ -214,7 +230,7 @@ def test_rate_limit_403_is_not_permission_denial(
 )
 def test_remote_authorization_failure_is_unavailable(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
     error: Exception,
 ) -> None:
@@ -232,7 +248,7 @@ def test_remote_authorization_failure_is_unavailable(
 
 def test_unexpected_programming_error_is_not_hidden(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     service: MagicMock,
 ) -> None:
     service.events.return_value.insert.return_value.execute.side_effect = TypeError(
@@ -251,7 +267,7 @@ def local_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_missing_token_prevents_provider_creation(
-    creator: EventCreator, creation_request: CreateEventRequest, local_token: Path
+    creator: EventCreator, creation_request: CreateEvent, local_token: Path
 ) -> None:
     with patch.object(google_create_events, "build") as build:
         with pytest.raises(EventCreationUnavailableError) as raised:
@@ -335,7 +351,7 @@ def test_unusable_authorization_does_not_save_token(
 @pytest.mark.parametrize("problem", ["revoked", "invalid"])
 def test_refresh_failure_records_remote_involvement_without_insert(
     creator: EventCreator,
-    creation_request: CreateEventRequest,
+    creation_request: CreateEvent,
     local_token: Path,
     credentials: MagicMock,
     problem: str,

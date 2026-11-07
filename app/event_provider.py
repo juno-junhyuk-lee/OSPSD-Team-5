@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from app.models import Event
+from calendar_contract import Event
 
 
 class EventNotFoundError(Exception):
@@ -39,7 +39,7 @@ class EventReader(Protocol):
     def get_event(self, event_id: str) -> Event:
         """Return one event by provider-assigned ID without changing events.
 
-        Return id, title, start_time, and end_time; an absent title is empty.
+        Return id, title, start, and end; an absent title is empty.
         Raise EventNotFoundError for a missing event, UnsupportedEventError
         for an all-day event, CalendarAuthenticationError for unavailable
         or rejected authorization, EventAccessDeniedError for denied access,

@@ -8,8 +8,8 @@ from app import google_create_events, google_delete_events
 
 EVENT = {
     "title": "Delete Me",
-    "start_time": "2026-10-06T10:00:00-04:00",
-    "end_time": "2026-10-06T11:00:00-04:00",
+    "start": "2026-10-06T10:00:00-04:00",
+    "end": "2026-10-06T11:00:00-04:00",
 }
 
 
@@ -123,7 +123,7 @@ def test_gone_google_event_returns_not_found(
         TimeoutError("network timeout"),
     ],
 )
-def test_provider_failure_returns_bad_gateway(
+def test_provider_failure_returns_classified_error(
     client: TestClient,
     google_service: MagicMock,
     provider_events: dict[str, dict[str, object]],
@@ -134,8 +134,11 @@ def test_provider_failure_returns_bad_gateway(
 
     response = client.delete("/events/test-event")
 
-    assert response.status_code == 502
-    assert response.json()["error"]["code"] == "provider_error"
+    rate_limited = isinstance(failure, HttpError) and failure.resp.status == 403
+    assert response.status_code == (503 if rate_limited else 502)
+    assert response.json()["error"]["code"] == (
+        "provider_unavailable" if rate_limited else "provider_error"
+    )
     assert response.json()["error"]["retryable"] is True
     assert "secret" not in response.text
     assert "test-event" in provider_events

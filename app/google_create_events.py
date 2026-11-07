@@ -3,21 +3,23 @@
 from pathlib import Path
 from typing import cast
 
+from calendar_contract import CreateEvent, Event
 from google.auth.exceptions import RefreshError, TransportError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
-from pydantic import AwareDatetime, BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from requests.exceptions import RequestException
 
 from app.event_creation_provider import (
     EventCreationDeniedError,
+    EventCreationProviderUnavailableError,
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
 )
-from app.models import CreateEventRequest, Event
+from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
@@ -35,7 +37,7 @@ RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceed
 
 
 class _GoogleEventTime(BaseModel):
-    dateTime: AwareDatetime
+    dateTime: str
 
 
 class _GoogleEvent(BaseModel):
@@ -81,40 +83,51 @@ def load_credentials() -> Credentials:
     return credentials
 
 
-def create_google_event(request: CreateEventRequest) -> Event:
+def create_google_event(request: CreateEvent) -> Event:
     """Insert into primary and translate the provider result to the public model."""
-    credentials = load_credentials()
     body = {
-        "summary": request.title,
-        "start": {"dateTime": request.start_time.isoformat()},
-        "end": {"dateTime": request.end_time.isoformat()},
+        "summary": request.title.strip(),
+        "start": {"dateTime": request.start},
+        "end": {"dateTime": request.end},
     }
-    with build("calendar", "v3", credentials=credentials) as service:
-        result = (
-            service.events()
-            .insert(calendarId="primary", body=body)
-            .execute(num_retries=0)
-        )
+    write_started = False
+    try:
+        credentials = load_credentials()
+        with build("calendar", "v3", credentials=credentials) as service:
+            insert = service.events().insert(calendarId="primary", body=body)
+            write_started = True
+            result = insert.execute(num_retries=0)
+    except HttpError as error:
+        if not write_started and (
+            error.resp.status in TEMPORARY_HTTP_STATUSES
+            or (error.resp.status == 403 and is_rate_limited(error))
+        ):
+            raise EventCreationProviderUnavailableError from error
+        raise
+    except (TransportError, HttpLib2Error, RequestException, OSError) as error:
+        if not write_started:
+            raise EventCreationProviderUnavailableError from error
+        raise
     provider_event = _GoogleEvent.model_validate(result)
-    translated = CreateEventRequest.model_validate(
+    translated = CreateEvent.model_validate(
         {
             "title": provider_event.summary,
-            "start_time": provider_event.start.dateTime.isoformat(),
-            "end_time": provider_event.end.dateTime.isoformat(),
+            "start": provider_event.start.dateTime,
+            "end": provider_event.end.dateTime,
         }
     )
     return Event(
         id=provider_event.id,
         title=translated.title,
-        start_time=translated.start_time,
-        end_time=translated.end_time,
+        start=translated.start,
+        end=translated.end,
     )
 
 
 class GoogleEventCreator:
     """Create Google events through the service creation contract."""
 
-    def create_event(self, request: CreateEventRequest) -> Event:
+    def create_event(self, request: CreateEvent) -> Event:
         try:
             return create_google_event(request)
         except GoogleCalendarSetupError as error:
@@ -137,6 +150,9 @@ class GoogleEventCreator:
                 )
                 if not reasons & RATE_LIMIT_REASONS:
                     raise EventCreationDeniedError from error
+                raise EventCreationProviderUnavailableError from error
+            if error.resp.status == 429:
+                raise EventCreationProviderUnavailableError from error
             raise EventCreationUnconfirmedError from error
         except (
             TransportError,

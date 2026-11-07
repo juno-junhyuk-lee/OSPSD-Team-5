@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from datetime import datetime
 
 import pytest
+from calendar_contract import CreateEvent, Event
 from fastapi.testclient import TestClient
 
 from app.event_creation_dependencies import get_event_creator
@@ -14,23 +15,22 @@ from app.event_creation_provider import (
     EventCreator,
 )
 from app.main import app
-from app.models import CreateEventRequest, Event
 
 
 class ControlledEventCreator:
     def __init__(self) -> None:
-        self.requests: list[CreateEventRequest] = []
+        self.requests: list[CreateEvent] = []
         self.error: Exception | None = None
 
-    def create_event(self, request: CreateEventRequest) -> Event:
+    def create_event(self, request: CreateEvent) -> Event:
         self.requests.append(request)
         if self.error is not None:
             raise self.error
         return Event(
             id=f"controlled-event-{len(self.requests)}",
             title=request.title,
-            start_time=request.start_time,
-            end_time=request.end_time,
+            start=request.start,
+            end=request.end,
         )
 
 
@@ -58,8 +58,8 @@ def client(creator: ControlledEventCreator) -> Iterator[TestClient]:
 def payload() -> dict[str, object]:
     return {
         "title": "  Team Meeting  ",
-        "start_time": "2026-10-13T10:00:00-04:00",
-        "end_time": "2026-10-13T11:00:00-04:00",
+        "start": "2026-10-13T10:00:00-04:00",
+        "end": "2026-10-13T11:00:00-04:00",
     }
 
 
@@ -74,15 +74,19 @@ def test_create_event_contract(
     assert response.status_code == 201
     assert response.json() == {
         "id": "controlled-event-1",
-        "title": "Team Meeting",
-        "start_time": "2026-10-13T10:00:00-04:00",
-        "end_time": "2026-10-13T11:00:00-04:00",
+        "title": "  Team Meeting  ",
+        "start": "2026-10-13T10:00:00-04:00",
+        "end": "2026-10-13T11:00:00-04:00",
     }
     assert len(creator.requests) == 1
     request = creator.requests[0]
-    assert request.title == "Team Meeting"
-    assert request.start_time == datetime.fromisoformat("2026-10-13T10:00:00-04:00")
-    assert request.end_time == datetime.fromisoformat("2026-10-13T11:00:00-04:00")
+    assert request.title == "  Team Meeting  "
+    assert datetime.fromisoformat(request.start) == datetime.fromisoformat(
+        "2026-10-13T10:00:00-04:00"
+    )
+    assert datetime.fromisoformat(request.end) == datetime.fromisoformat(
+        "2026-10-13T11:00:00-04:00"
+    )
     assert not [
         record for record in caplog.records if record.name == "calendar_service"
     ]
@@ -100,7 +104,7 @@ def test_repeated_creation_uses_returned_ids(
     assert len(creator.requests) == 2
 
 
-@pytest.mark.parametrize("field", ["title", "start_time", "end_time"])
+@pytest.mark.parametrize("field", ["title", "start", "end"])
 def test_missing_field_does_not_call_creator(
     client: TestClient,
     creator: ControlledEventCreator,
@@ -127,11 +131,11 @@ def test_missing_field_does_not_call_creator(
     [
         ("title", " \t\n "),
         ("title", 123),
-        ("start_time", "not-a-date"),
-        ("start_time", "2026-10-13T10:00:00"),
-        ("end_time", None),
-        ("end_time", "2026-10-13T10:00:00-04:00"),
-        ("end_time", "2026-10-13T15:00:00+02:00"),
+        ("start", "not-a-date"),
+        ("start", "2026-10-13T10:00:00"),
+        ("end", None),
+        ("end", "2026-10-13T10:00:00-04:00"),
+        ("end", "2026-10-13T15:00:00+02:00"),
     ],
 )
 def test_invalid_input_does_not_call_creator(
@@ -154,18 +158,18 @@ def test_invalid_input_does_not_call_creator(
 def test_time_order_compares_instants(
     client: TestClient, creator: ControlledEventCreator, payload: dict[str, object]
 ) -> None:
-    payload["end_time"] = "2026-10-13T09:00:00-06:00"
+    payload["end"] = "2026-10-13T09:00:00-06:00"
 
     response = client.post("/events", json=payload)
 
     assert response.status_code == 201
     assert len(creator.requests) == 1
-    assert creator.requests[0].end_time == datetime.fromisoformat(
+    assert datetime.fromisoformat(creator.requests[0].end) == datetime.fromisoformat(
         "2026-10-13T11:00:00-04:00"
     )
-    assert datetime.fromisoformat(
-        response.json()["end_time"]
-    ) == datetime.fromisoformat("2026-10-13T11:00:00-04:00")
+    assert datetime.fromisoformat(response.json()["end"]) == datetime.fromisoformat(
+        "2026-10-13T11:00:00-04:00"
+    )
 
 
 @pytest.mark.parametrize(

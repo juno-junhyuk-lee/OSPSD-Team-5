@@ -102,6 +102,14 @@ wheels = [
 ]
 
 [[package]]
+name = "calendar-contract"
+version = "0.1.0"
+source = { git = "https://github.com/Airbus-A330/OSPSD-Calendar?tag=v0.1.0-rc.1#1c1cad7a0732ddb242a05400d8833d94e4422424" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 source = { registry = "https://pypi.org/simple" }
@@ -663,6 +671,7 @@ dependencies = [
     { name = "annotated-types" },
     { name = "anyio" },
     { name = "ast-serialize" },
+    { name = "calendar-contract" },
     { name = "certifi" },
     { name = "cffi" },
     { name = "charset-normalizer" },
@@ -717,6 +726,7 @@ requires-dist = [
     { name = "annotated-types", specifier = "==0.8.0" },
     { name = "anyio", specifier = "==4.15.1" },
     { name = "ast-serialize", specifier = "==0.12.1" },
+    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar?tag=v0.1.0-rc.1" },
     { name = "certifi", specifier = "==2026.7.22" },
     { name = "cffi", specifier = "==2.1.1" },
     { name = "charset-normalizer", specifier = "==3.5.2" },
