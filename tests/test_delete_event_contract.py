@@ -135,13 +135,16 @@ def test_delete_failure_contract(
     assert body["error"]["retryable"] is retryable
     assert "private" not in response.text
     assert event_deleter.requested_ids == ["test-event"]
-    [record] = caplog.records
-    assert json.loads(record.getMessage()) == {
-        "operation": "delete_event",
-        "error": code,
-        "provider": code != "provider_unavailable",
-        "status": status,
-    }
+    [record] = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": "delete_event",
+            "error": code,
+            "provider": code != "provider_unavailable",
+            "status": status,
+        }.items()
+    )
     assert "private" not in caplog.text
 
 

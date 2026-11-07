@@ -31,6 +31,7 @@ from app.errors import (
 )
 from app.google_auth import hosted
 from app.models import Calendar
+from app.observability import RequestTelemetryMiddleware
 from app.runtime import lifespan, require_hosted_access
 
 app = FastAPI(
@@ -45,6 +46,7 @@ app = FastAPI(
     },
 )
 app.middleware("http")(require_hosted_access)
+app.add_middleware(RequestTelemetryMiddleware)
 app.add_exception_handler(ServiceError, service_error_handler)
 app.add_exception_handler(CalendarError, calendar_error_handler)
 app.add_exception_handler(RequestValidationError, request_validation_handler)

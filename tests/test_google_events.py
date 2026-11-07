@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import cast
 from unittest.mock import Mock
 
@@ -94,14 +95,19 @@ def test_cancelled_event_returns_not_found(
         }
     }
     [record] = [
-        record for record in caplog.records if record.name == "calendar_service"
+        record
+        for record in caplog.records
+        if record.name == "calendar_service" and record.levelno >= logging.WARNING
     ]
-    assert json.loads(record.getMessage()) == {
-        "operation": "get_event",
-        "error": "not_found",
-        "provider": True,
-        "status": 404,
-    }
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": "get_event",
+            "error": "not_found",
+            "provider": True,
+            "status": 404,
+        }.items()
+    )
     assert record.exc_info is None
     assert "Provider meeting" not in response.text
     assert "Provider meeting" not in caplog.text
@@ -179,14 +185,19 @@ def test_google_401_requires_authentication(
     }
     assert "Sensitive" not in response.text
     [record] = [
-        record for record in caplog.records if record.name == "calendar_service"
+        record
+        for record in caplog.records
+        if record.name == "calendar_service" and record.levelno >= logging.WARNING
     ]
-    assert json.loads(record.getMessage()) == {
-        "operation": "get_event",
-        "error": "provider_unavailable",
-        "provider": True,
-        "status": 503,
-    }
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": "get_event",
+            "error": "provider_unavailable",
+            "provider": True,
+            "status": 503,
+        }.items()
+    )
     assert "Sensitive" not in caplog.text
 
 

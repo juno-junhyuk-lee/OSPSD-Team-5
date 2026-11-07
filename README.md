@@ -846,8 +846,9 @@ implementation of the shared protocol. Overrides must be restored after tests.
 Adapters remain responsible for authorization, SDK calls, field translation,
 and closing clients. The shared service translates their known failures to
 `CalendarError`; it does not log or retry operations. `app/errors.py` adds HTTP
-status and operation context, writes one sanitized failure log, and returns the
-common error envelope. Unexpected programming errors propagate.
+status and safe error context and returns the common error envelope. The request
+middleware emits one sanitized outcome log at request completion. Unexpected
+programming errors propagate.
 
 Calendar metadata remains an extension using `CalendarReader` and
 `get_calendar_reader` in `app/calendar_dependencies.py`. It shares the HTTP
@@ -856,6 +857,11 @@ noninteractive in every route; the separate setup script requests both scopes.
 Synchronous route handlers keep blocking SDK work off the async event loop.
 
 ### Checks and testing
+
+The [Level 3 observability guide](docs/OBSERVABILITY.md) describes request
+counters, error categories, latency histograms, and correlated outcome logs.
+Cloud export, provider spans, saturation, and dashboard verification remain
+follow-up work; the guide distinguishes local SDK tests from deployed evidence.
 
 Run the same commands on macOS, Linux, or Windows:
 

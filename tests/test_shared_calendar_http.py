@@ -152,12 +152,19 @@ def test_shared_failures_have_one_sanitized_http_response_and_log(
             "retryable": retryable,
         }
     }
-    [record] = [r for r in caplog.records if r.name == "calendar_service"]
-    assert json.loads(record.getMessage()) == {
-        "operation": operation,
-        "error": code.value,
-        "provider": True,
-        "status": status,
-    }
+    [record] = [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": operation,
+            "error": code.value,
+            "provider": True,
+            "status": status,
+        }.items()
+    )
     assert record.exc_info is None
     assert "private" not in response.text + caplog.text

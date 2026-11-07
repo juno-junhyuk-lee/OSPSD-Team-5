@@ -88,7 +88,9 @@ def test_create_event_contract(
         "2026-10-13T11:00:00-04:00"
     )
     assert not [
-        record for record in caplog.records if record.name == "calendar_service"
+        record
+        for record in caplog.records
+        if record.name == "calendar_service" and record.levelno >= logging.WARNING
     ]
 
 
@@ -229,13 +231,20 @@ def test_creation_failure_contract(
         "error": {"code": code, "message": message, "retryable": False}
     }
     assert len(creator.requests) == 1
-    [record] = [r for r in caplog.records if r.name == "calendar_service"]
-    assert json.loads(record.getMessage()) == {
-        "operation": "create_event",
-        "error": code,
-        "provider": provider,
-        "status": status,
-    }
+    [record] = [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": "create_event",
+            "error": code,
+            "provider": provider,
+            "status": status,
+        }.items()
+    )
     assert record.levelno == (logging.ERROR if status >= 500 else logging.WARNING)
     assert record.exc_info is None
     assert "private" not in response.text + caplog.text

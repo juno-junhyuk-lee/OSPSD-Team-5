@@ -2,6 +2,14 @@
 
 ## Code and setup
 
+- `app/observability.py`: request counters/histograms and one sanitized outcome
+  log around authentication, validation, and HTTP handling. Error handlers pass
+  safe context to it instead of logging the same failure twice.
+- `tests/test_observability.py`: controlled HTTP checks with the real
+  OpenTelemetry SDK in-memory reader; no live Google or cloud export.
+- [Observability guide](docs/OBSERVABILITY.md): labels, correlation, limits,
+  and remaining Level 3 integration/verification.
+
 HW2 uses calendar-contract tag `v0.1.0-rc.1`, commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424`. Import shared Event, CreateEvent,
 ReplaceEvent, CalendarService, CalendarError, and ErrorCode from that package.

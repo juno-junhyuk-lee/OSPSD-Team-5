@@ -116,7 +116,11 @@ def test_success_does_not_log_failure(
             == 200
         )
 
-    assert not [r for r in caplog.records if r.name == "calendar_service"]
+    assert not [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
 
 
 @pytest.mark.parametrize("field", ["title", "start", "end"])
@@ -204,13 +208,20 @@ def test_update_failure_contract(
     assert body["error"]["retryable"] is retryable
     assert "private" not in response.text
     assert len(updater.calls) == 1
-    [record] = [r for r in caplog.records if r.name == "calendar_service"]
-    assert json.loads(record.getMessage()) == {
-        "operation": OPERATIONS[method],
-        "error": code,
-        "provider": provider,
-        "status": status,
-    }
+    [record] = [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": OPERATIONS[method],
+            "error": code,
+            "provider": provider,
+            "status": status,
+        }.items()
+    )
     assert "private" not in caplog.text
 
 

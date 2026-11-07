@@ -160,14 +160,21 @@ def test_calendar_failure_contract(
         }
     }
     assert calendar_reader.calls == 1
-    records = [r for r in caplog.records if r.name == "calendar_service"]
+    records = [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
     assert len(records) == 1
-    assert json.loads(records[0].getMessage()) == {
-        "operation": "get_calendar",
-        "error": code,
-        "provider": provider,
-        "status": status,
-    }
+    assert (
+        json.loads(records[0].getMessage()).items()
+        >= {
+            "operation": "get_calendar",
+            "error": code,
+            "provider": provider,
+            "status": status,
+        }.items()
+    )
     assert records[0].levelno == (logging.ERROR if status >= 500 else logging.WARNING)
     assert records[0].exc_info is None
     assert "secret" not in response.text + caplog.text
@@ -178,14 +185,21 @@ def test_unknown_calendar_log(
 ) -> None:
     with caplog.at_level(logging.WARNING, logger="calendar_service"):
         client.get("/calendars/private-id")
-    records = [r for r in caplog.records if r.name == "calendar_service"]
+    records = [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
     assert len(records) == 1
-    assert json.loads(records[0].getMessage()) == {
-        "operation": "get_calendar",
-        "error": "not_found",
-        "provider": False,
-        "status": 404,
-    }
+    assert (
+        json.loads(records[0].getMessage()).items()
+        >= {
+            "operation": "get_calendar",
+            "error": "not_found",
+            "provider": False,
+            "status": 404,
+        }.items()
+    )
     assert "private-id" not in records[0].getMessage()
 
 
@@ -194,4 +208,8 @@ def test_success_does_not_log_failure(
 ) -> None:
     with caplog.at_level(logging.WARNING, logger="calendar_service"):
         assert client.get("/calendars/primary").status_code == 200
-    assert not [r for r in caplog.records if r.name == "calendar_service"]
+    assert not [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
