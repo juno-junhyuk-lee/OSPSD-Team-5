@@ -20,6 +20,7 @@ from app.event_update_provider import (
 from app.google_create_events import GoogleCalendarSetupError, load_credentials
 from app.google_delete_events import GoogleEventNotFoundError, is_permission_denied
 from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
+from app.tracing import google_call
 
 
 class _GoogleEventTime(BaseModel):
@@ -44,11 +45,12 @@ def update_google_event(event_id: str, request: ReplaceEvent) -> Event:
     try:
         credentials = load_credentials()
         with build("calendar", "v3", credentials=credentials) as service:
-            existing = (
-                service.events()
-                .get(calendarId="primary", eventId=event_id)
-                .execute(num_retries=0)
-            )
+            with google_call("events.get"):
+                existing = (
+                    service.events()
+                    .get(calendarId="primary", eventId=event_id)
+                    .execute(num_retries=0)
+                )
             if not isinstance(existing, dict):
                 raise EventUpdateProviderError
             if existing.get("status") == "cancelled":
@@ -66,7 +68,8 @@ def update_google_event(event_id: str, request: ReplaceEvent) -> Event:
                 calendarId="primary", eventId=event_id, body=body
             )
             write_started = True
-            result = patch.execute(num_retries=0)
+            with google_call("events.patch"):
+                result = patch.execute(num_retries=0)
     except HttpError as error:
         if error.resp.status in (404, 410):
             raise GoogleEventNotFoundError(event_id) from error

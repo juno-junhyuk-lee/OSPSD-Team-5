@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from app.errors import ErrorCode
 from app.event_provider import CalendarAuthenticationError
 from app.google_auth import hosted, hosted_authorization
+from app.tracing import create_tracer_provider
 
 
 @asynccontextmanager
@@ -21,12 +22,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if mode not in {"local", "hosted"}:
         raise RuntimeError("CALENDAR_MODE must be local or hosted.")
     app.state.demo_bearer = None
+    app.state.request_tracer = None
+    provider = None
     try:
+        try:
+            provider = create_tracer_provider()
+            app.state.request_tracer = provider.get_tracer("calendar.requests")
+        except Exception:
+            pass
         if hosted():
             app.state.demo_bearer = validate_hosted_config()
         yield
     finally:
         app.state.demo_bearer = None
+        app.state.request_tracer = None
+        if provider is not None:
+            try:
+                provider.shutdown()
+            except Exception:
+                pass
         hosted_authorization.cache_clear()
 
 

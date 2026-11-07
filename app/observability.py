@@ -2,8 +2,6 @@
 
 import json
 import logging
-import os
-import re
 from dataclasses import dataclass
 from time import perf_counter
 from uuid import uuid4
@@ -13,12 +11,19 @@ from opentelemetry import metrics
 from opentelemetry.metrics import Meter
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.tracing import (
+    SERVICE,
+    finish_request_span,
+    release_identity,
+    request_span,
+    span_identity,
+)
+
 logger = logging.getLogger("calendar_service")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     logger.addHandler(logging.StreamHandler())
 
-SERVICE = "calendar-team-5"
 STATE_KEY = "calendar_request_outcome"
 OPERATIONS = {
     "create_event": "create",
@@ -166,69 +171,76 @@ class RequestTelemetryMiddleware:
         outcome = RequestOutcome()
         scope.setdefault("state", {})[STATE_KEY] = outcome
         request_id = uuid4().hex
-        started = perf_counter()
-        status = 500
-        unexpected = False
+        with request_span(scope, request_id) as span:
+            started = perf_counter()
+            status = 500
+            unexpected = False
 
-        async def send_response(message: Message) -> None:
-            nonlocal status
-            if message["type"] == "http.response.start":
-                status = message["status"]
-                message = {
-                    **message,
-                    "headers": [
-                        (key, value)
-                        for key, value in message.get("headers", [])
-                        if key.lower() != b"x-request-id"
-                    ]
-                    + [(b"x-request-id", request_id.encode("ascii"))],
-                }
-            await send(message)
+            async def send_response(message: Message) -> None:
+                nonlocal status
+                if message["type"] == "http.response.start":
+                    status = message["status"]
+                    message = {
+                        **message,
+                        "headers": [
+                            (key, value)
+                            for key, value in message.get("headers", [])
+                            if key.lower() not in {b"x-request-id", b"x-trace-id"}
+                        ]
+                        + [(b"x-request-id", request_id.encode("ascii"))],
+                    }
+                    trace_id = span_identity(span)["trace_id"]
+                    if trace_id is not None:
+                        message["headers"].append(
+                            (b"x-trace-id", trace_id.encode("ascii"))
+                        )
+                await send(message)
 
-        try:
-            await self.app(scope, receive, send_response)
-        except Exception:
-            unexpected = True
-            raise
-        finally:
-            duration = max(0.0, perf_counter() - started)
-            handler, operation = request_operation(scope)
-            result, source = request_result(outcome, status, unexpected)
-            release = os.getenv("CALENDAR_RELEASE", "")
-            if not re.fullmatch(r"[0-9a-f]{40}", release):
-                release = "local"
-            # Telemetry must never change the HTTP result or retry provider work.
             try:
-                self.metrics.record(operation, result, source, status, duration)
+                await self.app(scope, receive, send_response)
             except Exception:
-                pass
-            try:
-                level = (
-                    logging.ERROR
-                    if source == "service" or status >= 500
-                    else logging.WARNING
-                    if status >= 400
-                    else logging.INFO
-                )
-                logger.log(
-                    level,
-                    json.dumps(
-                        {
-                            "service": SERVICE,
-                            "release": release,
-                            "operation": handler,
-                            "contract_operation": operation,
-                            "outcome": result,
-                            "error": result if result != "success" else None,
-                            "failure_source": source,
-                            "provider": (
-                                outcome.provider if outcome.error is not None else None
-                            ),
-                            "status": status,
-                            "duration_ms": round(duration * 1000, 3),
-                            "request_id": request_id,
-                        }
-                    ),
-                )
-            except Exception:
-                pass
+                unexpected = True
+                raise
+            finally:
+                duration = max(0.0, perf_counter() - started)
+                handler, operation = request_operation(scope)
+                result, source = request_result(outcome, status, unexpected)
+                finish_request_span(span, operation, result, source, status)
+                # Telemetry must never change the HTTP result or retry provider work.
+                try:
+                    self.metrics.record(operation, result, source, status, duration)
+                except Exception:
+                    pass
+                try:
+                    level = (
+                        logging.ERROR
+                        if source == "service" or status >= 500
+                        else logging.WARNING
+                        if status >= 400
+                        else logging.INFO
+                    )
+                    logger.log(
+                        level,
+                        json.dumps(
+                            {
+                                "service": SERVICE,
+                                "release": release_identity(),
+                                "operation": handler,
+                                "contract_operation": operation,
+                                "outcome": result,
+                                "error": result if result != "success" else None,
+                                "failure_source": source,
+                                "provider": (
+                                    outcome.provider
+                                    if outcome.error is not None
+                                    else None
+                                ),
+                                "status": status,
+                                "duration_ms": round(duration * 1000, 3),
+                                "request_id": request_id,
+                                **span_identity(span),
+                            }
+                        ),
+                    )
+                except Exception:
+                    pass

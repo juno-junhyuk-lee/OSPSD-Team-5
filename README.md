@@ -859,9 +859,11 @@ Synchronous route handlers keep blocking SDK work off the async event loop.
 ### Checks and testing
 
 The [Level 3 observability guide](docs/OBSERVABILITY.md) describes request
-counters, error categories, latency histograms, and correlated outcome logs.
-Cloud export, provider spans, saturation, and dashboard verification remain
-follow-up work; the guide distinguishes local SDK tests from deployed evidence.
+counters, error categories, latency histograms, correlated logs, and request/RPC
+traces. Lifespan-managed runs produce SDK trace IDs, also returned in
+`X-Trace-ID` on responses reaching the middleware. Cloud export, saturation,
+and dashboard verification remain follow-up work; the guide distinguishes
+local SDK tests from deployed evidence.
 
 Run the same commands on macOS, Linux, or Windows:
 

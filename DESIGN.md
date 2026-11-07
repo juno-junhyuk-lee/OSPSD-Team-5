@@ -58,7 +58,7 @@ HTTP caller
   -> operation-specific Google adapter
   -> authenticated account's primary Google Calendar
   -> shared Event, or adapter error translated to CalendarError
-  -> HTTP response + one sanitized failure log when applicable
+  -> HTTP response + one sanitized request outcome log
 ```
 
 `app/calendar_service.py` implements `CalendarService` structurally by composing
@@ -82,7 +82,8 @@ Adapters create and close Google clients per operation using context management.
 They translate Google fields and validate returned data before constructing the
 shared Event. SDK outcomes become operation-specific errors inside adapters;
 `GoogleCalendarService` converts those errors to `CalendarError`. The HTTP
-handler then selects the public response and emits one sanitized failure log.
+handler selects the public response and supplies safe error context to the
+request middleware, which emits one outcome log at request completion.
 Programming errors propagate rather than being presented as known provider errors.
 
 Before requests, a developer runs `scripts/google_calendar_auth.py`. Routes never
@@ -310,6 +311,30 @@ verified**, including real Google smoke, cleanup, and a no-change Terraform plan
 Merged-revision automatic deployment remains pending. Track execution evidence
 and handoff follow-ups in the PR.
 
+### Level 3: request observability
+
+Jim's `RequestTelemetryMiddleware` wraps caller access, validation, and route
+execution. It records fixed-label request/error counters and duration histograms,
+then emits one sanitized outcome log. Existing error handlers supply categories
+and provider context without duplicating that log. The common metric operation
+names are `create`, `get`, `replace`, and `delete`, matching the shared Python
+interface; PATCH and calendar metadata remain separate extensions.
+
+The lifespan owns an isolated OpenTelemetry tracing SDK provider. Each request
+has one SERVER span and explicit Google execute/credential-refresh calls have
+CLIENT child spans. PUT/PATCH separates its pre-read from its write. Logs and
+responses reaching the middleware carry the SDK trace ID; logs retain a separate
+request UUID as well. Resources contain the service name and sanitized release.
+Incoming trace/baggage headers, raw URLs, event data, exception text, and
+tracebacks are not exported. Tracing failure does not change the API result or
+repeat provider work.
+
+These are locally checked instrumentation changes, not a claim that Level 3 is
+complete. The tracing provider has no production exporter yet; metric SDK/export
+wiring, saturation, the dashboard, and deployed/independent verification remain
+Jim's follow-ups. See [the observability guide](docs/OBSERVABILITY.md) for the
+recording boundaries, limits, tests, and handoff to Level 4.
+
 ## Testing and verification
 
 | Guarantee | Check and what it establishes |
@@ -318,7 +343,8 @@ and handoff follow-ups in the PR.
 | Shared interface and DI | `test_calendar_service.py` and `test_shared_calendar_http.py`: composition, service substitution, statuses/errors, and restored overrides |
 | Local ID and event-shape policy | `test_event_shape_policy.py`: no writes for all-day/series replacement, timed instance preservation, existing GET policy, HTTP ID boundaries |
 | Google translation and write phases | Adapter tests and `test_shared_provider_failures.py`: controlled SDK outcomes, unchanged replacement ID, before/after-write classification, no retry |
-| Sanitized logs | Controlled HTTP log assertions: one failure entry without sensitive payloads |
+| Sanitized request observations | `test_observability.py` and existing HTTP log assertions: counters, histograms, one outcome entry, correlation, bounded labels, privacy, and fail-open recording |
+| Request and provider traces | `test_tracing.py`: normal HTTP/adapter wiring with fake Google, real SDK span export, parentage, error/retry semantics, request isolation, and privacy; not deployed evidence |
 | Same vertical suite | #44's `test_shared_conformance.py`: tagged `CalendarServiceConformance` against Team 5's implementation |
 | Real persistence and extension preservation | Workflow script and recorded live conformance: actual Google reads/writes, description preservation, cleanup |
 | Deployment and rollback guards | `test_deploy_release.py` and `test_rollback_release.py`: immutable references, service-only plans, ready revision/traffic, trusted artifact provenance, and original configuration inputs |

@@ -7,6 +7,10 @@
   safe context to it instead of logging the same failure twice.
 - `tests/test_observability.py`: controlled HTTP checks with the real
   OpenTelemetry SDK in-memory reader; no live Google or cloud export.
+- `app/tracing.py`: app-owned SDK traces, safe request/RPC spans, and sanitized
+  resource metadata. Never enable automatic exception/event or body capture.
+- `tests/test_tracing.py`: normal HTTP/adapter wiring with fake Google clients
+  and a local span exporter; parentage, correlation, privacy, and failure checks.
 - [Observability guide](docs/OBSERVABILITY.md): labels, correlation, limits,
   and remaining Level 3 integration/verification.
 

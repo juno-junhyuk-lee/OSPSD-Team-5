@@ -13,6 +13,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
 
 from app.event_provider import CalendarAuthenticationError
+from app.tracing import google_call
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 HOSTED_SCOPES = [*SCOPES, "https://www.googleapis.com/auth/calendar.calendars.readonly"]
@@ -57,7 +58,8 @@ def load_hosted_credentials() -> Credentials:
     with _refresh_lock:
         if not credentials.valid:
             try:
-                credentials.refresh(partial(Request(), timeout=10))
+                with google_call("oauth.refresh"):
+                    credentials.refresh(partial(Request(), timeout=10))
             except TransportError:
                 raise
             except GoogleAuthError:
@@ -79,7 +81,8 @@ def load_credentials(token_path: Path = ROOT / "token.json") -> Any:
             if not credentials.expired or not credentials.refresh_token:
                 raise CalendarAuthenticationError
             provider_involved = True
-            credentials.refresh(Request())
+            with google_call("oauth.refresh"):
+                credentials.refresh(Request())
             token_path.write_text(credentials.to_json(), encoding="utf-8")
         return credentials
     except TransportError:
