@@ -64,8 +64,9 @@ to its recorded commit, while final deployed verification remains separate.
 
 See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for manual deployment and the
 [Level 2 pipeline/recovery procedure](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery).
-Automation is implemented; **live pipeline deployment and recovery verification
-remain pending**. Execution evidence is tracked in the PR.
+**Verify deployment, failure detection, and recovery are verified**, including
+real Google smoke and cleanup. Merged-revision automatic deployment remains
+pending. Execution evidence is tracked in the PR.
 
 ### Installation
 

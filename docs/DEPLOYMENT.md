@@ -158,9 +158,9 @@ deployment and coordinate with anyone who shares it.
 
 ## Level 2: automated deployment and recovery
 
-Owner: Kristie Lee. **Implementation/local checks complete; actual OIDC
-permissions, Actions deployment, failed-release detection, and recovery remain
-unverified.** Earlier manual Level 1 verification does not establish these results.
+Owner: Kristie Lee. **Verify OIDC authentication, Actions deployment, failure
+detection, and recovery are verified**, including real Google smoke/cleanup and
+a no-change Terraform plan. Merged-revision automatic deployment remains pending.
 Keep execution evidence and review/handoff follow-ups in the PR.
 Use only the disposable `verify` environment for the failure/recovery exercise.
 

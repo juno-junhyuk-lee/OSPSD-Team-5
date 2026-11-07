@@ -2,11 +2,11 @@
 
 | Item | Value |
 | --- | --- |
-| Status | In review; adoption integrated, Level 2 automation implemented, live pipeline acceptance pending |
+| Status | In review; adoption integrated; Level 2 verify deployment, failure detection, and recovery verified; merged-revision deployment pending |
 | Author | Juno Lee, with team input, Niriti Pahadi's review revisions, and Kristie Lee's Level 2 updates |
 | Team / vertical | Team 5 / Calendar |
 | Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
-| Last updated | November 6, 2026 |
+| Last updated | November 7, 2026 |
 | Complete-design reviewer | Niriti Pahadi; [review revisions #42][design-review], final review of this revision pending |
 | Contract-facing reviewer | Team 2 or Team 7 representative; assignment and final review pending |
 | Shared agreement | [Joint decision memo][memo], version 4, October 28, 2026; staff access needs verification |
@@ -305,8 +305,9 @@ restores its original Terraform configuration, image, and secret versions withou
 rebuilding, and repeats the same checks. It does not undo Calendar writes.
 
 See [the deployment runbook](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
-for setup and recovery. Implementation/local checks are complete; **actual
-pipeline deployment and recovery remain unverified**. Track execution evidence
+for setup and recovery. **Verify deployment, failure detection, and recovery are
+verified**, including real Google smoke, cleanup, and a no-change Terraform plan.
+Merged-revision automatic deployment remains pending. Track execution evidence
 and handoff follow-ups in the PR.
 
 ## Testing and verification
@@ -415,7 +416,7 @@ credentials. Historical HW1 results cannot substitute for HW2 checks.
 | Jim Lo | #43 adoption merged; migration, models/errors, examples | Review #40's tag-reference correction and unchanged shared commit before integration |
 | Ka Pui Cheung | #41 PUT and #44 conformance merged; real verification recorded | Follow up on inherited live cleanup concerns and verify the combined submission revision |
 | Juno Lee | Level 1 Cloud Run runtime, Terraform, billing, and teardown | Verify provisioning, repeat apply, and teardown independently before Level 2 handoff |
-| Kristie Lee | Level 2 CI, deployment, and recovery | Implementation complete; live pipeline verification pending |
+| Kristie Lee | Level 2 CI, deployment, and recovery | Verify deployment/failure/recovery verified; merged-revision deployment pending |
 
 Milestone 3 uses `hw2/milestone-3`. Level 2 work on
 `hw2/milestone-3-level-2` targets that branch; the combined milestone PR targets
@@ -482,7 +483,9 @@ requirements.
   hosted runtime, infrastructure configuration, and deployment runbook. Live
   provisioning and independent verification remain separate evidence.
 - November 6: added Level 2 CI, OIDC bootstrap, immutable deployment, smoke
-  gating, and manual recovery. Local checks pass; live pipeline verification pending.
+  gating, and manual recovery. Local checks passed.
+- November 7: verified pipeline deployment, controlled failure detection, and
+  recovery in verify, including real Google smoke/cleanup and a no-change plan.
 - Codex assisted with drafting, repository inspection, and review checks.
   Students must understand, verify, and own their submitted work.
 
