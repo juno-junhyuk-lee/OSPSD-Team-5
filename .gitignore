@@ -109,6 +109,13 @@ credentials.json
 client_secret*.json
 token.json
 tokens.json
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+.terraform.tfstate.lock.info
 .venv/
 venv/
 env/

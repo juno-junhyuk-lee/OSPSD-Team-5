@@ -19,6 +19,8 @@ from app.event_creation_provider import (
     EventCreationUnavailableError,
     EventCreationUnconfirmedError,
 )
+from app.event_provider import CalendarAuthenticationError
+from app.google_auth import hosted, load_hosted_credentials
 from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
@@ -49,6 +51,13 @@ class _GoogleEvent(BaseModel):
 
 def load_credentials() -> Credentials:
     """Load or refresh a local token without starting browser authorization."""
+    if hosted():
+        try:
+            return load_hosted_credentials()
+        except CalendarAuthenticationError as error:
+            raise GoogleCalendarSetupError(
+                "Hosted Google authorization is unavailable.", provider=error.provider
+            ) from None
     try:
         credentials = cast(
             Credentials,

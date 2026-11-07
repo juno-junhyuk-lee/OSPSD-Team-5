@@ -1,23 +1,26 @@
 """Verify the tagged Calendar workflow against Google, then clean up.
 
-Uses in-process HTTP requests through normal FastAPI dependencies and real Google
-adapters. Prints sanitized JSON checks and exits nonzero for any failed check or
+Uses in-process HTTP by default. Set CALENDAR_VERIFY_URL and
+CALENDAR_VERIFY_BEARER_FILE to check a deployed HTTPS service. Prints sanitized
+JSON checks and exits nonzero for any failed check or
 cleanup. Run `uv run python scripts/google_calendar_auth.py` first, then
 `uv run python -m scripts.verify_put_live`. This command changes the calendar.
 """
 
 import json
+import os
 import sys
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import distribution
+from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from uuid import uuid4
 
 from calendar_contract import Event
 from fastapi.testclient import TestClient
 from googleapiclient.discovery import build  # type: ignore[import-untyped]
-from httpx import Response
+from httpx import Client, Response
 
 from app.google_create_events import load_credentials
 from app.main import app
@@ -99,18 +102,18 @@ def check_event(
     return passed
 
 
-def clean_up(client: TestClient, event_id: str, verification: Verification) -> None:
+def clean_up(client: Client, event_id: str, verification: Verification) -> None:
     """Attempt every cleanup check even when an earlier request fails."""
     path = f"/events/{quote(event_id, safe='')}"
-    for step, method, statuses in (
-        ("delete", "DELETE", (204, 404)),
-        ("get_after_delete", "GET", (404,)),
-        ("repeat_delete", "DELETE", (404,)),
+    for step, method, expected in (
+        ("delete", "DELETE", 204),
+        ("get_after_delete", "GET", 404),
+        ("repeat_delete", "DELETE", 404),
     ):
         try:
             response = client.request(method, path)
             verification.check(
-                step, response.status_code in statuses, status=response.status_code
+                step, response.status_code == expected, status=response.status_code
             )
         except Exception as error:
             verification.check(step, False, error=type(error).__name__)
@@ -121,7 +124,7 @@ def google_time(value: object) -> object:
 
 
 def verify_workflow(
-    client: TestClient, google: Any, verification: Verification, run_id: str
+    client: Client, google: Any, verification: Verification, run_id: str
 ) -> None:
     """Use one disposable event; the SDK argument is Google's untyped client."""
     start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
@@ -202,6 +205,33 @@ def verify_workflow(
             )
 
 
+def verification_client() -> Client:
+    url = os.getenv("CALENDAR_VERIFY_URL")
+    if url is None:
+        if "CALENDAR_VERIFY_BEARER_FILE" in os.environ:
+            raise ValueError("Set CALENDAR_VERIFY_URL for deployed verification.")
+        return TestClient(app)
+    target = urlsplit(url)
+    if (
+        target.scheme != "https"
+        or not target.hostname
+        or target.username is not None
+        or target.path not in {"", "/"}
+        or target.query
+        or target.fragment
+    ):
+        raise ValueError("CALENDAR_VERIFY_URL must be an HTTPS service origin.")
+    bearer = Path(os.environ["CALENDAR_VERIFY_BEARER_FILE"]).read_text().strip()
+    if not bearer:
+        raise ValueError("Provide a demo bearer token.")
+    return Client(
+        base_url=url,
+        headers={"Authorization": f"Bearer {bearer}"},
+        timeout=100,
+        trust_env=False,
+    )
+
+
 def main() -> int:
     """Verify package provenance and the Google workflow; never authorize interactively."""
     verification = Verification()
@@ -212,7 +242,7 @@ def main() -> int:
         verification.check("run", True, run_id=run_id)
         credentials = load_credentials()
         with (
-            TestClient(app) as client,
+            verification_client() as client,
             build("calendar", "v3", credentials=credentials) as google,
         ):
             verify_workflow(client, google, verification, run_id)
