@@ -1,0 +1,180 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - hw2/milestone-3-level-2
+      - hw2/milestone-3
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Existing deployment environment
+        type: choice
+        options: [verify, demo]
+        default: verify
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  deploy:
+    needs: checks
+    if: >-
+      vars.CALENDAR_DEPLOY_ENABLED == 'true' &&
+      github.repository == 'juno-junhyuk-lee/OSPSD-Team-5' &&
+      contains(fromJSON('["refs/heads/hw2/milestone-3-level-2","refs/heads/hw2/milestone-3","refs/heads/main"]'), github.ref)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: calendar-${{ inputs.environment || (github.ref_name == 'hw2/milestone-3-level-2' && 'verify' || 'demo') }}
+    concurrency:
+      group: calendar-release-${{ inputs.environment || (github.ref_name == 'hw2/milestone-3-level-2' && 'verify' || 'demo') }}
+      cancel-in-progress: false
+    env:
+      CALENDAR_ENV: ${{ inputs.environment || (github.ref_name == 'hw2/milestone-3-level-2' && 'verify' || 'demo') }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      OAUTH_SECRET_VERSION: ${{ vars.OAUTH_SECRET_VERSION }}
+      BEARER_SECRET_VERSION: ${{ vars.BEARER_SECRET_VERSION }}
+      TF_IN_AUTOMATION: "true"
+      DOCKER_BUILD_SUMMARY: "false"
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check deployment configuration
+        env:
+          CONFIGURED_ENVIRONMENT: ${{ vars.CALENDAR_ENV }}
+        run: |
+          set -euo pipefail
+          for name in GCP_PROJECT_ID GCP_WORKLOAD_IDENTITY_PROVIDER GCP_DEPLOYER_SERVICE_ACCOUNT TF_STATE_BUCKET OAUTH_SECRET_VERSION BEARER_SECRET_VERSION; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing GitHub Environment variable: $name"
+              exit 1
+            fi
+          done
+          [[ "$CONFIGURED_ENVIRONMENT" == "$CALENDAR_ENV" ]]
+          [[ "$GCP_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$TF_STATE_BUCKET" =~ ^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$ ]]
+          [[ "$GCP_DEPLOYER_SERVICE_ACCOUNT" == "team5-calendar-${CALENDAR_ENV}-ci@${GCP_PROJECT_ID}.iam.gserviceaccount.com" ]]
+          [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[0-9]+/locations/global/workloadIdentityPools/team5-github-${CALENDAR_ENV}/providers/github$ ]]
+          [[ "$OAUTH_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+          [[ "$BEARER_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+      - name: Authenticate for the image push
+        id: registry-auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: false
+          export_environment_variables: false
+      - uses: docker/login-action@v3
+        with:
+          registry: us-central1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.registry-auth.outputs.access_token }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.5"
+          terraform_wrapper: false
+      - uses: docker/setup-buildx-action@v3
+      - name: Configure image repository
+        id: image
+        run: |
+          set -euo pipefail
+          echo "repository=us-central1-docker.pkg.dev/$GCP_PROJECT_ID/team5-calendar-$CALENDAR_ENV/calendar" >> "$GITHUB_OUTPUT"
+      - name: Build and push the commit image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ${{ steps.image.outputs.repository }}:${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - name: Authenticate for deployment
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Prepare release manifest
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python3 -m scripts.deploy_release prepare \
+            --commit "$GITHUB_SHA" --digest "$IMAGE_DIGEST" \
+            --oauth-version "$OAUTH_SECRET_VERSION" --bearer-version "$BEARER_SECRET_VERSION" \
+            --output "$RUNNER_TEMP/release.tfvars.json"
+      - name: Initialize deployment state
+        run: |
+          terraform -chdir=infra init -input=false -lockfile=readonly \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="prefix=calendar/$CALENDAR_ENV"
+      - name: Plan and check deployment scope
+        env:
+          TF_VAR_project_id: ${{ env.GCP_PROJECT_ID }}
+          TF_VAR_environment: ${{ env.CALENDAR_ENV }}
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra plan -input=false -lock-timeout=5m \
+            -var-file="$RUNNER_TEMP/release.tfvars.json" -out="$RUNNER_TEMP/deploy.tfplan"
+          terraform -chdir=infra show -json "$RUNNER_TEMP/deploy.tfplan" > "$RUNNER_TEMP/deploy-plan.json"
+          python3 -m scripts.deploy_release check-plan \
+            --plan "$RUNNER_TEMP/deploy-plan.json" --release "$RUNNER_TEMP/release.tfvars.json" \
+            --project "$GCP_PROJECT_ID" --environment "$CALENDAR_ENV"
+      - name: Apply the checked plan
+        run: terraform -chdir=infra apply -input=false -lock-timeout=5m "$RUNNER_TEMP/deploy.tfplan"
+      - name: Record deployed artifact
+        id: deployed
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          url=$(terraform -chdir=infra output -raw service_url)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          jq --arg project "$GCP_PROJECT_ID" --arg environment "$CALENDAR_ENV" \
+            --arg image "$IMAGE_REPOSITORY@$IMAGE_DIGEST" --arg url "$url" \
+            '. + {project: $project, environment: $environment, image: $image, url: $url, verified: false}' \
+            "$RUNNER_TEMP/release.tfvars.json" > "$RUNNER_TEMP/deployed-release.json"
+          {
+            echo "### Deployment applied — provider verification pending"
+            echo "Commit: $GITHUB_SHA"
+            echo "Image: $IMAGE_REPOSITORY@$IMAGE_DIGEST"
+            echo "Environment: $CALENDAR_ENV"
+            echo "URL: $url"
+            echo "This artifact is not yet recorded as a known-good release."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save non-secret release references
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-release-${{ env.CALENDAR_ENV }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deployed-release.json
+          retention-days: 14
+          if-no-files-found: error
+      - name: Remove temporary plans and manifests
+        if: always()
+        run: |
+          rm -f -- "$RUNNER_TEMP/deploy.tfplan" "$RUNNER_TEMP/deploy-plan.json" \
+            "$RUNNER_TEMP/release.tfvars.json" "$RUNNER_TEMP/deployed-release.json"

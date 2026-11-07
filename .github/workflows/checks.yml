@@ -3,6 +3,7 @@ name: Checks
 on:
   push:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -27,7 +28,9 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check .
       - name: Type check
-        run: uv run mypy
+        run: |
+          uv run mypy
+          uv run mypy scripts/deploy_release.py
       - name: Test
         run: uv run pytest --ignore=tests/test_shared_conformance.py
       - name: Shared conformance (controlled provider)
