@@ -298,6 +298,9 @@ defined by Level 3; a wrong 2xx result still needs smoke/conformance detection.
 
 See [the deployed verification record](OBSERVABILITY_VERIFICATION.md) for the
 uncommitted candidate's actual cloud data and the remaining independent checks.
+The [independent walkthrough and Level 4 handoff](OBSERVABILITY_HANDOFF.md)
+provides three request links, a pending verifier worksheet for Ka Pui, metric
+query details, and a separate reviewed-deployment checklist.
 
 To tear down observability, first disable export in the service configuration,
 then review/apply `terraform destroy` for this state. It removes the dashboard

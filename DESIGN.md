@@ -311,8 +311,11 @@ rebuilding, and repeats the same checks. It does not undo Calendar writes.
 See [the deployment runbook](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
 for setup and recovery. **Verify deployment, failure detection, and recovery are
 verified**, including real Google smoke, cleanup, and a no-change Terraform plan.
-Merged-revision automatic deployment remains pending. Track execution evidence
-and handoff follow-ups in the PR.
+The merged PR #48 revision `ed6ab9e` subsequently passed the
+[demo Deploy run, attempt 2](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42409430131/attempts/2),
+including ready revision/traffic, real Google smoke, cleanup and verified-release
+artifact publication. This Level 2 result does not establish deployment of the
+later Level 3 implementation.
 
 ### Level 3: request observability
 
@@ -354,6 +357,11 @@ See [the observability guide](docs/OBSERVABILITY.md) for setup, interpretation,
 export limits, independent verification, and the handoff to Level 4. Deployed
 evidence is separate from controlled SDK tests; teammate interpretation and
 the eventual reviewed release remain required before Level 3 sign-off.
+The [walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md) records
+Ka Pui as the planned independent verifier; the invitation, actual findings and
+handoff acknowledgment remain pending. It also defines the existing metric
+names/units and query boundaries that Level 4 can use without assuming an SLO
+policy from HTTP status alone.
 
 ## Testing and verification
 

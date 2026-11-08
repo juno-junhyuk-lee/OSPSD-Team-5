@@ -2,7 +2,9 @@
 
 Owner: Jim Lo. Recorded November 07, 2026 22:08 EST (2026-11-08 03:08 UTC).
 
-This record checks an **uncommitted candidate** in the disposable verify service. It is not a GitHub release, a deployment of the eventual reviewed commit, or independent teammate verification. No commit, Git push, workflow dispatch, or external message was made for this batch.
+This record checks a candidate deployed before its implementation was committed, in the disposable verify service. It is not a GitHub release, a deployment of the eventual reviewed commit, or independent teammate verification. The run did not use a Git push or workflow dispatch, and no external message was sent.
+
+The implementation was subsequently committed as `ac1b7c2`. An offline comparison confirmed that all 29 committed Dockerfile/app/pyproject/lock build inputs match the source fingerprint below. The historical logs still carry the parent release; a deployment of the reviewed merge commit remains separate.
 
 ## Candidate and scope
 
@@ -64,4 +66,6 @@ Actual exported logs and traces were inspected. The checks compared their conten
 
 ## Required follow-up
 
-An independent teammate must explain the successful, invalid and provider-failure requests using only the dashboard/log/trace links, recording their name, date and any issues. This has not happened yet. After review and commit, deploy the actual reviewed commit through the existing pipeline and record that release evidence. The candidate checks do not replace either step. Hand the operation names, outcome/source labels, no-data behavior and queries to Ka Pui for Level 4; no SLO or alert is claimed here.
+Jim plans to ask Ka Pui Cheung to explain the successful, invalid and provider-failure requests using only the dashboard/log/trace links. Ka Pui has not performed the walkthrough or accepted the handoff yet. The [walkthrough worksheet and Level 4 reference](OBSERVABILITY_HANDOFF.md) contain the entry links, questions and pending result fields.
+
+Record the actual verifier, date, observations and any corrections. After review/merge, deploy the actual reviewed commit through the existing pipeline and record that release evidence. The candidate checks do not replace either step. The same handoff reference gives Ka Pui the operation names, metric types, labels, no-data behavior and queries; no SLO or alert is claimed here.
