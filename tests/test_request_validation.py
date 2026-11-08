@@ -89,13 +89,20 @@ def test_validation_uses_shared_errors_without_leaking_inputs(
     }
     creator.create_event.assert_not_called()
     updater.update_event.assert_not_called()
-    [record] = [r for r in caplog.records if r.name == "calendar_service"]
-    assert json.loads(record.getMessage()) == {
-        "operation": operation,
-        "error": "invalid_input",
-        "provider": False,
-        "status": status,
-    }
+    [record] = [
+        r
+        for r in caplog.records
+        if r.name == "calendar_service" and r.levelno >= logging.WARNING
+    ]
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": operation,
+            "error": "invalid_input",
+            "provider": False,
+            "status": status,
+        }.items()
+    )
     assert record.levelno == logging.WARNING
     assert record.exc_info is None
     assert "private" not in response.text + record.getMessage()

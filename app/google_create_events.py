@@ -22,6 +22,7 @@ from app.event_creation_provider import (
 from app.event_provider import CalendarAuthenticationError
 from app.google_auth import hosted, load_hosted_credentials
 from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
+from app.tracing import google_call
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
@@ -77,7 +78,8 @@ def load_credentials() -> Credentials:
                 "Run scripts/google_calendar_auth.py to renew local authorization."
             )
         try:
-            credentials.refresh(Request())
+            with google_call("oauth.refresh"):
+                credentials.refresh(Request())
         except RefreshError as error:
             raise GoogleCalendarSetupError(
                 "Run scripts/google_calendar_auth.py to renew local authorization.",
@@ -105,7 +107,8 @@ def create_google_event(request: CreateEvent) -> Event:
         with build("calendar", "v3", credentials=credentials) as service:
             insert = service.events().insert(calendarId="primary", body=body)
             write_started = True
-            result = insert.execute(num_retries=0)
+            with google_call("events.insert"):
+                result = insert.execute(num_retries=0)
     except HttpError as error:
         if not write_started and (
             error.resp.status in TEMPORARY_HTTP_STATUSES

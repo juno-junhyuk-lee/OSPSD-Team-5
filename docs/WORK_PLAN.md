@@ -3,6 +3,33 @@
 The Level 1 foundations and endpoint/tests were developed with Codex assistance.
 Record actual work and reviews in PRs; adjust ownership if effort changes.
 
+## HW2 Milestone 3: observability
+
+Due before class on November 11, 2026. Jim owns Level 3 for the shared create,
+get, replace and delete operations. Ka Pui owns the following Level 4 SLI/SLO,
+error-budget and alert work. Branch: `feature/hw2-level3-observability`, based
+on `hw2/milestone-3` at the merged Level 2 revision `ed6ab9e`.
+
+| Batch | Work and status |
+| --- | --- |
+| 1, `7e37f53` | Request/error counters, latency and one correlated outcome log |
+| 2, `900c328` | Request traces and explicit Google-call child spans |
+| 3, `ac1b7c2` | Cloud export, saturation, dashboard and actual candidate verification; includes initial evidence and operator documentation |
+| 4 | Independent walkthrough completed by Ka Pui in PR #49; Level 4 metric reference delivered; reviewed-merge deployment pending |
+
+The [candidate record](OBSERVABILITY_VERIFICATION.md) contains completed cloud
+checks and restored-environment evidence. The
+[handoff](OBSERVABILITY_HANDOFF.md) records Ka Pui's actual independent
+observations and approval of `325515a` in PR #49, plus optional documentation
+clarifications. Re-review of those documentation changes and deployment of the
+reviewed merge remain separate checks. No final Level 3 sign-off is claimed yet.
+
+The Level 2 merged revision passed demo deployment, real Google smoke/cleanup
+and verified-release recording in
+[Deploy attempt 2](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42409430131/attempts/2).
+The later Level 3 candidate was verified only in disposable verify; the actual
+reviewed Level 3 merge still needs its matching deployment/telemetry evidence.
+
 ## HW2 shared-package adoption
 
 Jim's branch `feature/hw2-calendar-contract-adoption` starts from

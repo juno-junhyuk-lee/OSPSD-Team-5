@@ -846,8 +846,9 @@ implementation of the shared protocol. Overrides must be restored after tests.
 Adapters remain responsible for authorization, SDK calls, field translation,
 and closing clients. The shared service translates their known failures to
 `CalendarError`; it does not log or retry operations. `app/errors.py` adds HTTP
-status and operation context, writes one sanitized failure log, and returns the
-common error envelope. Unexpected programming errors propagate.
+status and safe error context and returns the common error envelope. The request
+middleware emits one sanitized outcome log at request completion. Unexpected
+programming errors propagate.
 
 Calendar metadata remains an extension using `CalendarReader` and
 `get_calendar_reader` in `app/calendar_dependencies.py`. It shares the HTTP
@@ -856,6 +857,19 @@ noninteractive in every route; the separate setup script requests both scopes.
 Synchronous route handlers keep blocking SDK work off the async event loop.
 
 ### Checks and testing
+
+The [Level 3 observability guide](docs/OBSERVABILITY.md) describes request
+counters, error categories, latency histograms, correlated logs, and request/RPC
+traces. Lifespan-managed runs produce SDK trace IDs, also returned in
+`X-Trace-ID` on responses reaching the middleware. Set
+`CALENDAR_TELEMETRY_PROJECT` only when cloud export is wanted; local runs do not
+discover cloud credentials. Cloud Run uses its runtime identity, separate from
+Calendar OAuth. The guide covers bounded export, saturation, the Terraform
+dashboard, and the separate deployed/teammate verification requirements.
+See the [cloud evidence](docs/OBSERVABILITY_VERIFICATION.md) and
+[Ka Pui walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md).
+Ka Pui completed independent interpretation in PR #49; deployment evidence for
+the eventual reviewed merge remains pending.
 
 Run the same commands on macOS, Linux, or Windows:
 

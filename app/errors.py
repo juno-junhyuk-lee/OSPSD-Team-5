@@ -10,6 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.observability import record_failure
+
 logger = logging.getLogger("calendar_service")
 
 
@@ -75,10 +77,11 @@ def log_failure(error: ServiceError) -> None:
     )
 
 
-def service_error_handler(_request: Request, error: Exception) -> JSONResponse:
-    """Render a ServiceError in the shared shape and log it."""
+def service_error_handler(request: Request, error: Exception) -> JSONResponse:
+    """Render the shared error and pass safe context to the request log."""
     assert isinstance(error, ServiceError)
-    log_failure(error)
+    if not record_failure(request.scope, error.code, error.provider):
+        log_failure(error)
     return JSONResponse(
         status_code=error.status,
         content={

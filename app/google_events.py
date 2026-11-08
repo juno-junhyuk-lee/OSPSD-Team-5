@@ -19,6 +19,7 @@ from app.event_provider import (
     UnsupportedEventError,
 )
 from app.google_auth import calendar_client
+from app.tracing import google_call
 
 # Google can report quota/rate limits as 403 instead of 429.
 RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
@@ -65,11 +66,12 @@ class GoogleEventReader:
     def get_event(self, event_id: str) -> Event:
         try:
             with closing(calendar_client()) as service:
-                data = (
-                    service.events()
-                    .get(calendarId="primary", eventId=event_id)
-                    .execute()
-                )
+                with google_call("events.get"):
+                    data = (
+                        service.events()
+                        .get(calendarId="primary", eventId=event_id)
+                        .execute()
+                    )
         except HttpError as error:
             if error.resp.status in (404, 410):
                 raise EventNotFoundError from error

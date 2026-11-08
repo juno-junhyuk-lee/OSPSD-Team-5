@@ -2,6 +2,27 @@
 
 ## Code and setup
 
+- `app/observability.py`: request counters/histograms and one sanitized outcome
+  log around authentication, validation, and HTTP handling. Error handlers pass
+  safe context to it instead of logging the same failure twice.
+- `tests/test_observability.py`: controlled HTTP checks with the real
+  OpenTelemetry SDK in-memory reader; no live Google or cloud export.
+- `app/tracing.py`: app-owned SDK traces, safe request/RPC spans, and sanitized
+  resource metadata. Never enable automatic exception/event or body capture.
+- `tests/test_tracing.py`: normal HTTP/adapter wiring with fake Google clients
+  and a local span exporter; parentage, correlation, privacy, and failure checks.
+- `app/cloud_telemetry.py`: opt-in official OTLP/HTTP exporters using runtime
+  ADC, bounded background export, safe SDK diagnostics, and app-owned metrics.
+- `tests/test_cloud_telemetry.py`: real SDK/OTLP wire payloads with controlled
+  HTTP transport; offline, privacy, fail-open, lifecycle, and saturation checks.
+- `infra/observability`: separate administrator state for telemetry API/writer
+  setup and the four-signal dashboard. Release CI must not administer this IAM.
+- [Observability guide](docs/OBSERVABILITY.md): labels, correlation, limits,
+  cloud setup, and separate deployed/teammate verification.
+- [Cloud verification](docs/OBSERVABILITY_VERIFICATION.md): uncommitted candidate
+  provenance, actual dashboard/log/trace links, Google workflow and authorization
+  failure, cleanup/restoration, and the completed independent teammate walkthrough.
+
 HW2 uses calendar-contract tag `v0.1.0-rc.1`, commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424`. Import shared Event, CreateEvent,
 ReplaceEvent, CalendarService, CalendarError, and ErrorCode from that package.

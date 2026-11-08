@@ -58,7 +58,7 @@ HTTP caller
   -> operation-specific Google adapter
   -> authenticated account's primary Google Calendar
   -> shared Event, or adapter error translated to CalendarError
-  -> HTTP response + one sanitized failure log when applicable
+  -> HTTP response + one sanitized request outcome log
 ```
 
 `app/calendar_service.py` implements `CalendarService` structurally by composing
@@ -82,7 +82,8 @@ Adapters create and close Google clients per operation using context management.
 They translate Google fields and validate returned data before constructing the
 shared Event. SDK outcomes become operation-specific errors inside adapters;
 `GoogleCalendarService` converts those errors to `CalendarError`. The HTTP
-handler then selects the public response and emits one sanitized failure log.
+handler selects the public response and supplies safe error context to the
+request middleware, which emits one outcome log at request completion.
 Programming errors propagate rather than being presented as known provider errors.
 
 Before requests, a developer runs `scripts/google_calendar_auth.py`. Routes never
@@ -261,11 +262,14 @@ suite's cleanup gaps remain a separate review concern described below.
 ### Milestone 3 deployment
 
 Juno owns the Cloud Run deployment, billing checks, and teardown. Deploy one
-request-billed service in `us-central1`, with zero minimum instances, a maximum
+service in `us-central1`, with zero minimum instances, a maximum
 of one instance, and one concurrent request per instance. The workload is
 occasional classroom demonstrations. The first request after idle may be slow.
-We expect no hosting charge within the recurring free allowances. The project
-requires billing, and overages can incur charges. Track registry storage and
+Level 3 uses always-allocated CPU so background telemetry can run after a
+response. This uses instance-based billing while an instance exists; do not
+carry forward the earlier request-billing free-tier assumption. The project
+requires billing, and compute, telemetry ingestion, and registry storage can
+incur charges. Juno owns billing review. Keep classroom traffic bounded and check
 billing through February 28, 2027, then tear down the deployment.
 
 | Responsibility | Implementation |
@@ -307,8 +311,58 @@ rebuilding, and repeats the same checks. It does not undo Calendar writes.
 See [the deployment runbook](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
 for setup and recovery. **Verify deployment, failure detection, and recovery are
 verified**, including real Google smoke, cleanup, and a no-change Terraform plan.
-Merged-revision automatic deployment remains pending. Track execution evidence
-and handoff follow-ups in the PR.
+The merged PR #48 revision `ed6ab9e` subsequently passed the
+[demo Deploy run, attempt 2](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42409430131/attempts/2),
+including ready revision/traffic, real Google smoke, cleanup and verified-release
+artifact publication. This Level 2 result does not establish deployment of the
+later Level 3 implementation.
+
+### Level 3: request observability
+
+Jim's `RequestTelemetryMiddleware` wraps caller access, validation, and route
+execution. It records fixed-label request/error counters and duration histograms,
+then emits one sanitized outcome log. Existing error handlers supply categories
+and provider context without duplicating that log. The common metric operation
+names are `create`, `get`, `replace`, and `delete`, matching the shared Python
+interface; PATCH and calendar metadata remain separate extensions.
+
+The lifespan owns an isolated OpenTelemetry tracing SDK provider. Each request
+has one SERVER span and explicit Google execute/credential-refresh calls have
+CLIENT child spans. PUT/PATCH separates its pre-read from its write. Logs and
+responses reaching the middleware carry the SDK trace ID; logs retain a separate
+request UUID as well. Resources contain the service name and sanitized release.
+Incoming trace/baggage headers, raw URLs, event data, exception text, and
+tracebacks are not exported. Tracing failure does not change the API result or
+repeat provider work.
+
+An explicit project setting attaches official OTLP/HTTP exporters to the
+app-owned SDK providers. Cloud Run's runtime identity authenticates to Google's
+Telemetry API; Calendar credentials are never used for export. Traces queue at
+most 512 spans, export batches of 64, and have a 256 KiB payload limit and
+three-second export timeout. Metrics aggregate in the SDK and export every
+30 seconds in batches of at most 256 points with the same payload/timeout limit.
+Worker failures drop observations without changing or retrying API work.
+No global SDK provider is installed. Shutdown attempts a final export.
+
+Request-entry saturation measures active common-operation requests divided by
+the configured instance concurrency of one; the histogram preserves brief work
+that a periodic gauge could miss. It is not a time-weighted utilization or
+queue measurement. Cloud Run memory relative to its 512 MiB limit supplies
+additional instance-wide context. `infra/observability` provisions a dashboard
+with all four signals for each common operation, release/environment legends,
+and log/trace investigation links. It owns separate administrator state; the
+release pipeline cannot change its IAM. No SLO targets or alerts are added here.
+
+See [the observability guide](docs/OBSERVABILITY.md) for setup, interpretation,
+export limits, independent verification, and the handoff to Level 4. Deployed
+evidence is separate from controlled SDK tests; teammate interpretation and
+the eventual reviewed release remain required before Level 3 sign-off.
+The [walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md) records
+Ka Pui’s completed independent interpretation and approval in PR #49, with
+optional documentation clarifications. Reviewed-merge deployment remains
+pending. The handoff also defines the existing metric
+names/units and query boundaries that Level 4 can use without assuming an SLO
+policy from HTTP status alone.
 
 ## Testing and verification
 
@@ -318,7 +372,8 @@ and handoff follow-ups in the PR.
 | Shared interface and DI | `test_calendar_service.py` and `test_shared_calendar_http.py`: composition, service substitution, statuses/errors, and restored overrides |
 | Local ID and event-shape policy | `test_event_shape_policy.py`: no writes for all-day/series replacement, timed instance preservation, existing GET policy, HTTP ID boundaries |
 | Google translation and write phases | Adapter tests and `test_shared_provider_failures.py`: controlled SDK outcomes, unchanged replacement ID, before/after-write classification, no retry |
-| Sanitized logs | Controlled HTTP log assertions: one failure entry without sensitive payloads |
+| Sanitized request observations | `test_observability.py` and existing HTTP log assertions: counters, histograms, one outcome entry, correlation, bounded labels, privacy, and fail-open recording |
+| Request and provider traces | `test_tracing.py`: normal HTTP/adapter wiring with fake Google, real SDK span export, parentage, error/retry semantics, request isolation, and privacy; not deployed evidence |
 | Same vertical suite | #44's `test_shared_conformance.py`: tagged `CalendarServiceConformance` against Team 5's implementation |
 | Real persistence and extension preservation | Workflow script and recorded live conformance: actual Google reads/writes, description preservation, cleanup |
 | Deployment and rollback guards | `test_deploy_release.py` and `test_rollback_release.py`: immutable references, service-only plans, ready revision/traffic, trusted artifact provenance, and original configuration inputs |

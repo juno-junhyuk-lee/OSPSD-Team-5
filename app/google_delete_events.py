@@ -15,6 +15,7 @@ from app.event_deletion_provider import (
 )
 from app.google_create_events import GoogleCalendarSetupError, load_credentials
 from app.google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
+from app.tracing import google_call
 
 
 class GoogleEventNotFoundError(LookupError):
@@ -48,7 +49,8 @@ def delete_google_event(event_id: str) -> None:
                 calendarId="primary", eventId=event_id, sendUpdates="none"
             )
             write_started = True
-            delete.execute(num_retries=0)
+            with google_call("events.delete"):
+                delete.execute(num_retries=0)
     except HttpError as error:
         # Google answers 410 Gone for an event that was already deleted.
         if error.resp.status in (404, 410):

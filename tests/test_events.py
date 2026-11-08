@@ -74,7 +74,9 @@ def test_get_known_event(
     }
     assert event_reader.requested_ids == ["test-event"]
     assert not [
-        record for record in caplog.records if record.name == "calendar_service"
+        record
+        for record in caplog.records
+        if record.name == "calendar_service" and record.levelno >= logging.WARNING
     ]
 
 
@@ -176,14 +178,19 @@ def test_event_failure_contract(
     }
     assert event_reader.requested_ids == ["test-event"]
     [record] = [
-        record for record in caplog.records if record.name == "calendar_service"
+        record
+        for record in caplog.records
+        if record.name == "calendar_service" and record.levelno >= logging.WARNING
     ]
-    assert json.loads(record.getMessage()) == {
-        "operation": "get_event",
-        "error": code,
-        "provider": provider,
-        "status": status,
-    }
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": "get_event",
+            "error": code,
+            "provider": provider,
+            "status": status,
+        }.items()
+    )
     assert record.levelno == (logging.ERROR if status >= 500 else logging.WARNING)
     assert record.exc_info is None
     assert "private" not in response.text
@@ -209,14 +216,19 @@ def test_invalid_id_is_rejected_before_reader(
     }
     assert event_reader.requested_ids == []
     [record] = [
-        record for record in caplog.records if record.name == "calendar_service"
+        record
+        for record in caplog.records
+        if record.name == "calendar_service" and record.levelno >= logging.WARNING
     ]
-    assert json.loads(record.getMessage()) == {
-        "operation": "get_event",
-        "error": "invalid_input",
-        "provider": False,
-        "status": 422,
-    }
+    assert (
+        json.loads(record.getMessage()).items()
+        >= {
+            "operation": "get_event",
+            "error": "invalid_input",
+            "provider": False,
+            "status": 422,
+        }.items()
+    )
     assert event_id not in caplog.text
 
 

@@ -18,6 +18,7 @@ from app.calendar_provider import (
 from app.event_provider import CalendarAuthenticationError
 from app.google_auth import hosted, load_hosted_credentials
 from app.models import Calendar
+from app.tracing import google_call
 
 TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
 RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
@@ -40,9 +41,12 @@ class GoogleCalendarReader:
             raise CalendarMetadataAuthenticationError from error
         try:
             with build("calendar", "v3", credentials=credentials) as service:
-                data = (
-                    service.calendars().get(calendarId="primary").execute(num_retries=0)
-                )
+                with google_call("calendars.get"):
+                    data = (
+                        service.calendars()
+                        .get(calendarId="primary")
+                        .execute(num_retries=0)
+                    )
         except HttpError as error:
             if error.resp.status == 404:
                 raise CalendarMetadataNotFoundError from error
