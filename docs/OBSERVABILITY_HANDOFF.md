@@ -163,12 +163,9 @@ results must retain retryable=false; an alert does not authorize retrying them.
 
 - Recipient: Ka Pui Cheung.
 - Walkthrough document received and used: [Ka Pui’s PR review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698).
-- Separate Level 4 policy/implementation acceptance: **Pending**; the review
-  confirms the walkthrough, not completed SLO or alert work.
-- Proposed eligible operations/outcomes and latency thresholds: **Pending;
-  Level 4 owner to define**.
-- No-data/reset/environment handling and alert test evidence: **Pending;
-  Level 4 owner to define**.
+- Level 4 policy and implementation: [SLIs, SLOs, error budget and alerts](SLO.md), Terraform in `infra/observability/slo.tf`.
+- Eligible operations/outcomes and latency threshold: defined in [SLO.md](SLO.md#slis-and-objectives-28-day-rolling-window).
+- No-data/reset/environment handling: defined in [SLO.md](SLO.md#no-data-resets-and-retries). Cloud apply and alert test evidence: **Pending**.
 
 ## Reviewed deployment follow-up
 
