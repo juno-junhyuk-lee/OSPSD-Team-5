@@ -861,9 +861,11 @@ Synchronous route handlers keep blocking SDK work off the async event loop.
 The [Level 3 observability guide](docs/OBSERVABILITY.md) describes request
 counters, error categories, latency histograms, correlated logs, and request/RPC
 traces. Lifespan-managed runs produce SDK trace IDs, also returned in
-`X-Trace-ID` on responses reaching the middleware. Cloud export, saturation,
-and dashboard verification remain follow-up work; the guide distinguishes
-local SDK tests from deployed evidence.
+`X-Trace-ID` on responses reaching the middleware. Set
+`CALENDAR_TELEMETRY_PROJECT` only when cloud export is wanted; local runs do not
+discover cloud credentials. Cloud Run uses its runtime identity, separate from
+Calendar OAuth. The guide covers bounded export, saturation, the Terraform
+dashboard, and the separate deployed/teammate verification requirements.
 
 Run the same commands on macOS, Linux, or Windows:
 

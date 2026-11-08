@@ -43,11 +43,16 @@ def release_identity() -> str:
 
 
 def create_tracer_provider() -> TracerProvider:
-    """Create an app-owned SDK provider; cloud processors are a later integration."""
+    """Create an app-owned SDK provider; attach exporters during startup."""
+    resource: dict[str, str] = {
+        "service.name": SERVICE,
+        "service.version": release_identity(),
+    }
+    project = os.getenv("CALENDAR_TELEMETRY_PROJECT", "")
+    if re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
+        resource["gcp.project_id"] = project
     return TracerProvider(
-        resource=Resource(
-            {"service.name": SERVICE, "service.version": release_identity()}
-        ),
+        resource=Resource(resource),
         sampler=ALWAYS_ON,
         span_limits=SpanLimits(
             max_attributes=16, max_events=0, max_links=0, max_attribute_length=128

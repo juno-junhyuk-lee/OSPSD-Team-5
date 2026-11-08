@@ -10,9 +10,11 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from app.cloud_telemetry import configure_cloud
 from app.errors import ErrorCode
 from app.event_provider import CalendarAuthenticationError
 from app.google_auth import hosted, hosted_authorization
+from app.observability import RequestMetrics
 from app.tracing import create_tracer_provider
 
 
@@ -23,19 +25,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("CALENDAR_MODE must be local or hosted.")
     app.state.demo_bearer = None
     app.state.request_tracer = None
+    app.state.request_metrics = None
     provider = None
+    metric_provider = None
     try:
         try:
             provider = create_tracer_provider()
             app.state.request_tracer = provider.get_tracer("calendar.requests")
         except Exception:
             pass
+        if provider is not None:
+            try:
+                metric_provider = configure_cloud(provider)
+                if metric_provider is not None:
+                    app.state.request_metrics = RequestMetrics(
+                        metric_provider.get_meter("calendar.requests"), cloud=True
+                    )
+            except Exception:
+                pass
         if hosted():
             app.state.demo_bearer = validate_hosted_config()
         yield
     finally:
         app.state.demo_bearer = None
         app.state.request_tracer = None
+        app.state.request_metrics = None
+        if metric_provider is not None:
+            try:
+                metric_provider.shutdown(timeout_millis=3000)
+            except Exception:
+                pass
         if provider is not None:
             try:
                 provider.shutdown()

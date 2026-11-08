@@ -58,13 +58,22 @@ resource "google_cloud_run_v2_service" "calendar" {
       }
 
       resources {
-        limits   = { cpu = "1", memory = "512Mi" }
-        cpu_idle = true
+        limits = { cpu = "1", memory = "512Mi" }
+        # Background OTLP workers must run after the HTTP response ends.
+        cpu_idle = false
       }
 
       env {
         name  = "CALENDAR_MODE"
         value = "hosted"
+      }
+      env {
+        name  = "CALENDAR_ENV"
+        value = var.environment
+      }
+      env {
+        name  = "CALENDAR_TELEMETRY_PROJECT"
+        value = var.project_id
       }
       env {
         name  = "CALENDAR_RELEASE"

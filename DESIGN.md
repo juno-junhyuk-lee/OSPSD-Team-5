@@ -262,11 +262,14 @@ suite's cleanup gaps remain a separate review concern described below.
 ### Milestone 3 deployment
 
 Juno owns the Cloud Run deployment, billing checks, and teardown. Deploy one
-request-billed service in `us-central1`, with zero minimum instances, a maximum
+service in `us-central1`, with zero minimum instances, a maximum
 of one instance, and one concurrent request per instance. The workload is
 occasional classroom demonstrations. The first request after idle may be slow.
-We expect no hosting charge within the recurring free allowances. The project
-requires billing, and overages can incur charges. Track registry storage and
+Level 3 uses always-allocated CPU so background telemetry can run after a
+response. This uses instance-based billing while an instance exists; do not
+carry forward the earlier request-billing free-tier assumption. The project
+requires billing, and compute, telemetry ingestion, and registry storage can
+incur charges. Juno owns billing review. Keep classroom traffic bounded and check
 billing through February 28, 2027, then tear down the deployment.
 
 | Responsibility | Implementation |
@@ -329,11 +332,28 @@ Incoming trace/baggage headers, raw URLs, event data, exception text, and
 tracebacks are not exported. Tracing failure does not change the API result or
 repeat provider work.
 
-These are locally checked instrumentation changes, not a claim that Level 3 is
-complete. The tracing provider has no production exporter yet; metric SDK/export
-wiring, saturation, the dashboard, and deployed/independent verification remain
-Jim's follow-ups. See [the observability guide](docs/OBSERVABILITY.md) for the
-recording boundaries, limits, tests, and handoff to Level 4.
+An explicit project setting attaches official OTLP/HTTP exporters to the
+app-owned SDK providers. Cloud Run's runtime identity authenticates to Google's
+Telemetry API; Calendar credentials are never used for export. Traces queue at
+most 512 spans, export batches of 64, and have a 256 KiB payload limit and
+three-second export timeout. Metrics aggregate in the SDK and export every
+30 seconds in batches of at most 256 points with the same payload/timeout limit.
+Worker failures drop observations without changing or retrying API work.
+No global SDK provider is installed. Shutdown attempts a final export.
+
+Request-entry saturation measures active common-operation requests divided by
+the configured instance concurrency of one; the histogram preserves brief work
+that a periodic gauge could miss. It is not a time-weighted utilization or
+queue measurement. Cloud Run memory relative to its 512 MiB limit supplies
+additional instance-wide context. `infra/observability` provisions a dashboard
+with all four signals for each common operation, release/environment legends,
+and log/trace investigation links. It owns separate administrator state; the
+release pipeline cannot change its IAM. No SLO targets or alerts are added here.
+
+See [the observability guide](docs/OBSERVABILITY.md) for setup, interpretation,
+export limits, independent verification, and the handoff to Level 4. Deployed
+evidence is separate from controlled SDK tests; teammate interpretation and
+the eventual reviewed release remain required before Level 3 sign-off.
 
 ## Testing and verification
 

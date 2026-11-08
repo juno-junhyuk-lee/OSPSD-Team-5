@@ -2,7 +2,10 @@
 
 import json
 import logging
+import os
+import re
 from dataclasses import dataclass
+from threading import Lock
 from time import perf_counter
 from uuid import uuid4
 
@@ -109,8 +112,25 @@ def request_result(
 class RequestMetrics:
     """Use fixed labels and SDK aggregation, never keep individual requests."""
 
-    def __init__(self, meter: Meter | None = None) -> None:
+    def __init__(self, meter: Meter | None = None, *, cloud: bool = False) -> None:
         meter = meter if meter is not None else metrics.get_meter("calendar.requests")
+        self.common: dict[str, str] = {}
+        if cloud:
+            environment = os.getenv("CALENDAR_ENV", "local")
+            self.common = {
+                "release": release_identity(),
+                "environment": environment
+                if environment in {"demo", "verify"}
+                else "local",
+            }
+        self.active = 0
+        self.lock = Lock()
+        self.saturation = meter.create_histogram(
+            "calendar.request.saturation",
+            unit="1",
+            description="Active shared-operation requests / configured concurrency (1)",
+            explicit_bucket_boundaries_advisory=(0, 0.25, 0.5, 0.75, 1, 2, 4),
+        )
         self.requests = meter.create_counter(
             "calendar.requests", unit="{request}", description="Completed HTTP requests"
         )
@@ -144,6 +164,7 @@ class RequestMetrics:
         self, operation: str, outcome: str, source: str, status: int, duration: float
     ) -> None:
         attributes = {
+            **self.common,
             "operation": operation,
             "outcome": outcome,
             "failure_source": source,
@@ -153,6 +174,22 @@ class RequestMetrics:
         self.duration.record(duration, attributes)
         if outcome != "success":
             self.errors.add(1, attributes)
+
+    def enter(self, operation: str) -> bool:
+        if operation not in {"create", "get", "replace", "delete"}:
+            return False
+        with self.lock:
+            self.active += 1
+            active = self.active
+        try:
+            self.saturation.record(active / 1, {**self.common, "operation": operation})
+        except Exception:
+            pass
+        return True
+
+    def leave(self) -> None:
+        with self.lock:
+            self.active -= 1
 
 
 class RequestTelemetryMiddleware:
@@ -171,6 +208,13 @@ class RequestTelemetryMiddleware:
         outcome = RequestOutcome()
         scope.setdefault("state", {})[STATE_KEY] = outcome
         request_id = uuid4().hex
+        state = getattr(scope.get("app"), "state", None)
+        request_metrics = getattr(state, "request_metrics", None) or self.metrics
+        entered = False
+        try:
+            entered = request_metrics.enter(request_operation(scope)[1])
+        except Exception:
+            pass
         with request_span(scope, request_id) as span:
             started = perf_counter()
             status = 500
@@ -202,13 +246,18 @@ class RequestTelemetryMiddleware:
                 unexpected = True
                 raise
             finally:
+                if entered:
+                    try:
+                        request_metrics.leave()
+                    except Exception:
+                        pass
                 duration = max(0.0, perf_counter() - started)
                 handler, operation = request_operation(scope)
                 result, source = request_result(outcome, status, unexpected)
                 finish_request_span(span, operation, result, source, status)
                 # Telemetry must never change the HTTP result or retry provider work.
                 try:
-                    self.metrics.record(operation, result, source, status, duration)
+                    request_metrics.record(operation, result, source, status, duration)
                 except Exception:
                     pass
                 try:
@@ -237,10 +286,27 @@ class RequestTelemetryMiddleware:
                                 ),
                                 "status": status,
                                 "duration_ms": round(duration * 1000, 3),
+                                "severity": logging.getLevelName(level),
                                 "request_id": request_id,
                                 **span_identity(span),
+                                **cloud_log_correlation(span_identity(span)),
                             }
                         ),
                     )
                 except Exception:
                     pass
+
+
+def cloud_log_correlation(identity: dict[str, str | None]) -> dict[str, str | bool]:
+    project = os.getenv("CALENDAR_TELEMETRY_PROJECT", "")
+    if (
+        not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project)
+        or not identity["trace_id"]
+        or not identity["span_id"]
+    ):
+        return {}
+    return {
+        "logging.googleapis.com/trace": f"projects/{project}/traces/{identity['trace_id']}",
+        "logging.googleapis.com/spanId": identity["span_id"],
+        "logging.googleapis.com/trace_sampled": True,
+    }
