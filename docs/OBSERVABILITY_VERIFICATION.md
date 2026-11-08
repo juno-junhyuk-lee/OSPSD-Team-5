@@ -2,7 +2,7 @@
 
 Owner: Jim Lo. Recorded November 07, 2026 22:08 EST (2026-11-08 03:08 UTC).
 
-This record checks a candidate deployed before its implementation was committed, in the disposable verify service. It is not a GitHub release, a deployment of the eventual reviewed commit, or independent teammate verification. The run did not use a Git push or workflow dispatch, and no external message was sent.
+The original run below checks a candidate deployed before its implementation was committed, in the disposable verify service. It is not a GitHub release or deployment of the eventual reviewed commit. Subsequent independent teammate verification is linked in the follow-up section. The run did not use a Git push or workflow dispatch, and no external message was sent.
 
 The implementation was subsequently committed as `ac1b7c2`. An offline comparison confirmed that all 29 committed Dockerfile/app/pyproject/lock build inputs match the source fingerprint below. The historical logs still carry the parent release; a deployment of the reviewed merge commit remains separate.
 
@@ -38,10 +38,10 @@ All 17 chart queries were read back from the created dashboard and executed agai
 
 | Case | HTTP / source | Outcome log | Trace |
 | --- | --- | --- | --- |
-| success | 201 / none | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Fb49454506862e151bc19e7e7866ba2e6%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=b49454506862e151bc19e7e7866ba2e6?project=ospsd-team5) |
-| invalid_input | 422 / caller | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Ff2a765aeb27c51c738b8a54847950029%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=f2a765aeb27c51c738b8a54847950029?project=ospsd-team5) |
-| provider_failure | 503 / provider | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Facbf0393a219d301c633b49216030b27%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=acbf0393a219d301c633b49216030b27?project=ospsd-team5) |
-| replace_success | 200 / none | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2F5c9ee3144bf5020fd7fe522df481c931%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=5c9ee3144bf5020fd7fe522df481c931?project=ospsd-team5) |
+| success | 201 / none | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Fb49454506862e151bc19e7e7866ba2e6%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=b49454506862e151bc19e7e7866ba2e6;spanId=8fc4a61494326f02?project=ospsd-team5) |
+| invalid_input | 422 / caller | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Ff2a765aeb27c51c738b8a54847950029%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=f2a765aeb27c51c738b8a54847950029;spanId=b7e0c1cb2cdfcc53?project=ospsd-team5) |
+| provider_failure | 503 / provider | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Facbf0393a219d301c633b49216030b27%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=acbf0393a219d301c633b49216030b27;spanId=66e24f876780b2ae?project=ospsd-team5) |
+| replace_success | 200 / none | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2F5c9ee3144bf5020fd7fe522df481c931%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=5c9ee3144bf5020fd7fe522df481c931;spanId=d3c743c41340d328?project=ospsd-team5) |
 
 Each exact trace lookup returned one application outcome log. Its request/trace IDs match the HTTP response, and its release matches the SERVER span. Google CLIENT spans have the SERVER span as parent. Invalid input has no Google child; successful PUT has separate get/patch children; authorization failure has an OAuth refresh child.
 
@@ -66,6 +66,42 @@ Actual exported logs and traces were inspected. The checks compared their conten
 
 ## Required follow-up
 
-Jim plans to ask Ka Pui Cheung to explain the successful, invalid and provider-failure requests using only the dashboard/log/trace links. Ka Pui has not performed the walkthrough or accepted the handoff yet. The [walkthrough worksheet and Level 4 reference](OBSERVABILITY_HANDOFF.md) contain the entry links, questions and pending result fields.
+Ka Pui completed the independent interpretation of all three historical requests
+and approved `325515a` in [PR #49](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698) on November 7, 2026
+(America/New_York). The [walkthrough record](OBSERVABILITY_HANDOFF.md) summarizes
+the actual observations, optional clarifications and corrected trace links.
 
-Record the actual verifier, date, observations and any corrections. After review/merge, deploy the actual reviewed commit through the existing pipeline and record that release evidence. The candidate checks do not replace either step. The same handoff reference gives Ka Pui the operation names, metric types, labels, no-data behavior and queries; no SLO or alert is claimed here.
+After review/merge, deploy the actual reviewed commit through the existing
+pipeline and record that release evidence. The earlier candidate checks and
+completed teammate walkthrough do not establish deployment of the eventual
+merge. The handoff also supplies the Level 4 metric reference; no completed SLO
+or alert work is claimed here.
+
+## Documentation follow-up checks (November 8, 2026)
+
+These checks ran on `325515a` with only the uncommitted documentation updates
+above; application code and dependencies were unchanged.
+
+- Offline pytest: 652 passed, 24 opt-in cases skipped. Ruff lint/format, strict
+  mypy (app/tests and deployment/live scripts), and git diff whitespace passed.
+- Current-branch in-process HTTP workflow against real Google Calendar:
+  health/readiness, POST, GET, PUT, GET, independent Google field/description
+  read-back, DELETE, GET 404 and repeated DELETE 404 passed. Run marker:
+  `aa6e26c19b02`. The workflow cleaned up its test event.
+- Live conformance class: 24 passed. Its normal-operation fixture uses real
+  Google adapters; its failure scenarios still use controlled failing adapters.
+  This is not 24 independently injected real Google failures.
+- All 17 dashboard chart queries succeeded against the historical request
+  window and returned data.
+- All four historical Cloud Trace records were retrieved again; the SERVER
+  span IDs in the corrected links match the actual records. Browser navigation
+  with the span selector follows Ka Pui's reported fix; this recheck used the API.
+
+The first local workflow attempt stopped at hosted startup configuration before
+creating an event. The temporary test harness was supplied with a release and
+local bearer configuration, then the workflow passed. No application fix was
+needed. Temporary credential files were removed on exit.
+
+No cloud service was redeployed, and the historical Google authorization-failure
+injection was not repeated. These checks do not replace the pending deployment
+of the eventual reviewed merge.

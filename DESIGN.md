@@ -358,8 +358,9 @@ export limits, independent verification, and the handoff to Level 4. Deployed
 evidence is separate from controlled SDK tests; teammate interpretation and
 the eventual reviewed release remain required before Level 3 sign-off.
 The [walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md) records
-Ka Pui as the planned independent verifier; the invitation, actual findings and
-handoff acknowledgment remain pending. It also defines the existing metric
+Ka Pui’s completed independent interpretation and approval in PR #49, with
+optional documentation clarifications. Reviewed-merge deployment remains
+pending. The handoff also defines the existing metric
 names/units and query boundaries that Level 4 can use without assuming an SLO
 policy from HTTP status alone.
 

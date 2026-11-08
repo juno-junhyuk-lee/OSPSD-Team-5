@@ -15,15 +15,14 @@ on `hw2/milestone-3` at the merged Level 2 revision `ed6ab9e`.
 | 1, `7e37f53` | Request/error counters, latency and one correlated outcome log |
 | 2, `900c328` | Request traces and explicit Google-call child spans |
 | 3, `ac1b7c2` | Cloud export, saturation, dashboard and actual candidate verification; includes initial evidence and operator documentation |
-| 4 | Independent walkthrough worksheet and Level 4 handoff prepared; Ka Pui's actual interpretation/acknowledgment is pending |
+| 4 | Independent walkthrough completed by Ka Pui in PR #49; Level 4 metric reference delivered; reviewed-merge deployment pending |
 
 The [candidate record](OBSERVABILITY_VERIFICATION.md) contains completed cloud
 checks and restored-environment evidence. The
-[handoff](OBSERVABILITY_HANDOFF.md) contains links and a worksheet Jim plans to
-give Ka Pui; he has not performed that review yet. Keep the result fields pending
-until his actual observations arrive, then record any fixes and recheck. Code
-review, independent interpretation, and deployment of the reviewed merge commit
-are separate completion checks. No Level 3 sign-off is claimed yet.
+[handoff](OBSERVABILITY_HANDOFF.md) records Ka Pui's actual independent
+observations and approval of `325515a` in PR #49, plus optional documentation
+clarifications. Re-review of those documentation changes and deployment of the
+reviewed merge remain separate checks. No final Level 3 sign-off is claimed yet.
 
 The Level 2 merged revision passed demo deployment, real Google smoke/cleanup
 and verified-release recording in

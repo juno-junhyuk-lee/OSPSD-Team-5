@@ -1,8 +1,9 @@
 # Level 3 independent walkthrough and Level 4 handoff
 
-Owner: Jim Lo. Planned verifier and Level 4 recipient: Ka Pui Cheung.
-Jim plans to invite Ka Pui; the walkthrough and its acceptance are **pending**.
-No independent verification or final Level 3 sign-off is claimed here.
+Owner: Jim Lo. Independent verifier and Level 4 recipient: Ka Pui Cheung.
+Ka Pui completed the independent walkthrough and approved `325515a` in
+[PR #49](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698) on November 7, 2026 (America/New_York).
+Deployment verification of the eventual reviewed merge remains pending.
 
 ## Independent walkthrough
 
@@ -23,9 +24,9 @@ that the later commit was deployed.
 
 | Request | UTC time | Outcome log | Trace |
 | --- | --- | --- | --- |
-| A | 02:59:38 | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Fb49454506862e151bc19e7e7866ba2e6%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=b49454506862e151bc19e7e7866ba2e6?project=ospsd-team5) |
-| B | 02:59:41 | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Ff2a765aeb27c51c738b8a54847950029%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=f2a765aeb27c51c738b8a54847950029?project=ospsd-team5) |
-| C | 02:57:16 | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Facbf0393a219d301c633b49216030b27%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=acbf0393a219d301c633b49216030b27?project=ospsd-team5) |
+| A | 02:59:38 | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Fb49454506862e151bc19e7e7866ba2e6%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=b49454506862e151bc19e7e7866ba2e6;spanId=8fc4a61494326f02?project=ospsd-team5) |
+| B | 02:59:41 | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Ff2a765aeb27c51c738b8a54847950029%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=f2a765aeb27c51c738b8a54847950029;spanId=b7e0c1cb2cdfcc53?project=ospsd-team5) |
+| C | 02:57:16 | [log](https://console.cloud.google.com/logs/query;query=trace%3D%22projects%2Fospsd-team5%2Ftraces%2Facbf0393a219d301c633b49216030b27%22%20AND%20jsonPayload.service%3D%22calendar-team-5%22?project=ospsd-team5) | [trace](https://console.cloud.google.com/traces/explorer;traceId=acbf0393a219d301c633b49216030b27;spanId=66e24f876780b2ae?project=ospsd-team5) |
 
 Use only the dashboard and linked logs/traces to explain each request, without
 the implementation or an explanation from its author. In Logs Explorer, set the
@@ -48,31 +49,49 @@ existing evidence.
 
 ### Verifier worksheet
 
-Ka Pui should fill this in or provide equivalent observations in a linked PR
-comment. Jim can transcribe the actual response and retain its source link.
+These observations summarize [Ka Pui's review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698); they are the
+verifier's findings, not an owner-performed substitute.
 
-- Verifier/date/time zone: **Pending**
-- Dashboard, log and trace access: **Pending**
-- Source comment or review link: **Pending**
+- Verifier/date/time zone: Ka Pui Cheung, November 7, 2026, America/New_York.
+- Evidence window: 21:55–22:01 EST; this is the request window, not the review time.
+- Access: dashboard, Logs Explorer and Trace Explorer worked with the team
+  account. Ka Pui reported that their NYU account did not have project access.
+- Source: PR #49 review linked above, on commit `325515a`.
 
 | Observation | Request A | Request B | Request C |
 | --- | --- | --- | --- |
-| Operation, HTTP status and outcome | Pending | Pending | Pending |
-| Caller/service/provider/none, with evidence | Pending | Pending | Pending |
-| Release and serving revision | Pending | Pending | Pending |
-| Matching log/trace ID | Pending | Pending | Pending |
-| SERVER duration and Google child spans | Pending | Pending | Pending |
-| Corresponding dashboard series/time window | Pending | Pending | Pending |
-| Sensitive-data inspection | Pending | Pending | Pending |
+| Operation, HTTP status and outcome | create / POST, 201, success | create / POST, 422, invalid_input | create / POST, 503, provider_unavailable |
+| Failure source and evidence | none; successful events.insert | caller; no Google child span | provider; OAuth refresh child ERROR, no insert |
+| Release / environment | 900c328… / verify | 900c328… / verify | 900c328… / verify |
+| Serving revision | team5-calendar-verify-00010-kbk | team5-calendar-verify-00010-kbk | team5-calendar-verify-00009-62d |
+| Log/trace correlation | Verifier confirmed matching IDs | Verifier confirmed matching IDs | Verifier confirmed matching IDs |
+| SERVER and child duration | 538 ms; insert 516 ms (96%) | 4.4 ms; no child | 83 ms; OAuth refresh 76 ms (91%) |
+| Dashboard in the evidence window | create traffic and latency, success | create traffic/errors/latency, invalid_input | create traffic/errors/latency, provider_unavailable |
+| Sensitive-data inspection | No event fields, tokens or credentials | No request body or validation details | No OAuth/secret contents or raw provider error |
 
-- Problems or clarification needed: **Pending**
-- Owner's corrections and verifier recheck, if needed: **Pending**
-- Verifier's conclusion: **Pending**
+Exact trace IDs and SERVER span IDs are in the links above, checked against
+exported trace records. The review used abbreviated IDs; these links preserve
+the complete recorded IDs rather than expanding the abbreviations by guesswork.
 
-Independent interpretation is complete when all three requests can be explained
-from those links and any blocking access/documentation issue has been resolved.
-Code-review approval alone does not record this walkthrough. Keep its status
-pending until Ka Pui supplies actual observations.
+Verifier's conclusion: all three requests can be explained using the dashboard,
+logs and traces alone; no blocking issue. Ka Pui also reported local Ruff, mypy
+and 652 tests passing. The review explicitly marked the following notes optional.
+
+Owner's documentation follow-up:
+
+- A/B used recovered revision `00010-kbk`; C used failure-injection revision
+  `00009-62d`. The same parent release label does not identify a unique revision.
+  Check the outcome log's Cloud Run resource labels for the serving revision.
+- `900c328…` is the candidate's parent, not a claim that the reviewed merge was
+  deployed. Use the source fingerprint and image in the verification record.
+- The workflow's GET after DELETE intentionally returns 404 `not_found`.
+  This is recorded in the workflow evidence; the aggregate dashboard alone
+  cannot identify a particular request as that cleanup check.
+- Trace URLs now include the recorded SERVER `spanId`, following Ka Pui's
+  report that `traceId` alone opened Explorer without selecting the trace.
+
+Independent interpretation is complete. Re-review of these documentation edits
+is pending; the reviewed merge's deployment evidence remains a separate step.
 
 ## Level 4 metric reference
 
@@ -143,7 +162,9 @@ results must retain retryable=false; an alert does not authorize retrying them.
 ### Level 4 handoff receipt
 
 - Recipient: Ka Pui Cheung.
-- Delivery/acknowledgment and source link: **Pending**.
+- Walkthrough document received and used: [Ka Pui’s PR review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698).
+- Separate Level 4 policy/implementation acceptance: **Pending**; the review
+  confirms the walkthrough, not completed SLO or alert work.
 - Proposed eligible operations/outcomes and latency thresholds: **Pending;
   Level 4 owner to define**.
 - No-data/reset/environment handling and alert test evidence: **Pending;
@@ -160,7 +181,7 @@ These entries remain pending until that deployment actually happens:
 
 | Evidence | Status/link |
 | --- | --- |
-| Level 3 PR and reviewed merge commit | Pending |
+| Level 3 PR and reviewed merge commit | PR #49 approved at 325515a; merge pending |
 | Successful Deploy run and verified-release artifact | Pending |
 | Google smoke/cleanup | Pending |
 | Dashboard/log/trace for the reviewed deployment | Pending |

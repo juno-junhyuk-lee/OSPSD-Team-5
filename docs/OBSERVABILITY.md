@@ -297,9 +297,9 @@ and queries to Ka Pui for Level 4. No availability/latency target or alert is
 defined by Level 3; a wrong 2xx result still needs smoke/conformance detection.
 
 See [the deployed verification record](OBSERVABILITY_VERIFICATION.md) for the
-uncommitted candidate's actual cloud data and the remaining independent checks.
+uncommitted candidate's actual cloud data and the remaining deployment checks.
 The [independent walkthrough and Level 4 handoff](OBSERVABILITY_HANDOFF.md)
-provides three request links, a pending verifier worksheet for Ka Pui, metric
+provides corrected request links, Ka Pui’s completed independent findings, metric
 query details, and a separate reviewed-deployment checklist.
 
 To tear down observability, first disable export in the service configuration,

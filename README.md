@@ -868,7 +868,8 @@ Calendar OAuth. The guide covers bounded export, saturation, the Terraform
 dashboard, and the separate deployed/teammate verification requirements.
 See the [cloud evidence](docs/OBSERVABILITY_VERIFICATION.md) and
 [Ka Pui walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md).
-Independent interpretation and reviewed-deployment evidence remain pending.
+Ka Pui completed independent interpretation in PR #49; deployment evidence for
+the eventual reviewed merge remains pending.
 
 Run the same commands on macOS, Linux, or Windows:
 

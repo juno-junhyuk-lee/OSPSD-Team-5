@@ -21,7 +21,7 @@
   cloud setup, and separate deployed/teammate verification.
 - [Cloud verification](docs/OBSERVABILITY_VERIFICATION.md): uncommitted candidate
   provenance, actual dashboard/log/trace links, Google workflow and authorization
-  failure, cleanup/restoration, and remaining independent teammate walkthrough.
+  failure, cleanup/restoration, and the completed independent teammate walkthrough.
 
 HW2 uses calendar-contract tag `v0.1.0-rc.1`, commit
 `1c1cad7a0732ddb242a05400d8833d94e4422424`. Import shared Event, CreateEvent,
