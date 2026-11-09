@@ -16,7 +16,7 @@ on `hw2/milestone-3` at the merged Level 2 revision `ed6ab9e`.
 | 2, `900c328` | Request traces and explicit Google-call child spans |
 | 3, `ac1b7c2` | Cloud export, saturation, dashboard and actual candidate verification; includes initial evidence and operator documentation |
 | 4 | Independent walkthrough completed by Ka Pui in PR #49; Level 4 metric reference delivered; reviewed-merge deployment pending |
-| Level 4 | Ka Pui: [SLIs, SLOs, error budget and burn-rate alerts](SLO.md); cloud apply and alert test pending |
+| Level 4 | Ka Pui: [SLIs, SLOs, error budget and burn-rate alerts](SLO.md); applied and read back in `ospsd-team5`; alert test pending |
 
 The [candidate record](OBSERVABILITY_VERIFICATION.md) contains completed cloud
 checks and restored-environment evidence. The
