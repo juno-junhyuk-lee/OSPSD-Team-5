@@ -61,6 +61,6 @@ jobs:
         run: terraform -chdir=${{ matrix.directory }} init -backend=false -input=false -lockfile=readonly
       - name: Validate Terraform
         run: terraform -chdir=${{ matrix.directory }} validate -no-color
-      - name: Test deployment access boundaries
-        if: matrix.directory == 'infra/ci'
-        run: terraform -chdir=infra/ci test -no-color
+      - name: Run Terraform tests
+        if: matrix.directory == 'infra/ci' || matrix.directory == 'infra/observability'
+        run: terraform -chdir=${{ matrix.directory }} test -no-color
