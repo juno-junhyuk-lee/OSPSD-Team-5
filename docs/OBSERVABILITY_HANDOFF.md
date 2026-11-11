@@ -3,7 +3,8 @@
 Owner: Jim Lo. Independent verifier and Level 4 recipient: Ka Pui Cheung.
 Ka Pui completed the independent walkthrough and approved `325515a` in
 [PR #49](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698) on November 7, 2026 (America/New_York).
-Deployment verification of the eventual reviewed merge remains pending.
+The reviewed Level 3 merge and later Level 4 merge have passed deployment;
+fresh merged-revision logs/traces are linked in the follow-up below.
 
 ## Independent walkthrough
 
@@ -169,19 +170,17 @@ results must retain retryable=false; an alert does not authorize retrying them.
 
 ## Reviewed deployment follow-up
 
-After review/merge into `hw2/milestone-3`, the existing pipeline should deploy
-the merged revision. Follow the [deployment runbook](DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
-and record the actual run, merge SHA, image digest, secret references and ready
-revision/traffic, along with Google smoke/cleanup and fresh cloud observations.
-Use the deployed manifest's release, not the historical parent SHA above.
-These entries remain pending until that deployment actually happens:
+The reviewed Level 3 merge `8ad2e64` passed
+[Deploy run 42535452049](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42535452049).
+After Level 4 merged, `191b006` passed the pipeline again. Use the deployed
+manifest's release, not the historical parent SHA above.
 
 | Evidence | Status/link |
 | --- | --- |
-| Level 3 PR and reviewed merge commit | PR #49 approved at 325515a; merge pending |
-| Successful Deploy run and verified-release artifact | Pending |
-| Google smoke/cleanup | Pending |
-| Dashboard/log/trace for the reviewed deployment | Pending |
+| Level 3 PR and reviewed merge commit | PR #49 approved at 325515a; merged as `8ad2e64` |
+| Successful Deploy run and verified-release artifact | [Run 43100667215](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43100667215), Level 4 merge `191b006` |
+| Google smoke/cleanup | Passed in that run; ready revision `team5-calendar-demo-00005-ld8` |
+| Fresh log/trace for the merged deployment | [November 11 deployed conformance observations](DEPLOYED_CONFORMANCE_VERIFICATION.md#fresh-log-and-trace-evidence); dashboard chart queries were not repeated in that check |
 
 Independent historical interpretation, code review and reviewed-release
 verification are separate evidence. See the

@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CALENDAR_LIVE_CONFORMANCE: "0"
+      CALENDAR_DEPLOYED_CONFORMANCE: "0"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,6 +39,7 @@ jobs:
         run: >-
           uv run pytest -v
           tests/test_shared_conformance.py::TestGoogleCalendarServiceConformance
+          tests/test_shared_conformance.py::TestHttpCalendarServiceConformance
 
   infrastructure:
     runs-on: ubuntu-latest

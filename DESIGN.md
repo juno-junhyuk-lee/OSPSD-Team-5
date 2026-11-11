@@ -2,17 +2,17 @@
 
 | Item | Value |
 | --- | --- |
-| Status | In review; adoption integrated; Level 2 verify deployment, failure detection, and recovery verified; merged-revision deployment pending |
-| Author | Juno Lee, with team input, Niriti Pahadi's review revisions, and Kristie Lee's Level 2 updates |
+| Status | Implemented through Level 4; design reviews confirmed by the team; release publication and submission access checks pending |
+| Author | Juno Lee, with team input, Niriti Pahadi's review revisions, Kristie Lee's Level 2 updates, Jim Lo's Level 3 work, and Ka Pui Cheung's Level 4 work |
 | Team / vertical | Team 5 / Calendar |
 | Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
-| Last updated | November 7, 2026 |
-| Complete-design reviewer | Niriti Pahadi; [review revisions #42][design-review], final review of this revision pending |
-| Contract-facing reviewer | Team 2 or Team 7 representative; assignment and final review pending |
+| Last updated | November 11, 2026 |
+| Complete-design reviewer | Niriti Pahadi; [review revisions #42][design-review]; review completion confirmed by the team through Juno on November 11 |
+| Contract-facing reviewer | Completion of the required outside-team review confirmed by the team through Juno on November 11; individual reviewer and review URL are not recorded here |
 | Shared agreement | [Joint decision memo][memo], version 4, October 28, 2026; staff access needs verification |
 | Shared contract revision | [calendar-contract v0.1.0-rc.1][shared-tag], commit `1c1cad7a0732ddb242a05400d8833d94e4422424`; installed distribution version `0.1.0` |
 | Python / HTTP contracts | [Python interface][python-contract] and [HTTP contract][http-contract] at the shared revision above |
-| Implementation work | [Design #40][design-pr], [local PUT #41][put-pr], [package adoption #43][adoption-pr], [conformance #44][conformance-pr] |
+| Implementation work | [Design #40][design-pr], [local PUT #41][put-pr], [package adoption #43][adoption-pr], [conformance #44][conformance-pr], [deployment #46][deployment-pr], [pipeline #48][pipeline-pr], [observability #49][observability-pr], [SLOs #50][slo-pr] |
 | Inspected HW1 baseline | `143be358c1c6086c47035b4088d967895d7f9ebb` |
 
 ## Context, goals, and non-goals
@@ -24,11 +24,13 @@ serialization. It also ignored unknown body fields and returned 422 for
 malformed JSON. These differences could hide client mistakes or require
 service-specific error handling.
 
-By November 4 before class, the team must preserve a reviewed design in its
-repository and demonstrate at least one Google-backed operation through a tagged
-shared package. PUT was selected as the early integration operation because it
+PUT was selected as the early Milestone 2 integration operation because it
 exercises replacement requests, the provider boundary, translation, and errors.
-Full required conformance and deployment remain November 11 checkpoints.
+Milestone 3 adds reproducible Cloud Run infrastructure, automated deployment and
+recovery, request observability, and reliability objectives with tested alerts.
+The four levels are integrated into `hw2/milestone-3` through merge commit
+`191b006c1bed59796f36321eb6f905d4768ba85d`. Release publication and final
+submission checks remain separate from implementation and deployment evidence.
 
 The current integration branch already contains local PUT and its live evidence
 from #41. Jim's #43 merged shared-package adoption into `hw2/milestone-2`
@@ -243,10 +245,11 @@ The common error envelope is `{"error":{"code":"...","message":"...","retryable"
 The service supplies safe messages, a Boolean provider-involvement flag, and
 a controlled reason for unsupported shapes. The HTTP handler uses that reason
 to select 400 without changing other `INVALID_INPUT` mappings.
-`app/errors.py` logs operation, code, status, and that flag once; it does not
+`app/errors.py` supplies sanitized failure context to the request middleware,
+which logs the operation, code, status, and that flag once; it does not
 expose raw exception messages, request bodies, titles, tokens, or authorization
-headers. Credential files stay outside Git and evidence. Deployment must define
-secret injection, refresh-token persistence, and write permissions separately.
+headers. Credential files stay outside Git and evidence. Hosted secret injection,
+refresh-token persistence, and write permissions are described below.
 
 PUT's local work is proportional to the encoded field sizes. Its normal provider
 path performs one existence read and one patch, with possible credential refresh.
@@ -256,8 +259,8 @@ internal complexity. Tests check that failures do not cause extra writes.
 Every live run owns its created data and records cleanup results. The workflow
 script keeps an obtained ID and cleans up in `finally`, attempting its remaining
 checks after failures. If creation is uncertain without an ID, inspect the
-calendar using the printed run marker before another POST. The shared live
-suite's cleanup gaps remain a separate review concern described below.
+calendar using the printed run marker before another POST. The shared suite's
+cleanup gaps are mitigated by the local fixture overrides described below.
 
 ### Milestone 3 deployment
 
@@ -270,7 +273,9 @@ response. This uses instance-based billing while an instance exists; do not
 carry forward the earlier request-billing free-tier assumption. The project
 requires billing, and compute, telemetry ingestion, and registry storage can
 incur charges. Juno owns billing review. Keep classroom traffic bounded and check
-billing through February 28, 2027, then tear down the deployment.
+billing while the service remains available for grading. The deployment runbook
+records February 28, 2027 as the target teardown date; coordinate teardown with
+the grading requirement rather than removing the service before grades are released.
 
 | Responsibility | Implementation |
 | --- | --- |
@@ -291,8 +296,12 @@ deployment. External apps in Testing can issue refresh tokens that expire after
 seven days.
 
 See [the deployment runbook](docs/DEPLOYMENT.md) for bootstrap, plan/apply,
-verification, and teardown. An independent teammate must reproduce the steps in
-a disposable environment. Keep the review evidence separate from the design.
+verification, and teardown. Kristie independently reproduced a disposable
+deployment at `244148d`, verified the real Google workflow and a no-change plan,
+and destroyed all seven verification resources without affecting demo. Her
+[PR #46 review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/46)
+records the walkthrough; its reported conformance/additional checks were 16
+passed and 14 skipped, not complete deployed conformance coverage.
 
 ### Level 2: release pipeline and recovery
 
@@ -314,8 +323,17 @@ verified**, including real Google smoke, cleanup, and a no-change Terraform plan
 The merged PR #48 revision `ed6ab9e` subsequently passed the
 [demo Deploy run, attempt 2](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42409430131/attempts/2),
 including ready revision/traffic, real Google smoke, cleanup and verified-release
-artifact publication. This Level 2 result does not establish deployment of the
-later Level 3 implementation.
+artifact publication. The later [Level 3 merge deployment][level3-deploy] at
+`8ad2e64958fe05e17b8712dacd49a87e2a06bde7` also passed controlled conformance,
+ready revision/traffic checks, real Google smoke/cleanup, and verified-release
+artifact publication. Results belong to those commits, not every later head.
+
+After #50 merged, [Deploy run 43100667215][final-deploy] successfully deployed
+`191b006c1bed59796f36321eb6f905d4768ba85d` on November 11. Application checks,
+controlled shared conformance, all three infrastructure checks, deployed Google
+smoke/cleanup, and verified-release publication passed. This confirms the
+merged Level 4 integration revision; a later documentation or release commit
+needs its own matching CI and deployment record before submission.
 
 ### Level 3: request observability
 
@@ -351,18 +369,56 @@ queue measurement. Cloud Run memory relative to its 512 MiB limit supplies
 additional instance-wide context. `infra/observability` provisions a dashboard
 with all four signals for each common operation, release/environment legends,
 and log/trace investigation links. It owns separate administrator state; the
-release pipeline cannot change its IAM. No SLO targets or alerts are added here.
+release pipeline cannot change its IAM. Level 4 adds SLOs and alerts in that
+administrator-managed Terraform root.
 
 See [the observability guide](docs/OBSERVABILITY.md) for setup, interpretation,
 export limits, independent verification, and the handoff to Level 4. Deployed
-evidence is separate from controlled SDK tests; teammate interpretation and
-the eventual reviewed release remain required before Level 3 sign-off.
+evidence is separate from controlled SDK tests.
 The [walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md) records
 Ka Pui’s completed independent interpretation and approval in PR #49, with
-optional documentation clarifications. Reviewed-merge deployment remains
-pending. The handoff also defines the existing metric
-names/units and query boundaries that Level 4 can use without assuming an SLO
-policy from HTTP status alone.
+optional documentation clarifications. The reviewed Level 3 merge was deployed
+by [run 42535452049][level3-deploy]. Historical success, invalid-input, and
+provider-failure traces still identify their original verify revisions, not the
+later merge. The handoff defines the metric names/units and query boundaries
+used by Level 4.
+
+### Level 4: reliability objectives and actionable alerts
+
+Ka Pui's `infra/observability/slo.tf` defines environment-specific Cloud
+Monitoring services and two request-based SLOs over `create`, `get`, `replace`,
+and `delete`. Both use a rolling 28-day window and aggregate releases within
+one environment, so a deployment does not reset the budget. Extensions and
+health/readiness traffic are excluded.
+
+Availability targets 99%: all common-operation requests are eligible, and only
+service/provider failures are bad. Correct caller rejections remain eligible
+without consuming budget. Latency targets 95% of successful common-operation
+requests finishing within one second. Success-only latency prevents fast
+rejections from hiding slow successful work; one second is an existing histogram
+bucket boundary. The initial observed create took 538 ms, including 516 ms in
+Google insert. These server-side measurements cannot count requests that never
+reach the middleware, and a semantically wrong 2xx can still appear successful.
+Conformance and independent provider read-back remain necessary.
+
+Each SLO has an alert policy with OR-combined burn-rate conditions: more than
+14.4 times budget consumption over one hour, or more than six times over six
+hours sustained for five minutes. Notification channels are configured
+separately for demo and verify. Alerts identify the environment and objective
+and link to the dashboard and runbook. No data is not treated as proof of health.
+Uncertain POST/PUT requests remain non-retryable regardless of alert status.
+
+[SLO.md](docs/SLO.md) contains the eligible/good definitions, calculations,
+traffic-based budget examples, runbook, and error-budget policy. Feature merges
+freeze below 25% remaining budget; exhaustion calls for rollback and an incident
+note. Provider failures consume budget rather than being excluded after a failure.
+
+On November 11, provider failures were injected only in disposable verify.
+The availability alert opened at 15:35:25 EST, delivered email with dashboard
+and runbook links, and closed at 15:38:20 after recovery. The
+[verification record](docs/SLO.md#alert-test-2026-11-11) links the incident and
+notification screenshot. Demo's notification channel was applied separately.
+This is required Level 4 verification; no extra-credit game day is claimed.
 
 ## Testing and verification
 
@@ -378,6 +434,8 @@ policy from HTTP status alone.
 | Real persistence and extension preservation | Workflow script and recorded live conformance: actual Google reads/writes, description preservation, cleanup |
 | Deployment and rollback guards | `test_deploy_release.py` and `test_rollback_release.py`: immutable references, service-only plans, ready revision/traffic, trusted artifact provenance, and original configuration inputs |
 | Smoke failure/cleanup behavior | `test_verify_put_live.py`: controlled remote HTTP transport, readiness before writes, faulty PUT detection, cleanup, and no uncertain-create retry; not live pipeline evidence |
+| Cloud telemetry export | `test_cloud_telemetry.py`: controlled real SDK serialization, bounded export, privacy, and failure isolation; not cloud delivery evidence |
+| SLO and alert configuration | `infra/observability/tests/slo.tftest.hcl`: mocked plan assertions for goals, failure filters, success-only latency, burn conditions, and dashboard/runbook links; CI runs these alongside dashboard tests |
 
 In #44, the offline `service` fixture constructs `GoogleCalendarService` using
 real adapters backed by the isolated fake Google client. `failing_service`
@@ -411,11 +469,23 @@ update must be caught with a replacement start representing a different instant;
 the tagged suite currently has a gap here, so retain Team 5's separate
 replacement checks.
 
-The tagged suite also does not register `missing_id` fallback cleanup and stops
-cleanup after its first unexpected deletion failure. Ka Pui owns a local fixture
-override or corrected shared release before final live-suite approval. Track IDs
-immediately, attempt every cleanup, and test both failure paths offline. A prior
-successful live run does not establish cleanup behavior during failures.
+Team 5 overrides the tagged suite's cleanup fixtures locally in
+`tests/conformance_support.py`. Missing-event IDs are registered before the
+initial delete, and teardown attempts every unique tracked ID before reporting
+sanitized aggregate failures. HTTP creation also records an ID before validating
+the rest of the response, so malformed responses with known IDs can be cleaned
+up. Uncertain writes without an ID are not retried and require Calendar
+inspection. Offline regressions exercise setup-deletion failure, multiple cleanup
+failures, malformed create responses, and ignored start updates.
+
+The test-only `HttpCalendarService` bridge runs the inherited shared suite through
+deployed HTTPS when `CALENDAR_DEPLOYED_CONFORMANCE=1`. It uses the same URL and
+private bearer-file inputs as the existing smoke script. Fast CI runs an
+equivalent HTTP suite on fake Google, with live flags explicitly disabled.
+Provider-failure cases still use controlled adapters; they do not inject failures
+into demo. HTTP validation extensions check unknown, missing, and legacy fields
+plus malformed/empty JSON. See [deployed conformance evidence](docs/DEPLOYED_CONFORMANCE_VERIFICATION.md)
+for the tested server revision, source fingerprint, reproduction, and cleanup.
 
 ### Observed evidence and limits
 
@@ -469,9 +539,11 @@ credentials. Historical HW1 results cannot substitute for HW2 checks.
 | Niriti Pahadi | Complete-design review and verification support | Review the consolidated revision and record concerns/outcomes; help reproduce adoption as needed |
 | Kristie Lee | Shared-contract and contract-facing coordination | Record accepted revision, cross-team review, and release references before submission |
 | Jim Lo | #43 adoption merged; migration, models/errors, examples | Review #40's tag-reference correction and unchanged shared commit before integration |
-| Ka Pui Cheung | #41 PUT and #44 conformance merged; real verification recorded | Follow up on inherited live cleanup concerns and verify the combined submission revision |
-| Juno Lee | Level 1 Cloud Run runtime, Terraform, billing, and teardown | Verify provisioning, repeat apply, and teardown independently before Level 2 handoff |
-| Kristie Lee | Level 2 CI, deployment, and recovery | Verify deployment/failure/recovery verified; merged-revision deployment pending |
+| Ka Pui Cheung | #41 PUT and #44 conformance merged; real verification recorded | Juno's local cleanup overrides and deployed HTTP checks resolve the inherited concerns; repeat final tag verification after publication inputs are selected |
+| Juno Lee | Level 1 Cloud Run runtime, Terraform, billing, and teardown | Independent provisioning, no-change plan, and teardown recorded in #46; maintain billing and grading availability |
+| Kristie Lee | Level 2 CI, deployment, and recovery | Verify failure/recovery exercise completed; merged Level 4 revision deployment and Google smoke/cleanup passed in run 43100667215 |
+| Jim Lo | Level 3 metrics, logs, traces, and dashboard | Independent walkthrough in #49; reviewed merge deployment at `8ad2e64` passed |
+| Ka Pui Cheung | Level 4 SLIs/SLOs, error-budget policy, and alerts | #50 merged; verify alert delivery/resolution and demo notification setup recorded in `docs/SLO.md` |
 
 Milestone 3 uses `hw2/milestone-3`. Level 2 work on
 `hw2/milestone-3-level-2` targets that branch; the combined milestone PR targets
@@ -491,18 +563,20 @@ team review. Publish a new tag rather than moving an existing published tag.
 | Old names and PATCH behavior | Documented #43's rejection of legacy names and full-field PATCH with `start/end` | Jim; review with affected callers before integration |
 | Shared tag pin | Corrected source/lock/current references to `v0.1.0-rc.1` in this revision; shared commit unchanged, historical output retained with clarification | Juno implements; Jim reviews before #40 integration |
 | Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; verify the combined submission revision |
-| Replacement-start and live cleanup gaps | Keep separate start-change tests; fix cleanup fixtures locally or via a new shared release | Ka Pui; before relying on those guarantees/live-suite approval |
+| Replacement-start and live cleanup gaps | Local conformance extension detects a changed start instant; fixture overrides track missing-event IDs and attempt all cleanup; offline failure regressions added | Juno; implementation and deployed results in `docs/DEPLOYED_CONFORMANCE_VERIFICATION.md` |
 | HTTP IDs and unsupported event shapes | Local policy implemented and checked in `tests/test_event_shape_policy.py`: ID forwarding/rejection, no unsupported writes, instance metadata preserved | Juno implements; Jim/Ka Pui review with the consolidated design before final acceptance |
-| Hosting and credential persistence | Cloud Run, Terraform, and durable Secret Manager credentials replace the original Render proposal | Juno; record live provisioning, billing setup, and independent verification before Level 2 |
-| Final complete-design and contract-facing reviews | Review the consolidated revision, link substantive comments/resolutions and scope of approval | Niriti and Team 2/7 reviewer; before submission |
+| Hosting and credential persistence | Cloud Run, Terraform, and durable Secret Manager credentials replace the original Render proposal; #46 records independent provisioning and teardown | Juno; maintain billing, runtime credentials, and grader availability |
+| Final complete-design and contract-facing reviews | Completion confirmed by the team through Juno on November 11; #42 remains the linked design-review history | Team; preserve review links with the submission where available |
 
-Niriti's #42 provides review revisions; it does not approve this later revision.
+Niriti's #42 provides review revisions; that historical PR alone does not approve
+this later revision. Juno confirmed completion of both required design reviews
+on behalf of the team on November 11; this records that confirmation rather than
+claiming a new GitHub approval or inventing an outside review URL.
 Kristie's feedback supplied in team coordination requested fresh progress notes,
 concrete architecture/error conversion, compatibility policy, suite execution,
 and final revision/evidence links. This document now incorporates the known code
-and evidence for those items; final review and unresolved dispositions remain
-explicit. Kristie's coordination feedback is not a substitute for the required
-outside-team review. No final design approval is claimed.
+and evidence for those items. Kristie's coordination feedback is separate from
+the outside-team review confirmed by the team above.
 
 ## Submission and change record
 
@@ -541,6 +615,17 @@ requirements.
   gating, and manual recovery. Local checks passed.
 - November 7: verified pipeline deployment, controlled failure detection, and
   recovery in verify, including real Google smoke/cleanup and a no-change plan.
+- November 8: #49 merged and its `8ad2e64` deployment passed controlled
+  conformance and the real Google workflow/cleanup. Historical Level 3 request
+  evidence and independent interpretation retain their original revision scope.
+- November 11: #50 merged at `191b006`; added Level 4 design, alert verification,
+  demo notification setup, measurement limits, and current deployment evidence.
+  Deploy run 43100667215 passed merged-revision checks, Google smoke/cleanup,
+  and verified-release publication.
+  The team confirmed the complete-design and contract-facing reviews. Local
+  conformance fixture fixes and deployed HTTP checks address the inherited
+  cleanup and replacement-start concerns. Release publication and grader access
+  remain submission follow-ups.
 - Codex assisted with drafting, repository inspection, and review checks.
   Students must understand, verify, and own their submitted work.
 
@@ -553,6 +638,12 @@ requirements.
 [put-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41
 [adoption-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/43
 [conformance-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/44
+[deployment-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/46
+[pipeline-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/48
+[observability-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49
+[slo-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/50
+[level3-deploy]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42535452049
+[final-deploy]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43100667215
 [put-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/e52d656/docs/PUT_LIVE_VERIFICATION.md
 [adoption-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/aa11f9ccbd75dd66fd280aa22a06186a29a47564/docs/SHARED_CONTRACT_VERIFICATION.md
 [conformance-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/86fd81e250543610d7a51bbe7197a95236b5b08b/docs/SHARED_CONTRACT_VERIFICATION.md
