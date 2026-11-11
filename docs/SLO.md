@@ -106,6 +106,16 @@ Provider-caused burn still counts. If Google is the cause, the response is retry
 | --- | --- |
 | `terraform test` (mock provider): goals, bad-filter scope, success-only latency, two burn conditions per SLO, no default channel | Added in `tests/slo.tftest.hcl` |
 | Apply in `ospsd-team5` and confirm both SLOs report compliance on the demo service | Done 2026-11-08 19:11 EST: 5 resources added, nothing changed or destroyed. Read-back at 19:13 over the previous 6 h: availability 7 good / 0 bad, latency 5 good / 0 bad; compliance 1.0 and budget left 1.0 for both. Both alert policies enabled with 1 h and 6 h `select_slo_burn_rate` conditions. |
-| Alert test: inject provider failures in `verify` with `slo_environment=verify`, confirm the fast-burn condition opens and then closes | **Pending** |
+| Alert links on `demo` | Applied 2026-11-11 15:30 EST: both policies updated in place (0 added, 2 changed) with the Dashboard and Runbook links. |
+| Alert test: inject provider failures in `verify`, confirm the alert reaches a real destination and resolves after recovery | Done 2026-11-11, details below. Fired 15:35:25 EST, email received, closed 15:38:20 EST. |
 
-The alert test needs a `verify` release that exports metrics: the running `verify` revision predates Level 3 and has no `CALENDAR_ENV` or `CALENDAR_TELEMETRY_PROJECT`, and the `calendar-verify` deployment environment accepts only `hw2/milestone-3-level-2`. Apply the `verify` SLOs under their own state prefix (`calendar/observability-verify`) so the test cannot replace the demo objectives. Record the run, times and incident links here when done.
+### Alert test (2026-11-11)
+
+The `verify` SLOs and alerts were applied with `slo_environment=verify` and `alert_email=kc5931@nyu.edu` under their own state prefix (`calendar/observability-verify`), then provider failures were injected (Google Calendar calls failing TLS, so requests returned `provider_unavailable`).
+
+| Time (EST) | Event |
+| --- | --- |
+| 15:32:58–15:34:21 | Failure injection: 43 provider failures, 5 good requests. |
+| 15:35:25 | Alert opened: "Team 5 Calendar availability error-budget burn (verify)", fast burn 64.19x. Email delivered to kc5931@nyu.edu with Dashboard and Runbook links. |
+| 15:35:59 | Recovery: failures stopped, normal traffic resumed. |
+| 15:38:20 | Alert closed; 1 h burn rate back to 6.07 (below 14.4). |
