@@ -63,7 +63,7 @@ resource "google_monitoring_slo" "latency" {
 resource "google_monitoring_notification_channel" "email" {
   count        = var.alert_email == "" ? 0 : 1
   project      = var.project_id
-  display_name = "Team 5 Calendar SLO alerts"
+  display_name = "Team 5 Calendar SLO alerts (${var.slo_environment})"
   type         = "email"
   labels = {
     email_address = var.alert_email

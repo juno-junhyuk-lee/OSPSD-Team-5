@@ -71,7 +71,7 @@ One policy per SLO, each with two burn-rate conditions (Google SRE multiwindow p
 | Fast | 1 h | > 14.4 | About 2% of the 28-day budget in one hour; act now |
 | Slow | 6 h, held 5 min | > 6 | About 5% of the budget in six hours; act the same day |
 
-`alert_email` adds an email channel; it is empty by default so applying the module emails no one by surprise. Each alert's documentation links to the [dashboard](https://console.cloud.google.com/monitoring/dashboards/custom/c25e66c8-e3e3-44bc-af2b-6707ca37a175?project=ospsd-team5) and to the runbook below, both in its Markdown body and as incident links.
+`alert_email` adds an email channel; it is empty by default so applying the module emails no one by surprise. Both `demo` and `verify` are applied with `alert_email=kc5931@nyu.edu`, so each environment's policies notify its own channel, "Team 5 Calendar SLO alerts (demo)" or "(verify)". Each alert's documentation links to the [dashboard](https://console.cloud.google.com/monitoring/dashboards/custom/c25e66c8-e3e3-44bc-af2b-6707ca37a175?project=ospsd-team5) and to the runbook below, both in its Markdown body and as incident links.
 
 ## Runbook
 
@@ -84,6 +84,7 @@ One policy per SLO, each with two burn-rate conditions (Google SRE multiwindow p
 
 ## No data, resets and retries
 
+- These SLIs are measured inside the service, so they cannot see requests that never reach it: DNS or TLS failures, Cloud Run front-end errors, cold-start timeouts at the load balancer, or a service that is down entirely. Those show up as missing traffic, not as bad requests; an uptime check or client-side probe would be needed to count them.
 - No data is not zero errors. A missing series can mean no traffic, too few samples or broken telemetry. Burn-rate conditions evaluate to no data in that case; check the dashboard's traffic panel before trusting a quiet alert.
 - Counters are cumulative per process; Cloud Monitoring's SLO computation handles resets per time series, so do not pre-sum counters across instances.
 - Uncertain POST/PUT results keep `retryable=false`. An alert never authorizes retrying them.
@@ -107,6 +108,7 @@ Provider-caused burn still counts. If Google is the cause, the response is retry
 | `terraform test` (mock provider): goals, bad-filter scope, success-only latency, two burn conditions per SLO, no default channel | Added in `tests/slo.tftest.hcl` |
 | Apply in `ospsd-team5` and confirm both SLOs report compliance on the demo service | Done 2026-11-08 19:11 EST: 5 resources added, nothing changed or destroyed. Read-back at 19:13 over the previous 6 h: availability 7 good / 0 bad, latency 5 good / 0 bad; compliance 1.0 and budget left 1.0 for both. Both alert policies enabled with 1 h and 6 h `select_slo_burn_rate` conditions. |
 | Alert links on `demo` | Applied 2026-11-11 15:30 EST: both policies updated in place (0 added, 2 changed) with the Dashboard and Runbook links. |
+| Notification destination on `demo` | Applied 2026-11-11 15:59 EST with `alert_email=kc5931@nyu.edu`: channel "Team 5 Calendar SLO alerts (demo)" added and attached to both `demo` policies (1 added, 2 changed). |
 | Alert test: inject provider failures in `verify`, confirm the alert reaches a real destination and resolves after recovery | Done 2026-11-11, details below. Fired 15:35:25 EST, email received, closed 15:38:20 EST. |
 
 ### Alert test (2026-11-11)
@@ -119,3 +121,8 @@ The `verify` SLOs and alerts were applied with `slo_environment=verify` and `ale
 | 15:35:25 | Alert opened: "Team 5 Calendar availability error-budget burn (verify)", fast burn 64.19x. Email delivered to kc5931@nyu.edu with Dashboard and Runbook links. |
 | 15:35:59 | Recovery: failures stopped, normal traffic resumed. |
 | 15:38:20 | Alert closed; 1 h burn rate back to 6.07 (below 14.4). |
+
+- Incident: [`0.oewehvv3uzw4`](https://console.cloud.google.com/monitoring/alerting/incidents/0.oewehvv3uzw4?project=ospsd-team5) (API name `projects/ospsd-team5/alerts/0.oewehvv3uzw4`, policy `alertPolicies/14475636449240691308`), opened 20:35:25 UTC, closed 20:38:20 UTC.
+- Notification: email channel `notificationChannels/10564378853256895788` to kc5931@nyu.edu. The firing email below shows the policy, condition, burn value and the Dashboard and Runbook links.
+
+<img src="images/level4-alert-email.png" alt="Alert firing email for the verify availability policy, fast burn 64.19x, with Dashboard and Runbook quick links" width="360">

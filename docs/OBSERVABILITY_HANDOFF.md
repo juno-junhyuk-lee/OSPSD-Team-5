@@ -165,7 +165,7 @@ results must retain retryable=false; an alert does not authorize retrying them.
 - Walkthrough document received and used: [Ka Pui’s PR review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49#pullrequestreview-5816656698).
 - Level 4 policy and implementation: [SLIs, SLOs, error budget and alerts](SLO.md), Terraform in `infra/observability/slo.tf`.
 - Eligible operations/outcomes and latency threshold: defined in [SLO.md](SLO.md#slis-and-objectives-28-day-rolling-window).
-- No-data/reset/environment handling: defined in [SLO.md](SLO.md#no-data-resets-and-retries). Cloud apply verified 2026-11-08 (see [SLO.md](SLO.md#verification)); alert test evidence: **Pending**.
+- No-data/reset/environment handling: defined in [SLO.md](SLO.md#no-data-resets-and-retries). Cloud apply verified 2026-11-08 (see [SLO.md](SLO.md#verification)); alert test done 2026-11-11 (see [SLO.md](SLO.md#alert-test-2026-11-11)).
 
 ## Reviewed deployment follow-up
 
