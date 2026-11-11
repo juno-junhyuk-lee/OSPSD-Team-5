@@ -1,5 +1,13 @@
 mock_provider "google" {}
 
+override_resource {
+  target          = google_monitoring_dashboard.calendar
+  override_during = plan
+  values = {
+    id = "projects/ospsd-team5/dashboards/test-dashboard"
+  }
+}
+
 variables {
   project_id = "ospsd-team5"
 }
@@ -21,6 +29,16 @@ run "slo_scope_and_burn_alerts" {
   assert {
     condition     = alltrue([for policy in google_monitoring_alert_policy.burn_rate : length(policy.conditions) == 2])
     error_message = "Each SLO needs a fast and a slow burn-rate condition."
+  }
+  assert {
+    condition = alltrue([
+      for policy in google_monitoring_alert_policy.burn_rate :
+      [for link in policy.documentation[0].links : link.display_name] == ["Dashboard", "Runbook"] &&
+      endswith(policy.documentation[0].links[0].url, "/dashboards/custom/test-dashboard?project=ospsd-team5") &&
+      endswith(policy.documentation[0].links[1].url, "docs/SLO.md#runbook") &&
+      strcontains(policy.documentation[0].content, "[Runbook](")
+    ])
+    error_message = "Each alert must link to the dashboard and the runbook."
   }
   assert {
     condition     = length(google_monitoring_notification_channel.email) == 0

@@ -22,6 +22,46 @@ Why these choices:
 - Latency uses success only, so fast rejections cannot hide slow successes. The Level 3 sample shows create at 538 ms (Google insert 516 ms) and rejections at about 4 ms; 1 s leaves room for Google calls but flags cold starts and slow provider calls.
 - Histogram buckets bound the threshold; 1 s must stay a bucket boundary.
 
+## Calculating the current value
+
+Both SLIs are ratios of request counts over the 28-day window:
+
+- Availability = (eligible − bad) / eligible, where eligible is the increase of `calendar.requests` and bad is the increase of `calendar.request.errors` with `failure_source` `service` or `provider`.
+- Latency = successful requests in the `le="1"` histogram bucket / all successful requests.
+- Error budget left = 1 − (bad / eligible) / (1 − objective). Burn rate over a window = (bad / eligible in that window) / (1 − objective).
+
+The exact Cloud Monitoring filters are in `infra/observability/slo.tf` (`total_service_filter`, `bad_service_filter`, `distribution_filter`). To reproduce the numbers Cloud Monitoring computes, ask the SLO itself (any signed-in project viewer; adjust the dates):
+
+```sh
+SLO=projects/ospsd-team5/services/team5-calendar-demo/serviceLevelObjectives/availability  # or .../latency
+for SELECTOR in select_slo_counts select_slo_compliance select_slo_budget_fraction; do
+  curl -sG https://monitoring.googleapis.com/v3/projects/ospsd-team5/timeSeries \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    --data-urlencode "filter=$SELECTOR(\"$SLO\")" \
+    --data-urlencode interval.startTime=2026-10-14T00:00:00Z \
+    --data-urlencode interval.endTime=2026-11-11T00:00:00Z \
+    --data-urlencode aggregation.alignmentPeriod=2419200s \
+    --data-urlencode aggregation.perSeriesAligner=ALIGN_SUM
+done
+```
+
+`select_slo_counts` returns good and bad series; `select_slo_compliance` and `select_slo_budget_fraction` return the ratio and the budget left. The same values are on the Monitoring SLO page for the `Team 5 Calendar (demo)` service.
+
+### Recorded value
+
+Read back on 2026-11-08 at 19:13 EST over the previous 6 h: availability 7 good / 0 bad, so 7 / 7 = 100% against 99%, budget left 1.0. Latency 5 good / 0 bad successful requests, so 5 / 5 = 100% against 95%, budget left 1.0.
+
+### Error-budget examples
+
+| Case | Availability (99%) | Latency (95%) |
+| --- | --- | --- |
+| Budget for 10,000 eligible requests in 28 days | 100 service/provider failures | 500 successes slower than 1 s (of 10,000 successes) |
+| 40 bad of 10,000 | SLI 99.6%; budget used 40 / 100 = 40%, left 60% | 200 slow: SLI 98.0%; used 40%, left 60% |
+| 80 bad of 10,000 | SLI 99.2%; used 80%, left 20%: feature freeze (policy below) | 400 slow: SLI 96.0%; used 80%, left 20%: freeze |
+| 120 bad of 10,000 | SLI 98.8%; budget exhausted (−20%): roll back | 600 slow: SLI 94.0%; exhausted: roll back |
+
+Burn-rate examples for availability: in one hour with 100 eligible requests, 15 bad gives a 15% error ratio and a burn rate of 0.15 / 0.01 = 15 > 14.4, so the fast condition opens. At that rate the 28-day budget lasts 28 × 24 / 15 ≈ 45 h. One bad request in 100 is a burn rate of 1.0, which spends the budget exactly over 28 days and alerts on neither window.
+
 ## Alerts
 
 One policy per SLO, each with two burn-rate conditions (Google SRE multiwindow pattern):
@@ -31,7 +71,16 @@ One policy per SLO, each with two burn-rate conditions (Google SRE multiwindow p
 | Fast | 1 h | > 14.4 | About 2% of the 28-day budget in one hour; act now |
 | Slow | 6 h, held 5 min | > 6 | About 5% of the budget in six hours; act the same day |
 
-`alert_email` adds an email channel; it is empty by default so applying the module emails no one by surprise.
+`alert_email` adds an email channel; it is empty by default so applying the module emails no one by surprise. Each alert's documentation links to the [dashboard](https://console.cloud.google.com/monitoring/dashboards/custom/c25e66c8-e3e3-44bc-af2b-6707ca37a175?project=ospsd-team5) and to the runbook below, both in its Markdown body and as incident links.
+
+## Runbook
+
+1. Open the dashboard from the alert. Check the traffic panel first: no traffic means no data, not health.
+2. Find the operation with errors and read its outcome and source. `provider` points at Google Calendar; `service` points at our code or configuration.
+3. Open the [outcome logs](https://console.cloud.google.com/logs/query?project=ospsd-team5) for that operation and follow a trace ID into Cloud Trace to see which Google call failed or was slow.
+4. If a deploy started it, roll back to the last verified revision through the Deploy workflow's `rollback_run_id` input ([deployment runbook](DEPLOYMENT.md#level-2-automated-deployment-and-recovery)), then run the smoke test.
+5. If Google is failing, do not retry uncertain POST/PUT requests (`retryable=false`); wait for recovery and watch the burn rate fall.
+6. When the incident closes, record the budget left and apply the error-budget policy below.
 
 ## No data, resets and retries
 

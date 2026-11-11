@@ -10,6 +10,8 @@ variable "alert_email" {
 
 locals {
   shared_operations = "monitoring.regex.full_match(\"create|get|replace|delete\")"
+  dashboard_url     = "https://console.cloud.google.com/monitoring/dashboards/custom/${basename(google_monitoring_dashboard.calendar.id)}?project=${var.project_id}"
+  runbook_url       = "https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/hw2/milestone-3/docs/SLO.md#runbook"
   slo_selector      = "resource.type=\"prometheus_target\" AND metric.labels.environment=\"${var.slo_environment}\" AND metric.labels.operation=${local.shared_operations}"
 
   burn_windows = {
@@ -87,7 +89,16 @@ resource "google_monitoring_alert_policy" "burn_rate" {
   }
   notification_channels = google_monitoring_notification_channel.email[*].id
   documentation {
-    content   = "See docs/SLO.md for the error-budget policy. Uncertain POST/PUT results keep retryable=false; this alert does not authorize retries."
+    subject   = "Team 5 Calendar ${each.key} SLO burning error budget (${var.slo_environment})"
+    content   = "The ${each.key} SLO for `${var.slo_environment}` is burning its 28-day error budget too fast.\n\n- [Dashboard](${local.dashboard_url}): check traffic first, then the failing operation, outcome and source.\n- [Runbook](${local.runbook_url}): triage steps and the error-budget policy.\n\nUncertain POST/PUT results keep `retryable=false`; this alert does not authorize retries."
     mime_type = "text/markdown"
+    links {
+      display_name = "Dashboard"
+      url          = local.dashboard_url
+    }
+    links {
+      display_name = "Runbook"
+      url          = local.runbook_url
+    }
   }
 }

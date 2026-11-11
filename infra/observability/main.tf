@@ -109,5 +109,5 @@ resource "google_monitoring_dashboard" "calendar" {
 }
 
 output "dashboard_url" {
-  value = "https://console.cloud.google.com/monitoring/dashboards/custom/${basename(google_monitoring_dashboard.calendar.id)}?project=${var.project_id}"
+  value = local.dashboard_url
 }
