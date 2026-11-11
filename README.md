@@ -65,8 +65,12 @@ to its recorded commit, while final deployed verification remains separate.
 See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for manual deployment and the
 [Level 2 pipeline/recovery procedure](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery).
 **Verify deployment, failure detection, and recovery are verified**, including
-real Google smoke and cleanup. Merged-revision automatic deployment remains
-pending. Execution evidence is tracked in the PR.
+real Google smoke and cleanup. The merged Level 4 revision `191b006` passed
+[automatic deployment](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43100667215),
+including Google smoke/cleanup and verified-release artifact publication.
+The [deployed shared-conformance record](docs/DEPLOYED_CONFORMANCE_VERIFICATION.md)
+documents the HTTPS suite, controlled-failure scope, and independent cleanup
+search. Release publication remains separate from pipeline artifact creation.
 
 ### Installation
 

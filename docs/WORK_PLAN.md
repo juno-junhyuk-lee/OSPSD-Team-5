@@ -15,21 +15,26 @@ on `hw2/milestone-3` at the merged Level 2 revision `ed6ab9e`.
 | 1, `7e37f53` | Request/error counters, latency and one correlated outcome log |
 | 2, `900c328` | Request traces and explicit Google-call child spans |
 | 3, `ac1b7c2` | Cloud export, saturation, dashboard and actual candidate verification; includes initial evidence and operator documentation |
-| 4 | Independent walkthrough completed by Ka Pui in PR #49; Level 4 metric reference delivered; reviewed-merge deployment pending |
+| 4 | Independent walkthrough completed by Ka Pui in PR #49; reviewed merge `8ad2e64` deployed successfully; Level 4 merge `191b006` also passed deployment |
 | Level 4 | Ka Pui: [SLIs, SLOs, error budget and burn-rate alerts](SLO.md); applied and read back in `ospsd-team5`; alert tested 2026-11-11 (fired, emailed, resolved) |
 
 The [candidate record](OBSERVABILITY_VERIFICATION.md) contains completed cloud
 checks and restored-environment evidence. The
 [handoff](OBSERVABILITY_HANDOFF.md) records Ka Pui's actual independent
 observations and approval of `325515a` in PR #49, plus optional documentation
-clarifications. Re-review of those documentation changes and deployment of the
-reviewed merge remain separate checks. No final Level 3 sign-off is claimed yet.
+clarifications. Historical independent interpretation remains distinct from the
+later merged-revision deployment and fresh observations.
 
 The Level 2 merged revision passed demo deployment, real Google smoke/cleanup
 and verified-release recording in
 [Deploy attempt 2](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42409430131/attempts/2).
-The later Level 3 candidate was verified only in disposable verify; the actual
-reviewed Level 3 merge still needs its matching deployment/telemetry evidence.
+The reviewed Level 3 merge passed Deploy run 42535452049; the Level 4 merge
+`191b006` passed [Deploy run 43100667215](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43100667215).
+The [deployed conformance record](DEPLOYED_CONFORMANCE_VERIFICATION.md) contains
+the HTTP suite, local cleanup fixes, independent Google cleanup search, and fresh
+merged-revision log/trace observations. Juno confirmed the team's complete-design
+and contract-facing reviews on November 11. Final release publication and grader
+access checks remain team submission tasks.
 
 ## HW2 shared-package adoption
 

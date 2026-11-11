@@ -160,7 +160,11 @@ deployment and coordinate with anyone who shares it.
 
 Owner: Kristie Lee. **Verify OIDC authentication, Actions deployment, failure
 detection, and recovery are verified**, including real Google smoke/cleanup and
-a no-change Terraform plan. Merged-revision automatic deployment remains pending.
+a no-change Terraform plan. The merged Level 4 revision `191b006` passed
+[Deploy run 43100667215](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43100667215),
+including ready revision/traffic, real Google smoke/cleanup, and verified-release
+publication. Full deployed conformance scope and reproduction are recorded
+[separately](DEPLOYED_CONFORMANCE_VERIFICATION.md).
 Keep execution evidence and review/handoff follow-ups in the PR.
 Use only the disposable `verify` environment for the failure/recovery exercise.
 
