@@ -27,6 +27,7 @@ dependencies = [
     "httplib2==0.32.0",
     "httpx==0.28.1",
     "idna==3.20",
+    "issue-tracker-contract==1.0.0",
     "iniconfig==2.3.0",
     "librt==0.16.0",
     "mypy==2.4.0",
@@ -67,6 +68,7 @@ package = false
 
 [tool.uv.sources]
 calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar", tag = "v0.1.0-rc.1" }
+issue-tracker-contract = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4", tag = "issue-tracker-contract-v1.0.0", subdirectory = "contract" }
 
 [tool.ruff]
 target-version = "py314"

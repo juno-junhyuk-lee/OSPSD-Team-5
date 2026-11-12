@@ -521,6 +521,14 @@ wheels = [
 ]
 
 [[package]]
+name = "issue-tracker-contract"
+version = "1.0.0"
+source = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4?subdirectory=contract&tag=issue-tracker-contract-v1.0.0#e2528b1a8b55ea7c74df8d222b9e6555b9d87925" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[[package]]
 name = "librt"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -790,6 +798,7 @@ dependencies = [
     { name = "httpx" },
     { name = "idna" },
     { name = "iniconfig" },
+    { name = "issue-tracker-contract" },
     { name = "librt" },
     { name = "mypy" },
     { name = "mypy-extensions" },
@@ -847,6 +856,7 @@ requires-dist = [
     { name = "httpx", specifier = "==0.28.1" },
     { name = "idna", specifier = "==3.20" },
     { name = "iniconfig", specifier = "==2.3.0" },
+    { name = "issue-tracker-contract", git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4?subdirectory=contract&tag=issue-tracker-contract-v1.0.0" },
     { name = "librt", specifier = "==0.16.0" },
     { name = "mypy", specifier = "==2.4.0" },
     { name = "mypy-extensions", specifier = "==1.1.0" },
