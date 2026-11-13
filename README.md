@@ -6,9 +6,15 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 Member 3's [issue tracker integration](docs/ISSUE_TRACKER_INTEGRATION.md)
 provides a configurable HTTP adapter using Team 4's tagged shared contract,
-offline tests, and the handoff to the composed workflow. No composed endpoint or
-live Trello verification is claimed yet. The documented cache-bypass limitation
-and outstanding access/review work remain explicit.
+offline tests, and the handoff to the composed workflow. No live Trello
+verification is claimed yet. The documented cache-bypass limitation and
+outstanding access/review work remain explicit.
+
+Member 1's [scheduled-issue workflow](docs/WORKFLOW.md) adds
+`POST /workflows/scheduled-issues`. It creates an issue, then a Calendar event,
+then stores a Markdown summary, and reports failed steps and leftovers. It is
+tested offline with controlled dependencies. Summary storage is a placeholder
+that returns 503 until Member 4's adapter is connected.
 
 ## Calendar service — HW2 shared contract adoption
 

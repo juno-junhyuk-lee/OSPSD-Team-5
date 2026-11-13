@@ -33,6 +33,15 @@ from app.google_auth import hosted
 from app.models import Calendar
 from app.observability import RequestTelemetryMiddleware
 from app.runtime import lifespan, require_hosted_access
+from app.workflow import (
+    ScheduledIssue,
+    ScheduledIssueRequest,
+    ScheduledIssueWorkflow,
+    WorkflowError,
+    WorkflowErrorResponse,
+    workflow_error_handler,
+)
+from app.workflow_dependencies import get_scheduled_issue_workflow
 
 app = FastAPI(
     title="Calendar Service",
@@ -48,6 +57,7 @@ app = FastAPI(
 app.middleware("http")(require_hosted_access)
 app.add_middleware(RequestTelemetryMiddleware)
 app.add_exception_handler(ServiceError, service_error_handler)
+app.add_exception_handler(WorkflowError, workflow_error_handler)
 app.add_exception_handler(CalendarError, calendar_error_handler)
 app.add_exception_handler(RequestValidationError, request_validation_handler)
 
@@ -194,3 +204,22 @@ def delete_event(
     validate_event_id(event_id, operation="delete_event")
     service.delete(event_id)
     return Response(status_code=204)
+
+
+WORKFLOW_RESPONSES: dict[int | str, dict[str, object]] = {
+    status: {"model": WorkflowErrorResponse} for status in (403, 422, 502, 503)
+}
+
+
+@app.post(
+    "/workflows/scheduled-issues",
+    response_model=ScheduledIssue,
+    status_code=201,
+    responses=WORKFLOW_RESPONSES,
+)
+def create_scheduled_issue(
+    request: ScheduledIssueRequest,
+    workflow: Annotated[ScheduledIssueWorkflow, Depends(get_scheduled_issue_workflow)],
+) -> ScheduledIssue:
+    """Create an issue, schedule a matching event, and store a Markdown summary."""
+    return workflow.run(request)
