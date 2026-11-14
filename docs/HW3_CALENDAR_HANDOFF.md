@@ -132,7 +132,9 @@ not reported as passing. No real-provider or deployed execution was performed.
 
 - Review this proposal with the team and fold it into Member 5's DESIGN.md.
 - Obtain teammate review of Jim's changes and the PR #53 integration evidence.
-- Run fresh Calendar-only real-provider verification with valid test access.
+- Calendar-only real-provider verification passed on November 14 at `05808cc`;
+  see [the run record](HW3_CALENDAR_VERIFICATION.md). Teammate verification remains
+  separate.
 - After integration/deployment, record the complete workflow's Google evidence
   and cleanup. Historical HW2 runs do not establish HW3 completion.
 - Member 1 owns deployment branch/IAM configuration; the current pipeline does
