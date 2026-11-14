@@ -204,7 +204,7 @@ The official OTLP/HTTP exporters send protobuf over TLS to
 avoid sharing mutable auth state between the two worker threads. Cloud Run
 requires always-allocated CPU (`cpu_idle=false`) so export can continue after
 the HTTP response. Minimum instances remain zero and maximum one; see the
-billing implications in DESIGN.md.
+billing implications in [HW2_DESIGN.md](HW2_DESIGN.md).
 
 Bounds: 512 queued spans, batches of at most 64 spans, 1-second trace scheduling,
 30-second metric scheduling, 3-second export timeouts, and 256 KiB request size
