@@ -12,12 +12,12 @@ test account and externally supplied OAuth token file.
 
 ## Install and configure
 
-This candidate has not been published. After review, replace
-`COMMIT_TO_BE_REPLACED` below with the reviewed implementation commit or its
-immutable tag. Do not run or share the placeholder as a working install command.
+This implementation candidate is available at the pinned Git commit below for
+review. Installation from that GitHub revision passed in an independent consumer
+environment. No new implementation release tag has been published yet.
 
 ```sh
-pip install "team5-calendar @ git+https://github.com/juno-junhyuk-lee/OSPSD-Team-5.git@COMMIT_TO_BE_REPLACED#subdirectory=packages/team5-calendar"
+pip install "team5-calendar @ git+https://github.com/juno-junhyuk-lee/OSPSD-Team-5.git@b1d6e7fa2bea4cfbab16d6e5a195a2a445885ba2#subdirectory=packages/team5-calendar"
 ```
 
 The implementation declares its tagged shared-contract dependency, so a clean

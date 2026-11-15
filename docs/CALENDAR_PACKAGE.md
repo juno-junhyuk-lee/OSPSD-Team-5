@@ -18,11 +18,9 @@ repository. Team 5's existing `get_calendar_service` FastAPI dependency remains
 the internal handoff for the composed workflow. External consumers use the
 ordinary Python factory below instead of importing Team 5's `app` package.
 
-The [package README](../packages/team5-calendar/README.md) contains the proposed
-Git installation and OAuth commands. This candidate is unpublished; the
-`COMMIT_TO_BE_REPLACED` install placeholder must be replaced with a reviewed
-commit or new immutable implementation tag before it is sent as an install
-instruction. Existing published tags, including `v0.1.0-beta.6`, are not moved.
+The [package README](../packages/team5-calendar/README.md) contains the tested,
+pinned GitHub installation and OAuth commands. The implementation candidate is
+available for review; a new implementation release tag remains pending. Existing published tags, including `v0.1.0-beta.6`, are not moved.
 Implementation versioning is separate from the shared contract version.
 
 Python 3.14 or newer is required, including in the consumer's dependency
@@ -166,11 +164,10 @@ uv run python scripts/check_calendar_wheel.py \
   /tmp/team5-calendar-dist/team5_calendar-0.1.0-py3-none-any.whl
 ```
 
-This document describes the package candidate under review. Record actual
-build, clean-consumer, conformance, and Google results in the implementation
-verification record before describing them as complete. A new immutable tag and
-release require review and separate authorization; no published install version
-is claimed here.
+This document describes the package candidate under review. Build, clean-consumer
+installation (including the pinned GitHub revision), shared conformance, and real
+Google results are recorded in the verification record. A new immutable tag and
+release remain after teammate review; the installable Git revision is available now.
 
 The final handoff to Team 1 consists of the fixed install revision, exact import
 and factory example, supported Python version, OAuth/token setup, shared error

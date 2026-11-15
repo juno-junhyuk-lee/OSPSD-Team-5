@@ -39,8 +39,8 @@ containing exactly the package exported from `b223c6b`. Fixture commit:
 `5d4b2925e8c5ccc4f722f6c134e64085766adf7f`. The initial transfer directly from
 the linked worktree stalled and was stopped; it is not counted as a passing
 install. The temporary fixture avoids that local transfer issue while exercising
-the same package layout and dependency metadata. No remote push occurred, so
-installation from the GitHub URL itself remains a post-push check.
+the same package layout and dependency metadata. At that checkpoint no remote push had occurred. The subsequent GitHub install
+check is recorded separately below.
 
 The independent consumer resolved Pydantic 2.14.3 and Google API Core 2.44.0;
 the application lock retains its previously pinned versions. Both environments
@@ -106,4 +106,20 @@ claimed. The CI wheel check was added but has not run remotely before push.
 
 This does not establish the complete deployed three-vertical workflow, Team 1's
 own deployment/account setup, or independent teammate verification. New tags,
-remote publication, and the final GitHub-install check remain after review.
+release publication and Team 1 reproduction remain after review.
+
+## Post-push GitHub installation
+
+After the user approved pushing the candidate, an independent consumer installed
+`team5-calendar` directly from GitHub at pinned commit
+`b1d6e7fa2bea4cfbab16d6e5a195a2a445885ba2`, using
+`#subdirectory=packages/team5-calendar`. uv resolved and built the package with
+its declared runtime dependencies. Installed distribution metadata confirmed
+the exact Git commit. The consumer retained its own `app`, imported the package
+from its virtual environment, loaded no Team 5 application or FastAPI, and
+received the expected shared error for absent authorization. All checks passed.
+
+[Sanitized GitHub-install evidence](evidence/CALENDAR_PACKAGE_GITHUB_INSTALL_2026-11-15.json)
+is separate from the prior live Google run; no new provider writes were needed
+for this installation check. Subsequent documentation changes do not relabel
+that tested commit or the original wheel/live evidence.
