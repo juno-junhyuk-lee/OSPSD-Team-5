@@ -5,7 +5,29 @@ assistance after Juno supplied the agreed test-list configuration in ignored
 `.env.trello`. This is agent-executed provider verification, not an independent
 teammate walkthrough or the deployed composed workflow.
 
-## Provenance
+## Clean-commit rerun after PR review
+
+Reran November 15, 2026, starting 22:09:10 UTC (17:09:10 EST), with Codex
+assistance and Juno's explicit approval to create and delete one marked test
+card in the configured list. The source was clean commit
+`d7072ba3a4c049c7c51dc4389ce237a530fbe758` on `hw3/issue-tracker`;
+the script recorded `dirty=false`. Contract 1.1.0 and implementation 1.0.0
+remained the tagged dependencies listed below, installed with `uv sync --frozen`.
+
+All checks passed with exit 0: independent list preflight, creation through our
+dependency and Team 4's imported provider, fresh read, independent Trello
+read-back, deletion, and independent confirmation of removal. The marker was
+`team5-hw3-acd8fad6556b4ee7a0eb2c5091e90297`. One test card was created and
+deleted; no uncertain write or cleanup failure occurred.
+
+[Sanitized clean-commit JSONL evidence](evidence/HW3_ISSUE_TRACKER_LIVE_d7072ba_2026-11-15.jsonl)
+records the exact commit and clean-tree status. This rerun supplies committed-source
+evidence for PR #52; it remains agent-executed provider verification, separate
+from an independent teammate walkthrough and the deployed composed workflow.
+
+The sections below preserve the original pre-commit run as historical evidence.
+
+## Initial-run provenance
 
 - Branch: `hw3/issue-tracker`.
 - Base commit: `fb5dad8385b3438cc1538cc92c19fd322d7e9639`.

@@ -62,8 +62,8 @@ Calendar-only startup remains independent of these settings.
 The provider reads environment variables on each operation, opens/closes its own
 connections, and has a no-op `close()`. The factory calls `close()` on normal or
 exceptional dependency exit. Do not change credentials during a workflow. The
-provider's fixed timeout is controlled by its package, not our former HTTP
-timeout setting.
+provider's fixed timeout is 10 seconds per request (`REQUEST_TIMEOUT_SECONDS`),
+controlled by its package, not our former HTTP timeout setting.
 
 ## Shared interface and Member 1 handoff
 
@@ -173,8 +173,9 @@ for the imported implementation. The existing TestClient warning remains.
 
 The [November 15 live record](ISSUE_TRACKER_VERIFICATION.md) reports successful
 creation, fresh read, independent Trello read-back, and confirmed cleanup. This
-migration still needs renewed teammate review and integration into Member 5's
-design. These results precede its commit/publication; GitHub CI is separate.
+migration still needs integration into Member 5's design. The initial live run
+preceded its commit/publication; the record also includes a successful rerun on
+clean commit `d7072ba`. GitHub CI and independent teammate verification are separate.
 
 [team4]: https://github.com/Tyler-Arciniaga/OSPSD-Team-4
 [package]: https://github.com/Tyler-Arciniaga/OSPSD-Team-4/tree/team-4-issue-tracker-trello-v1.0.0/team-4-trello-impl
