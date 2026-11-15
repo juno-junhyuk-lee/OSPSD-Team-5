@@ -2,7 +2,7 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## HW3 Milestone 1 — issue integration in progress
+## HW3 Milestone 1 — integration in progress
 
 Member 3's [issue tracker integration](docs/ISSUE_TRACKER_INTEGRATION.md)
 provides a configurable HTTP adapter using Team 4's tagged shared contract,
@@ -13,8 +13,13 @@ outstanding access/review work remain explicit.
 Member 1's [scheduled-issue workflow](docs/WORKFLOW.md) adds
 `POST /workflows/scheduled-issues`. It creates an issue, then a Calendar event,
 then stores a Markdown summary, and reports failed steps and leftovers. It is
-tested offline with controlled dependencies. Summary storage is a placeholder
-that returns 503 until Member 4's adapter is connected.
+tested offline with controlled dependencies.
+
+The [storage integration](docs/HW3_STORAGE.md) owned by Kristie (Member 4) supplies the configured
+shared HTTP adapter and verifies summary contents before returning success.
+Set STORAGE_BASE_URL and STORAGE_ROOT_PATH. Team 3's real storage probe and cleanup
+passed; direct Dropbox inspection, a real other-team swap, deployed end-to-end
+verification and reviews remain pending. The guide includes setup and swap steps.
 
 ## Calendar service — HW2 shared contract adoption
 

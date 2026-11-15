@@ -11,7 +11,7 @@ live end-to-end evidence is claimed yet.
 | --- | --- | --- |
 | Issue tracker (`IssueProvider`) | Member 3 | Wired via `get_issue_provider` (PR #52); live verification pending |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Member 4 | Placeholder: `get_summary_store` returns 503 until the adapter lands |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | Configured shared HTTP adapter; Team 3 probe passed, direct Dropbox verification and real swap pending |
 
 ## Endpoint
 
@@ -41,7 +41,8 @@ Success is `201`:
 4. **Render Markdown** from provider-confirmed values (`render_summary`). Titles
    are escaped and collapsed to one line; IDs stay inside code spans.
 5. **Store the summary** through `SummaryStore.save_summary(name, markdown)`.
-   The suggested name is path-safe; storage may assign its own ID.
+   The name is placed under STORAGE_ROOT_PATH; storage verifies exact UTF-8 bytes
+   through download before returning its opaque reference.
 
 ## Failure handling
 
@@ -82,23 +83,24 @@ dependency resolution with 503, before any write.
 - `app/workflow.py`: request/response models, Markdown rendering, orchestration,
   error translation, compensation, and the error handler.
 - `app/workflow_dependencies.py`: selects the three providers; translates issue
-  configuration errors; storage placeholder.
+  configuration errors; supplies the scoped storage client.
 - `app/summary_storage.py`: `SummaryStore` protocol, `StoredSummary`, and
   `SummaryStorageError(may_have_applied, retryable, configured)`.
 - `tests/test_workflow.py`: offline orchestration, Markdown, failure, logging,
   and dependency tests with fakes for all three providers.
 
-## Handoff for Member 4 (storage)
+## Storage handoff for Kristie (Member 4)
 
-Implement `SummaryStore` and replace `get_summary_store` in
-`app/workflow_dependencies.py`. Raise `SummaryStorageError` only, with
-`may_have_applied=True` whenever the write might have happened (for example, a lost
-response), and `configured=False` for missing configuration. Do not include
-provider bodies or credentials in messages.
+`DocumentSummaryStore` now bridges to tagged `DocumentStorage` through
+`HttpDocumentStorage`; `get_summary_store` validates configuration before writes
+and closes its HTTP client afterward. It raises sanitized `SummaryStorageError`
+for operation failures and a 503 `WorkflowError` with `step=summary` and no
+leftovers for bad configuration. See [storage setup and remaining evidence](HW3_STORAGE.md).
 
 ## Remaining work
 
-- Connect Member 4's storage adapter and verify each integration live.
+- Independently verify each integration in its provider and complete the real
+  configuration-only storage swap; the storage adapter is connected locally.
 - Run the full workflow against deployed services, including cleanup, and record
   evidence.
 - Deploy the endpoint (bearer authentication already covers all non-health paths).
