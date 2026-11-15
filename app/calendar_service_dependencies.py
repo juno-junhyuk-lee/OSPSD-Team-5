@@ -1,8 +1,9 @@
 """Select the shared service while keeping operation providers replaceable."""
 
+import os
 from typing import Annotated
 
-from calendar_contract import CalendarService
+from calendar_contract import CalendarError, CalendarService, ErrorCode
 from fastapi import Depends
 
 from app.calendar_service import GoogleCalendarService
@@ -23,6 +24,14 @@ def get_calendar_service(
     deleter: Annotated[EventDeleter, Depends(get_event_deleter)],
 ) -> CalendarService:
     """Supply the Google implementation of the shared four-operation interface."""
+    # Fail closed on a misspelled deployment setting; never choose a fallback account.
+    if os.getenv("CALENDAR_IMPLEMENTATION", "google") != "google":
+        raise CalendarError(
+            ErrorCode.PROVIDER_UNAVAILABLE,
+            "Unsupported Calendar implementation. Set CALENDAR_IMPLEMENTATION=google.",
+            retryable=False,
+            details={"provider": False},
+        )
     return GoogleCalendarService(
         creator=creator, reader=reader, updater=updater, deleter=deleter
     )

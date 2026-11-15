@@ -2,13 +2,25 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
-## HW3 Milestone 1 — issue integration in progress
+## HW3 Milestone 1 integrations
+
+### Calendar
+
+See the [Member 2 handoff](docs/HW3_CALENDAR_HANDOFF.md) for the shared Calendar
+boundary, configuration, credential setup, and failure/recovery responsibilities.
+`CALENDAR_IMPLEMENTATION=google` explicitly selects our existing implementation
+(also the default); unsupported values fail without a provider call. The event
+contract is unchanged. The [Google verification record](docs/HW3_CALENDAR_VERIFICATION.md)
+documents Calendar-only live verification and cleanup.
+
+### Issue tracker
 
 Member 3's [issue tracker integration](docs/ISSUE_TRACKER_INTEGRATION.md)
 imports Team 4's tagged Trello implementation with our own test credentials and
 list. It uses shared contract 1.1.0 and supports uncached fresh reads. The guide
-covers configuration, controlled tests, live verification, and the handoff to
-the composed workflow; full deployed workflow verification remains separate.
+covers configuration, controlled tests, and the handoff to the composed workflow.
+The [Trello verification record](docs/ISSUE_TRACKER_VERIFICATION.md) documents
+live creation, fresh reads, independent provider checks, and cleanup.
 
 ## Calendar service — HW2 shared contract adoption
 
