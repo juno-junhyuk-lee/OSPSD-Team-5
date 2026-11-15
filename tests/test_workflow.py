@@ -547,6 +547,8 @@ def test_unconfigured_storage_fails_before_any_write(
     calendar: FakeCalendar,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("STORAGE_BASE_URL", raising=False)
+
     def controlled_issues() -> IssueProvider:
         return issues
 
@@ -568,6 +570,8 @@ def test_unconfigured_storage_fails_before_any_write(
         "code": "provider_unavailable",
         "message": "The summary storage is not configured or unavailable.",
         "retryable": False,
+        "step": "summary",
+        "leftovers": [],
     }
     assert issues.calls == calendar.calls == []
 

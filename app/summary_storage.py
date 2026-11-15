@@ -1,12 +1,20 @@
 """Storage boundary for workflow Markdown summaries.
 
-Member 4 supplies the real storage adapter. Until then the workflow depends only
-on this protocol, so tests and the endpoint use controlled implementations.
+The workflow supplies Markdown; DocumentSummaryStore saves and verifies UTF-8
+bytes through the shared contract. Controlled stores can still be substituted.
 """
 
 from typing import Protocol
 
+from cloud_storage_api import (
+    DocumentStorage,
+    ProviderError,
+    ProviderUnavailableError,
+    StorageError,
+)
 from pydantic import BaseModel
+
+from app.storage_client import storage_path
 
 
 class StoredSummary(BaseModel):
@@ -40,3 +48,47 @@ class SummaryStore(Protocol):
     def save_summary(self, name: str, markdown: str) -> StoredSummary:
         """Save one Markdown document; raise SummaryStorageError on failure."""
         ...
+
+
+class DocumentSummaryStore:
+    """Create one summary under an isolated root and verify its exact contents."""
+
+    def __init__(self, storage: DocumentStorage, root_path: str) -> None:
+        self._storage = storage
+        self._root = storage_path(root_path)
+
+    def save_summary(self, name: str, markdown: str) -> StoredSummary:
+        if (
+            not name
+            or name in {".", ".."}
+            or "/" in name
+            or "\\" in name
+            or any(ord(c) < 32 or ord(c) == 127 for c in name)
+        ):
+            raise SummaryStorageError(
+                "Invalid summary filename.", may_have_applied=False
+            )
+        try:
+            content = markdown.encode("utf-8")
+        except UnicodeEncodeError:
+            raise SummaryStorageError(
+                "Invalid summary text.", may_have_applied=False
+            ) from None
+        path = self._root + "/" + name
+        created = False
+        try:
+            info = self._storage.create(path, content)
+            created = True
+            if self._storage.download(path) != content:
+                raise SummaryStorageError(
+                    "Stored summary contents could not be verified.",
+                    may_have_applied=True,
+                )
+        except StorageError as error:
+            raise SummaryStorageError(
+                "Summary storage request failed.",
+                may_have_applied=created
+                or isinstance(error, (ProviderError, ProviderUnavailableError)),
+            ) from None
+        # The shared contract permits id=None (for example S3).
+        return StoredSummary(id=info.id or info.path)
