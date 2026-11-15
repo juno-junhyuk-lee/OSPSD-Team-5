@@ -3,6 +3,12 @@
 Owner: Jim Lo. AI assistance: Codex assisted with implementation, tests, and
 documentation. Student review and teammate PR review remain required.
 
+External consumers now use the candidate installable implementation described in
+[the package guide](CALENDAR_PACKAGE.md). The existing dependency below remains
+the internal workflow handoff; the shared contract and its error semantics are
+unchanged. Package source is under `packages/team5-calendar/src/team5_calendar`;
+the old `app` module paths remain compatibility aliases.
+
 ## Integration proposal and boundary
 
 Reuse `get_calendar_service` from `app/calendar_service_dependencies.py` through

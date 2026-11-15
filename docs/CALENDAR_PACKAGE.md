@@ -155,6 +155,17 @@ another project's installed package works.
 
 ## Release and handoff status
 
+The [November 15 verification record](CALENDAR_PACKAGE_VERIFICATION.md) documents
+the built wheel, clean consumer installation, pinned Git fixture, unchanged
+contract checks, and real Google create/read/replace/delete/cleanup. To repeat the
+automated install boundary check:
+
+```sh
+uv build --wheel packages/team5-calendar --out-dir /tmp/team5-calendar-dist
+uv run python scripts/check_calendar_wheel.py \
+  /tmp/team5-calendar-dist/team5_calendar-0.1.0-py3-none-any.whl
+```
+
 This document describes the package candidate under review. Record actual
 build, clean-consumer, conformance, and Google results in the implementation
 verification record before describing them as complete. A new immutable tag and

@@ -38,6 +38,7 @@ jobs:
           uv run mypy scripts/deploy_release.py
           uv run mypy scripts/verify_put_live.py
           uv run mypy scripts/check_calendar_wheel.py
+          uv run mypy scripts/verify_calendar_package_live.py
       - name: Test
         run: uv run pytest --ignore=tests/test_shared_conformance.py
       - name: Shared conformance (controlled provider)
