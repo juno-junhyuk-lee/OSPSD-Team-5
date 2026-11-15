@@ -1,5 +1,24 @@
 # Contributor instructions
 
+## Calendar implementation package
+
+`packages/team5-calendar/src/team5_calendar` owns the shared service, Google CRUD
+adapters, and provider error types. The matching `app` modules are compatibility
+aliases to the same module objects; keep them so existing imports, dependency
+overrides, error identities, and controlled patches still work. Do not duplicate
+provider behavior in the aliases. `get_calendar_service` remains the internal
+FastAPI dependency; consumers use `team5_calendar.create_calendar_service` with
+an explicit external token path. Public factory authorization is isolated per
+service/call and refreshed in memory. The legacy API retains its existing local
+and hosted token handling. Optional provider tracing calls back into app-owned
+tracing without a framework/SDK dependency in the package.
+
+After changing package source, run `uv sync --frozen --reinstall-package
+team5-calendar` before tests: the local path dependency is intentionally
+non-editable to match the deployment image. Mypy includes package source. Build
+and external-consumer checks are described in `docs/CALENDAR_PACKAGE.md` and CI;
+they catch namespace/dependency errors that in-repo tests cannot establish.
+
 ## Code and setup
 
 - `app/observability.py`: request counters/histograms and one sanitized outcome

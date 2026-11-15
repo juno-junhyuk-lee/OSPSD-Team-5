@@ -6,6 +6,13 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 ### Calendar
 
+Other teams importing our implementation should use the installable
+[`team5-calendar` package](packages/team5-calendar/README.md) and
+[consumer guide](docs/CALENDAR_PACKAGE.md). It uses the same shared contract,
+requires Python 3.14, and accepts an external OAuth token path without starting
+our API. The existing `get_calendar_service` dependency remains the workflow
+handoff. Release status and installation verification are documented in the guide.
+
 See the [Member 2 handoff](docs/HW3_CALENDAR_HANDOFF.md) for the shared Calendar
 boundary, configuration, credential setup, and failure/recovery responsibilities.
 `CALENDAR_IMPLEMENTATION=google` explicitly selects our existing implementation

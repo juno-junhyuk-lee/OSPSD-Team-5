@@ -1,0 +1,186 @@
+"""Create timed events using the team's local Google authorization."""
+
+from pathlib import Path
+from typing import cast
+
+from calendar_contract import CreateEvent, Event
+from google.auth.exceptions import RefreshError, TransportError
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build  # type: ignore[import-untyped]
+from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
+from httplib2 import HttpLib2Error  # type: ignore[import-untyped]
+from pydantic import BaseModel, Field, ValidationError
+from requests.exceptions import RequestException
+
+from .authorization import active_authorization
+from .event_creation_provider import (
+    EventCreationDeniedError,
+    EventCreationProviderUnavailableError,
+    EventCreationUnavailableError,
+    EventCreationUnconfirmedError,
+)
+from .event_provider import CalendarAuthenticationError
+from .google_auth import hosted, load_hosted_credentials
+from .google_events import TEMPORARY_HTTP_STATUSES, is_rate_limited
+from .tracing import google_call
+
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+TOKEN_PATH = Path(__file__).resolve().parents[1] / "token.json"
+
+
+class GoogleCalendarSetupError(RuntimeError):
+    """Local authorization needs attention before creating an event."""
+
+    def __init__(self, message: str, *, provider: bool = False) -> None:
+        super().__init__(message)
+        self.provider = provider
+
+
+RATE_LIMIT_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
+
+
+class _GoogleEventTime(BaseModel):
+    dateTime: str
+
+
+class _GoogleEvent(BaseModel):
+    id: str = Field(min_length=1)
+    summary: str
+    start: _GoogleEventTime
+    end: _GoogleEventTime
+
+
+def load_credentials() -> Credentials:
+    """Load or refresh a local token without starting browser authorization."""
+    authorization = active_authorization.get()
+    if authorization is not None:
+        try:
+            return authorization.load()
+        except CalendarAuthenticationError as error:
+            raise GoogleCalendarSetupError(
+                provider=error.provider,
+                message="Calendar authorization is unavailable.",
+            ) from None
+    if hosted():
+        try:
+            return load_hosted_credentials()
+        except CalendarAuthenticationError as error:
+            raise GoogleCalendarSetupError(
+                "Hosted Google authorization is unavailable.", provider=error.provider
+            ) from None
+    try:
+        credentials = cast(
+            Credentials,
+            Credentials.from_authorized_user_file(str(TOKEN_PATH)),
+        )
+    except (OSError, ValueError) as error:
+        raise GoogleCalendarSetupError(
+            "Run scripts/google_calendar_auth.py to create a usable local token."
+        ) from error
+    if not credentials.has_scopes(SCOPES):
+        raise GoogleCalendarSetupError(
+            "Run scripts/google_calendar_auth.py to grant calendar.events access."
+        )
+    if not credentials.valid:
+        if not credentials.expired or not credentials.refresh_token:
+            raise GoogleCalendarSetupError(
+                "Run scripts/google_calendar_auth.py to renew local authorization."
+            )
+        try:
+            with google_call("oauth.refresh"):
+                credentials.refresh(Request())
+        except RefreshError as error:
+            raise GoogleCalendarSetupError(
+                "Run scripts/google_calendar_auth.py to renew local authorization.",
+                provider=True,
+            ) from error
+        if not credentials.valid or not credentials.has_scopes(SCOPES):
+            raise GoogleCalendarSetupError(
+                "Refreshed authorization lacks valid calendar.events access.",
+                provider=True,
+            )
+        TOKEN_PATH.write_text(credentials.to_json(), encoding="utf-8")
+    return credentials
+
+
+def create_google_event(request: CreateEvent) -> Event:
+    """Insert into primary and translate the provider result to the public model."""
+    body = {
+        "summary": request.title.strip(),
+        "start": {"dateTime": request.start},
+        "end": {"dateTime": request.end},
+    }
+    write_started = False
+    try:
+        credentials = load_credentials()
+        with build("calendar", "v3", credentials=credentials) as service:
+            insert = service.events().insert(calendarId="primary", body=body)
+            write_started = True
+            with google_call("events.insert"):
+                result = insert.execute(num_retries=0)
+    except HttpError as error:
+        if not write_started and (
+            error.resp.status in TEMPORARY_HTTP_STATUSES
+            or (error.resp.status == 403 and is_rate_limited(error))
+        ):
+            raise EventCreationProviderUnavailableError from error
+        raise
+    except (TransportError, HttpLib2Error, RequestException, OSError) as error:
+        if not write_started:
+            raise EventCreationProviderUnavailableError from error
+        raise
+    provider_event = _GoogleEvent.model_validate(result)
+    translated = CreateEvent.model_validate(
+        {
+            "title": provider_event.summary,
+            "start": provider_event.start.dateTime,
+            "end": provider_event.end.dateTime,
+        }
+    )
+    return Event(
+        id=provider_event.id,
+        title=translated.title,
+        start=translated.start,
+        end=translated.end,
+    )
+
+
+class GoogleEventCreator:
+    """Create Google events through the service creation contract."""
+
+    def create_event(self, request: CreateEvent) -> Event:
+        try:
+            return create_google_event(request)
+        except GoogleCalendarSetupError as error:
+            raise EventCreationUnavailableError(provider=error.provider) from error
+        except RefreshError as error:
+            raise EventCreationUnavailableError(provider=True) from error
+        except HttpError as error:
+            if error.resp.status == 401:
+                raise EventCreationUnavailableError(provider=True) from error
+            if error.resp.status == 403:
+                details = error.error_details
+                reasons = (
+                    {
+                        detail.get("reason")
+                        for detail in details
+                        if isinstance(detail, dict)
+                    }
+                    if isinstance(details, list)
+                    else set()
+                )
+                if not reasons & RATE_LIMIT_REASONS:
+                    raise EventCreationDeniedError from error
+                raise EventCreationProviderUnavailableError from error
+            if error.resp.status == 429:
+                raise EventCreationProviderUnavailableError from error
+            raise EventCreationUnconfirmedError from error
+        except (
+            TransportError,
+            HttpLib2Error,
+            RequestException,
+            OSError,
+            ValidationError,
+        ) as error:
+            raise EventCreationUnconfirmedError from error

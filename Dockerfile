@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 WORKDIR /service
 ENV UV_PYTHON_DOWNLOADS=never
 COPY pyproject.toml uv.lock ./
+COPY packages/team5-calendar packages/team5-calendar
 RUN uv sync --frozen --no-dev --no-install-project --no-cache
 
 FROM python:3.14.2-slim-bookworm@sha256:e87711ef5c86aaeaa7031718a69db79d334d94c545c709583f651b8185870941

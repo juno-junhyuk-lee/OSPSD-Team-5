@@ -1,0 +1,19 @@
+[project]
+name = "team5-calendar"
+version = "0.1.0"
+description = "Team 5 Google implementation of the OSPSD shared Calendar contract"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "calendar-contract @ git+https://github.com/Airbus-A330/OSPSD-Calendar.git@v0.1.0-rc.1",
+    "google-api-python-client==2.201.0",
+    "google-auth==2.59.1",
+    "google-auth-httplib2==0.4.4",
+    "google-auth-oauthlib==1.5.0",
+    "httplib2==0.32.0",
+    "requests==2.34.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
