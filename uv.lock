@@ -281,6 +281,11 @@ wheels = [
 ]
 
 [[package]]
+name = "cloud-storage-api"
+version = "0.2.0"
+source = { git = "https://github.com/Dayana20/ospsd26-cloud-storage?subdirectory=src%2Fcloud_storage_api&tag=0.3.1#664afc92f7cc0b2ee51cde6ddfa088cc3b37206c" }
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -783,6 +788,7 @@ dependencies = [
     { name = "cffi" },
     { name = "charset-normalizer" },
     { name = "click" },
+    { name = "cloud-storage-api" },
     { name = "colorama" },
     { name = "cryptography" },
     { name = "fastapi" },
@@ -841,6 +847,7 @@ requires-dist = [
     { name = "cffi", specifier = "==2.1.1" },
     { name = "charset-normalizer", specifier = "==3.5.2" },
     { name = "click", specifier = "==8.5.0" },
+    { name = "cloud-storage-api", git = "https://github.com/Dayana20/ospsd26-cloud-storage?subdirectory=src%2Fcloud_storage_api&tag=0.3.1" },
     { name = "colorama", specifier = "==0.4.6" },
     { name = "cryptography", specifier = "==50.0.2" },
     { name = "fastapi", specifier = "==0.142.2" },

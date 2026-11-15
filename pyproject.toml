@@ -9,6 +9,7 @@ dependencies = [
     "anyio==4.15.1",
     "ast-serialize==0.12.1",
     "calendar-contract",
+    "cloud-storage-api",
     "certifi==2026.7.22",
     "cffi==2.1.1",
     "charset-normalizer==3.5.2",
@@ -67,6 +68,7 @@ dev = []
 package = false
 
 [tool.uv.sources]
+cloud-storage-api = { git = "https://github.com/Dayana20/ospsd26-cloud-storage", tag = "0.3.1", subdirectory = "src/cloud_storage_api" }
 calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar", tag = "v0.1.0-rc.1" }
 issue-tracker-contract = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4", tag = "issue-tracker-contract-v1.0.0", subdirectory = "contract" }
 
