@@ -2,6 +2,14 @@
 
 This is Team 5's repository for CS 3943 OSPSD.
 
+## HW3 Calendar integration
+
+See the [Member 2 handoff](docs/HW3_CALENDAR_HANDOFF.md) for the shared Calendar
+boundary, configuration, credential setup, failure/recovery responsibilities,
+and remaining live-verification work. `CALENDAR_IMPLEMENTATION=google` explicitly
+selects our existing implementation (also the default); unsupported values fail
+without a provider call. This does not change the event contract.
+
 ## Calendar service — HW2 shared contract adoption
 
 Juno Lee owns `GET /calendars/{calendar_id}`, Kristie Lee owns
