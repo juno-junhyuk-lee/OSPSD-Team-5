@@ -5,10 +5,10 @@ This is Team 5's repository for CS 3943 OSPSD.
 ## HW3 Milestone 1 — issue integration in progress
 
 Member 3's [issue tracker integration](docs/ISSUE_TRACKER_INTEGRATION.md)
-provides a configurable HTTP adapter using Team 4's tagged shared contract,
-offline tests, and the handoff to the composed workflow. No composed endpoint or
-live Trello verification is claimed yet. The documented cache-bypass limitation
-and outstanding access/review work remain explicit.
+imports Team 4's tagged Trello implementation with our own test credentials and
+list. It uses shared contract 1.1.0 and supports uncached fresh reads. The guide
+covers configuration, controlled tests, live verification, and the handoff to
+the composed workflow; full deployed workflow verification remains separate.
 
 ## Calendar service — HW2 shared contract adoption
 
