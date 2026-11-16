@@ -115,6 +115,17 @@ def test_workflow_uses_storage_and_preserves_failure_certainty(mode: str) -> Non
                 "event",
                 "summary",
             ]
+            summary = response.json()["error"]["leftovers"][-1]
+            assert summary == {
+                "kind": "summary",
+                "id": None,
+                "state": "uncertain",
+                "path": "/team5/scheduled-issue-issue-1-event-1.md",
+            }
+            assert all(
+                "path" not in item
+                for item in response.json()["error"]["leftovers"][:-1]
+            )
             assert [call[0] for call in issues.calls] == ["create"]
             assert [call[0] for call in calendar.calls] == ["create"]
 

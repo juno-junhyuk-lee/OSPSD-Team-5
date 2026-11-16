@@ -50,6 +50,18 @@ Errors keep the existing shape (`code`, `message`, `retryable`) and add `step`
 (`validate`, `issue`, `event`, `summary`) and `leftovers`, the resources that may
 still exist. Messages are fixed text; remote messages are never forwarded.
 
+An uncertain summary includes its optional storage `path` when the store knows
+the destination. The provider `id` remains `null` when it is not reported; a path
+is not substituted for an ID in leftovers. Unknown paths are omitted, preserving
+the existing shape for controlled stores and other integrations. For example:
+
+```json
+{"kind": "summary", "id": null, "state": "uncertain", "path": "/team5/summary.md"}
+```
+
+This locator helps manual reconciliation; it does not prove the file exists or
+make retrying safe. Retry and compensation behavior are unchanged.
+
 | Failure | Action | Leftovers |
 | --- | --- | --- |
 | Invalid input | None | none |
@@ -85,7 +97,7 @@ dependency resolution with 503, before any write.
 - `app/workflow_dependencies.py`: selects the three providers; translates issue
   configuration errors; supplies the scoped storage client.
 - `app/summary_storage.py`: `SummaryStore` protocol, `StoredSummary`, and
-  `SummaryStorageError(may_have_applied, retryable, configured)`.
+  `SummaryStorageError(may_have_applied, retryable, configured, path=None)`.
 - `tests/test_workflow.py`: offline orchestration, Markdown, failure, logging,
   and dependency tests with fakes for all three providers.
 

@@ -36,12 +36,15 @@ class SummaryStorageError(Exception):
         may_have_applied: bool,
         retryable: bool = False,
         configured: bool = True,
+        path: str | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.may_have_applied = may_have_applied
         self.retryable = retryable
         self.configured = configured
+        # Caller-visible storage path, supplied locally rather than remote error text.
+        self.path = path
 
 
 class SummaryStore(Protocol):
@@ -83,12 +86,14 @@ class DocumentSummaryStore:
                 raise SummaryStorageError(
                     "Stored summary contents could not be verified.",
                     may_have_applied=True,
+                    path=path,
                 )
         except StorageError as error:
             raise SummaryStorageError(
                 "Summary storage request failed.",
                 may_have_applied=created
                 or isinstance(error, (ProviderError, ProviderUnavailableError)),
+                path=path,
             ) from None
         # The shared contract permits id=None (for example S3).
         return StoredSummary(id=info.id or info.path)

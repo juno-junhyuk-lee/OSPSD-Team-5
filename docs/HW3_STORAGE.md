@@ -16,8 +16,9 @@ not establish direct Dropbox inspection or deployed three-vertical success.
 15, 2026, 01:02:50–01:02:56 America/New_York (06:02 UTC). Its application base is
 `736efc8`; hashes identify the exact application files and then-uncommitted probe.
 Commit `0d13358` subsequently records that script, its tests and the evidence.
-The recorded hashes match the current files. Do not rewrite the historical base
-commit merely because the evidence was committed later.
+The recorded hashes identify the files tested at that time; later application
+changes, including the optional failure-path field, are not new live evidence.
+Do not rewrite the historical base commit merely because evidence was committed later.
 
 Full offline checks after the probe implementation: 900 passed, 58 opt-in tests
 skipped; Ruff lint/format, strict mypy and probe-script mypy passed. The existing
@@ -109,8 +110,13 @@ become the existing 502 summary failure and trigger event-then-issue compensatio
 The existing file is never overwritten or deleted. A lost response, malformed
 upload metadata, failed download or mismatched bytes produces a non-retryable
 502 with possible summary state; the workflow keeps its issue and event.
-Reconcile the known destination before retrying. The current summary leftover
-has `id=null`; reconstruct its path from the returned issue/event IDs and root.
+Reconcile the known destination before retrying. An uncertain summary leftover
+now includes `path` when known, while keeping `id=null` when no provider ID is
+reported. The path comes from the locally constructed root and filename, not
+remote error messages. If the store does not supply a path, the field is omitted.
+No URL or credential is added. Readback errors and mismatched contents also carry
+the destination. This additive field leaves success responses, retry advice and
+compensation behavior unchanged and can be supplied by HTTP or package stores.
 
 Controlled endpoint tests cover these paths. The real probe covers only the
 successful storage path and conflict; it is not the required controlled failure
