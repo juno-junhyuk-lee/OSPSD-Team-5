@@ -5,24 +5,43 @@
 Python API service. Python 3.14 or newer is required.
 
 The four shared methods, models, and errors remain defined by
-[`calendar-contract` v0.1.0-rc.1](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1).
+[`calendar-contract` v0.1.0](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0).
 This package supplies the Google behavior; installing only the contract does
 not install the implementation. The implementation runs with your own Google
 test account and externally supplied OAuth token file.
 
 ## Install and configure
 
-This implementation candidate is available at the pinned Git commit below for
-review. Installation from that GitHub revision passed in an independent consumer
-environment. No new implementation release tag has been published yet.
+This working-tree candidate depends directly on the stable contract. No new
+implementation tag has been published. Earlier pinned-commit installation
+evidence used `rc.1`; it does not identify this uncommitted update.
+
+Until the updated candidate is committed and published, build and install its
+wheel from the repository root:
 
 ```sh
-pip install "team5-calendar @ git+https://github.com/juno-junhyuk-lee/OSPSD-Team-5.git@b1d6e7fa2bea4cfbab16d6e5a195a2a445885ba2#subdirectory=packages/team5-calendar"
+uv build --wheel packages/team5-calendar --out-dir /tmp/team5-calendar-dist
+pip install /tmp/team5-calendar-dist/team5_calendar-0.1.0-py3-none-any.whl
 ```
 
 The implementation declares its tagged shared-contract dependency, so a clean
 installer can resolve it without inheriting Team 5's uv configuration. If your
-project already pins the contract, use a compatible source for the same revision.
+project also declares the contract, use the same stable source. For uv:
+
+```toml
+[tool.uv.sources]
+calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar.git", rev = "v0.1.0" }
+```
+
+Using `rev` matches the direct Git reference in this package's metadata. No
+dependency override is needed when both declarations resolve to that revision.
+
+The intended immutable implementation tag is `team5-calendar-v0.1.0`. The command
+below is for use **after** that tag is published; it is not available yet:
+
+```sh
+pip install "team5-calendar @ git+https://github.com/juno-junhyuk-lee/OSPSD-Team-5.git@team5-calendar-v0.1.0#subdirectory=packages/team5-calendar"
+```
 
 Enable Google Calendar API in your Google Cloud project, configure a Desktop
 OAuth client, and authorize a dedicated test account. Keep the client JSON and

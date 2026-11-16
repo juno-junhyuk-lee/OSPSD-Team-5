@@ -26,8 +26,8 @@ from app.google_create_events import load_credentials
 from app.main import app
 
 DESCRIPTION = "Non-shared field kept by PUT"
-PACKAGE_TAG = "v0.1.0-rc.1"
-PACKAGE_COMMIT = "1c1cad7a0732ddb242a05400d8833d94e4422424"
+PACKAGE_TAG = "v0.1.0"
+PACKAGE_COMMIT = "db73e6261a93b0c3cc6aa0a48c4687f742aacc9b"
 
 
 class Verification:

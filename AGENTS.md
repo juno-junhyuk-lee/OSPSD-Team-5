@@ -13,6 +13,10 @@ service/call and refreshed in memory. The legacy API retains its existing local
 and hosted token handling. Optional provider tracing calls back into app-owned
 tracing without a framework/SDK dependency in the package.
 
+The active HW3 package uses `calendar-contract` tag `v0.1.0`, commit
+`db73e6261a93b0c3cc6aa0a48c4687f742aacc9b`. The HW2 `rc.1` references below
+describe the historical release; retain its recorded provenance.
+
 After changing package source, run `uv sync --frozen --reinstall-package
 team5-calendar` before tests: the local path dependency is intentionally
 non-editable to match the deployment image. Mypy includes package source. Build

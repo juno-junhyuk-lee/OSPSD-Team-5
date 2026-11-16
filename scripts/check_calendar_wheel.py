@@ -10,6 +10,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
+CONTRACT_SOURCE = (
+    "calendar-contract @ git+https://github.com/Airbus-A330/OSPSD-Calendar.git@v0.1.0"
+)
+
 CONSUMER_CHECK = '''"""Check the installed distribution without Team 5's source tree."""
 import json
 import sys
@@ -40,8 +44,7 @@ assert distribution("team5-calendar").version == "0.1.0"
 contract = distribution("calendar-contract")
 assert contract.version == "0.1.0"
 source = json.loads(contract.read_text("direct_url.json") or "{}")
-if "vcs_info" in source:
-    assert source["vcs_info"]["commit_id"] == "1c1cad7a0732ddb242a05400d8833d94e4422424"
+assert source["vcs_info"]["commit_id"] == "db73e6261a93b0c3cc6aa0a48c4687f742aacc9b"
 
 def deny_provider_network(event, args):
     if event == "socket.connect":
@@ -82,6 +85,7 @@ print(json.dumps({
     "installed_modules": True,
     "framework_independent": True,
     "authorization_checks": checked,
+    "contract_commit": source["vcs_info"]["commit_id"],
 }))
 '''
 
@@ -111,6 +115,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
     parser.add_argument("--uv", default="uv", help="Path to the uv executable")
+    parser.add_argument("--installer", choices=("uv", "pip"), default="uv")
     args = parser.parse_args()
     wheel: Path = args.wheel.resolve()
     inspect_wheel(wheel)
@@ -121,18 +126,41 @@ def main() -> int:
     with TemporaryDirectory(prefix="team5-calendar-consumer-") as temporary:
         consumer = Path(temporary)
         python = consumer / ".venv" / "bin" / "python"
+        create_environment = [
+            args.uv,
+            "venv",
+            str(consumer / ".venv"),
+            "--python",
+            sys.executable,
+        ]
+        if args.installer == "pip":
+            create_environment.append("--seed")
         subprocess.run(
-            [args.uv, "venv", str(consumer / ".venv"), "--python", sys.executable],
+            create_environment,
             cwd=consumer,
             env=environment,
             check=True,
         )
-        subprocess.run(
-            [args.uv, "pip", "install", "--python", str(python), str(wheel)],
-            cwd=consumer,
-            env=environment,
-            check=True,
-        )
+        if args.installer == "uv":
+            # Resolve a consumer that explicitly depends on both distributions.
+            dependencies = ["team5-calendar @ " + wheel.as_uri(), CONTRACT_SOURCE]
+            (consumer / "pyproject.toml").write_text(
+                '[project]\nname = "calendar-consumer-check"\nversion = "0.0.0"\n'
+                'requires-python = ">=3.14"\ndependencies = '
+                + json.dumps(dependencies)
+                + "\n",
+                encoding="utf-8",
+            )
+            commands = [
+                [args.uv, "lock", "--python", sys.executable],
+                [args.uv, "sync", "--frozen", "--python", sys.executable],
+            ]
+        else:
+            commands = [
+                [str(python), "-m", "pip", "install", str(wheel), CONTRACT_SOURCE]
+            ]
+        for command in commands:
+            subprocess.run(command, cwd=consumer, env=environment, check=True)
         (consumer / "app").mkdir()
         (consumer / "app" / "__init__.py").write_text(
             'SENTINEL = "consumer-owned-app"\n', encoding="utf-8"
@@ -154,6 +182,8 @@ def main() -> int:
                 "passed": True,
                 "wheel": wheel.name,
                 "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
+                "installer": args.installer,
+                "explicit_contract_dependency": True,
             }
         )
     )

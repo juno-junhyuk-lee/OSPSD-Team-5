@@ -123,3 +123,45 @@ received the expected shared error for absent authorization. All checks passed.
 is separate from the prior live Google run; no new provider writes were needed
 for this installation check. Subsequent documentation changes do not relabel
 that tested commit or the original wheel/live evidence.
+
+## November 16: stable-contract follow-up (uncommitted)
+
+Juno's follow-up candidate on `hw3/calendar-package`, based on
+`df6bb55cc4fa577a880add58cc9d7d4d809119cd`, repins both active dependency
+declarations to stable `calendar-contract` tag `v0.1.0`, commit
+`db73e6261a93b0c3cc6aa0a48c4687f742aacc9b`. The package remains version 0.1.0;
+its factory and Google operation behavior are unchanged. Historical sections
+above describe their original `rc.1` runs and are not relabeled.
+
+Comparison of the two contract tags found no changes to Event, request models,
+timestamp/title validation, CalendarService, or CalendarError/ErrorCode. The
+stable release adds HTTP conformance support and cleans up an unintended root
+export. The active provenance check now rejects the old commit even though both
+contract distributions report version 0.1.0; a regression case covers this.
+
+With Python 3.14.2, frozen sync and forced non-editable package reinstallation,
+the final suite reported **773 passed, 58 skipped**. Ruff lint/format, strict
+application/package/script mypy, and whitespace checks passed. Both sdist and
+wheel built successfully. The existing TestClient warning remains.
+
+Independent installations used the new wheel and an explicit direct dependency
+on stable `calendar-contract`, without an override:
+
+- **uv:** a fresh consumer project ran `uv lock` and `uv sync --frozen`, then
+  verified installed module locations, its own `app` namespace, framework
+  independence, exact stable contract commit, and eight shared authorization
+  failures with provider network connections blocked.
+- **pip:** a separate seeded environment installed the wheel and explicit stable
+  contract together and passed the same consumer checks.
+
+[Sanitized consumer evidence](evidence/CALENDAR_PACKAGE_STABLE_CONSUMER_2026-11-16.json)
+records the uncommitted candidate's base, source hashes, wheel checksum, actual
+contract commit, and both installers' results. No Google writes or OAuth setup
+were performed for this follow-up. The prior live Google run remains evidence
+for its original `rc.1` candidate, not a new stable-contract provider run.
+
+The stable candidate is not committed/pushed, has no new GitHub CI result, and
+has no published immutable implementation tag. Remote installation from the
+old pinned SHA still installs the older `rc.1` metadata. Final reviewed-commit
+checks, independent verifier reproduction, actual-tag installation, and GitHub
+Release publication remain on the [release checklist](CALENDAR_PACKAGE_RELEASE.md).

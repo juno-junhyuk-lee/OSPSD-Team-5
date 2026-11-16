@@ -9,7 +9,7 @@ The consumer deploys its combined API through its own pipeline.
 
 | Dependency | Responsibility |
 | --- | --- |
-| `calendar-contract` v0.1.0-rc.1, commit `1c1cad7a0732ddb242a05400d8833d94e4422424` | Shared models, errors, four-method protocol, conformance suite |
+| `calendar-contract` v0.1.0, commit `db73e6261a93b0c3cc6aa0a48c4687f742aacc9b` | Shared models, errors, four-method protocol, conformance suite |
 | `team5-calendar` 0.1.0 candidate | Google authorization and Calendar operations, imported as `team5_calendar` |
 
 The implementation uses the shared types directly. It does not modify the
@@ -18,16 +18,29 @@ repository. Team 5's existing `get_calendar_service` FastAPI dependency remains
 the internal handoff for the composed workflow. External consumers use the
 ordinary Python factory below instead of importing Team 5's `app` package.
 
-The [package README](../packages/team5-calendar/README.md) contains the tested,
-pinned GitHub installation and OAuth commands. The implementation candidate is
-available for review; a new implementation release tag remains pending. Existing published tags, including `v0.1.0-beta.6`, are not moved.
+The [package README](../packages/team5-calendar/README.md) contains local-wheel
+installation and OAuth commands for this stable-contract candidate. Earlier
+pinned GitHub installation evidence used `rc.1`; the current changes must be
+committed/published before an equivalent new remote install is available.
+A new implementation release tag remains pending. Existing published tags,
+including `v0.1.0-beta.6`, are not moved.
 Implementation versioning is separate from the shared contract version.
 
 Python 3.14 or newer is required, including in the consumer's dependency
 metadata. The implementation explicitly declares the tagged contract source;
 Team 5's `[tool.uv.sources]` settings are not automatically inherited by another
 project. If a consumer also declares the contract directly, both declarations
-must resolve to the same source/revision.
+must resolve to the same source/revision. For uv use:
+
+```toml
+[tool.uv.sources]
+calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar.git", rev = "v0.1.0" }
+```
+
+This matches the package's direct Git reference without an override. The
+stable tag changes neither the shared models/validation nor the service/error
+definitions relative to `rc.1`; it adds HTTP conformance support and removes
+an unintended root export. Version `0.1.0` remains the distribution version.
 
 ## Google setup and credential ownership
 
@@ -161,13 +174,21 @@ automated install boundary check:
 ```sh
 uv build --wheel packages/team5-calendar --out-dir /tmp/team5-calendar-dist
 uv run python scripts/check_calendar_wheel.py \
-  /tmp/team5-calendar-dist/team5_calendar-0.1.0-py3-none-any.whl
+  /tmp/team5-calendar-dist/team5_calendar-0.1.0-py3-none-any.whl --installer uv
+uv run python scripts/check_calendar_wheel.py \
+  /tmp/team5-calendar-dist/team5_calendar-0.1.0-py3-none-any.whl --installer pip
 ```
 
-This document describes the package candidate under review. Build, clean-consumer
-installation (including the pinned GitHub revision), shared conformance, and real
-Google results are recorded in the verification record. A new immutable tag and
-release remain after teammate review; the installable Git revision is available now.
+The uv check creates a clean consumer project that explicitly depends on both
+the wheel and stable contract, runs `uv lock` and frozen sync with no overrides,
+and checks imports, namespace isolation, and shared authorization errors. The pip
+check installs the same two explicit dependencies in a separate seeded environment.
+
+This document describes the package candidate under review. Historical
+pinned-GitHub and live Google results retain their original `rc.1` provenance.
+The verification record separately identifies the new stable-contract checks.
+Commit/publication, an immutable implementation tag, and release publication
+remain after review; see the [release draft](CALENDAR_PACKAGE_RELEASE.md).
 
 The final handoff to Team 1 consists of the fixed install revision, exact import
 and factory example, supported Python version, OAuth/token setup, shared error

@@ -18,9 +18,11 @@ call the dependency function without supplying its arguments: FastAPI resolves
 the four operation providers. Do not create another Calendar HTTP adapter for
 our in-process workflow or call Google directly from the orchestrator.
 
-The contract remains `calendar-contract` tag `v0.1.0-rc.1`, commit
-`1c1cad7a0732ddb242a05400d8833d94e4422424`; install with `uv sync --frozen`.
-Python 3.14 is required by this application. No dependency update is needed.
+The active package uses `calendar-contract` tag `v0.1.0`, commit
+`db73e6261a93b0c3cc6aa0a48c4687f742aacc9b`; install with `uv sync --frozen`.
+The November 14 evidence below used `rc.1`; it is retained as historical evidence.
+Python 3.14 is required by this application. Use the updated lockfile when
+moving from the earlier `rc.1` candidate.
 
 | Call | Input | Result |
 | --- | --- | --- |
