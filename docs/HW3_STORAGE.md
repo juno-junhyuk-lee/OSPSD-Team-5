@@ -98,6 +98,10 @@ settings. This storage branch does not deploy or modify infrastructure.
 
 ## Decisions and failure behavior
 
+See the [failure certainty and cleanup plan](HW3_STORAGE_FAILURE_POLICY.md) for
+current behavior, Ka Pui's pre-send failure feedback, and HTTP/package regression
+criteria. It is a follow-up plan; the connection-failure implementation is unchanged.
+
 | Decision | Constraint, alternative and accepted tradeoff |
 | --- | --- |
 | Depend on shared contracts and HTTP | Allows endpoint-only swaps; importing a team's SDK would tie the workflow to its provider. Revisit when the shared protocol changes, reporting mismatches to its owners. |

@@ -62,6 +62,9 @@ the existing shape for controlled stores and other integrations. For example:
 This locator helps manual reconciliation; it does not prove the file exists or
 make retrying safe. Retry and compensation behavior are unchanged.
 
+The [storage failure certainty plan](HW3_STORAGE_FAILURE_POLICY.md) distinguishes
+current behavior from proposed pre-send failure handling and its acceptance tests.
+
 | Failure | Action | Leftovers |
 | --- | --- | --- |
 | Invalid input | None | none |
