@@ -4,3 +4,11 @@
 !uv.lock
 !app/
 !app/*.py
+!packages/
+!packages/team5-calendar/
+!packages/team5-calendar/pyproject.toml
+!packages/team5-calendar/README.md
+!packages/team5-calendar/src/
+!packages/team5-calendar/src/team5_calendar/
+!packages/team5-calendar/src/team5_calendar/*.py
+!packages/team5-calendar/src/team5_calendar/py.typed

@@ -6,6 +6,13 @@ This is Team 5's repository for CS 3943 OSPSD.
 
 ### Calendar
 
+Other teams importing our implementation should use the installable
+[`team5-calendar` package](packages/team5-calendar/README.md) and
+[consumer guide](docs/CALENDAR_PACKAGE.md). It uses the same shared contract,
+requires Python 3.14, and accepts an external OAuth token path without starting
+our API. The existing `get_calendar_service` dependency remains the workflow
+handoff. Release status and installation verification are documented in the guide.
+
 See the [Member 2 handoff](docs/HW3_CALENDAR_HANDOFF.md) for the shared Calendar
 boundary, configuration, credential setup, and failure/recovery responsibilities.
 `CALENDAR_IMPLEMENTATION=google` explicitly selects our existing implementation
@@ -35,10 +42,13 @@ network access.
 
 ### Shared contract adoption (HW2)
 
-The dependency is `calendar-contract` at annotated tag
+The HW2 release used `calendar-contract` at annotated tag
 [`v0.1.0-rc.1`](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1), commit
-`1c1cad7a0732ddb242a05400d8833d94e4422424`. `pyproject.toml` selects the tag;
-`uv.lock` fixes its commit. The package supports Python 3.14 and supplies
+`1c1cad7a0732ddb242a05400d8833d94e4422424`. The active HW3 package now selects
+stable tag [`v0.1.0`](https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0),
+commit `db73e6261a93b0c3cc6aa0a48c4687f742aacc9b`, in `pyproject.toml` and
+`uv.lock`. Historical verification records retain their original revision.
+The package supports Python 3.14 and supplies
 `CalendarService`, `Event`, `CreateEvent`, `ReplaceEvent`, `CalendarError`, and
 `ErrorCode`. Google SDK and OAuth code remain in this service repository.
 

@@ -104,7 +104,7 @@ wheels = [
 [[package]]
 name = "calendar-contract"
 version = "0.1.0"
-source = { git = "https://github.com/Airbus-A330/OSPSD-Calendar?tag=v0.1.0-rc.1#1c1cad7a0732ddb242a05400d8833d94e4422424" }
+source = { git = "https://github.com/Airbus-A330/OSPSD-Calendar.git?rev=v0.1.0#db73e6261a93b0c3cc6aa0a48c4687f742aacc9b" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -824,6 +824,7 @@ dependencies = [
     { name = "ruff" },
     { name = "starlette" },
     { name = "team-4-issue-tracker-trello" },
+    { name = "team5-calendar" },
     { name = "typing-extensions" },
     { name = "typing-inspection" },
     { name = "uritemplate" },
@@ -837,7 +838,7 @@ requires-dist = [
     { name = "annotated-types", specifier = "==0.8.0" },
     { name = "anyio", specifier = "==4.15.1" },
     { name = "ast-serialize", specifier = "==0.12.1" },
-    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar?tag=v0.1.0-rc.1" },
+    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar.git?rev=v0.1.0" },
     { name = "certifi", specifier = "==2026.7.22" },
     { name = "cffi", specifier = "==2.1.1" },
     { name = "charset-normalizer", specifier = "==3.5.2" },
@@ -883,6 +884,7 @@ requires-dist = [
     { name = "ruff", specifier = "==0.16.10" },
     { name = "starlette", specifier = "==1.7.0" },
     { name = "team-4-issue-tracker-trello", git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=team-4-trello-impl&rev=team-4-issue-tracker-trello-v1.0.0" },
+    { name = "team5-calendar", directory = "packages/team5-calendar" },
     { name = "typing-extensions", specifier = "==4.16.0" },
     { name = "typing-inspection", specifier = "==0.4.4" },
     { name = "uritemplate", specifier = "==4.2.0" },
@@ -1138,6 +1140,31 @@ version = "1.0.0"
 source = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=team-4-trello-impl&rev=team-4-issue-tracker-trello-v1.0.0#c88ce2fd287f2524ba09ad5d94faf3983fdac08d" }
 dependencies = [
     { name = "issue-tracker-contract" },
+]
+
+[[package]]
+name = "team5-calendar"
+version = "0.1.0"
+source = { directory = "packages/team5-calendar" }
+dependencies = [
+    { name = "calendar-contract" },
+    { name = "google-api-python-client" },
+    { name = "google-auth" },
+    { name = "google-auth-httplib2" },
+    { name = "google-auth-oauthlib" },
+    { name = "httplib2" },
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar.git?rev=v0.1.0" },
+    { name = "google-api-python-client", specifier = "==2.201.0" },
+    { name = "google-auth", specifier = "==2.59.1" },
+    { name = "google-auth-httplib2", specifier = "==0.4.4" },
+    { name = "google-auth-oauthlib", specifier = "==1.5.0" },
+    { name = "httplib2", specifier = "==0.32.0" },
+    { name = "requests", specifier = "==2.34.2" },
 ]
 
 [[package]]
