@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for team and outside-team review.** Endpoint in [PR #53](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/53), issue adapter in [PR #52](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/52), Calendar selection in [PR #54](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/54) (merged), storage adapter in [PR #55](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/55); deployment not started. Behavior below describes those PRs as of 2026-11-15. Per-vertical detail (arriving with #52, #53 and #55) lives in [WORKFLOW.md](docs/WORKFLOW.md), [ISSUE_TRACKER_INTEGRATION.md](docs/ISSUE_TRACKER_INTEGRATION.md), [HW3_CALENDAR_HANDOFF.md](docs/HW3_CALENDAR_HANDOFF.md) and [HW3_STORAGE.md](docs/HW3_STORAGE.md); this document holds the combined design and links to them instead of repeating them. |
+| Status | **Draft for team and outside-team review.** Endpoint in [PR #53](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/53), issue adapter in [PR #52](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/52) (merged), Calendar selection in [PR #54](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/54) and the `team5-calendar` package in [PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57) (both merged), storage adapter in [PR #55](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/55); deployment not started. Behavior below describes those PRs as of 2026-11-16. Per-vertical detail (arriving with #53 and #55) lives in [WORKFLOW.md](docs/WORKFLOW.md), [ISSUE_TRACKER_INTEGRATION.md](docs/ISSUE_TRACKER_INTEGRATION.md), [HW3_CALENDAR_HANDOFF.md](docs/HW3_CALENDAR_HANDOFF.md) and [HW3_STORAGE.md](docs/HW3_STORAGE.md); this document holds the combined design and links to them instead of repeating them. |
 | Milestone | HW3 Milestone 1, "Compose the Services", due November 18, 2026, before class |
 | Owner | Member 5 (Ka Pui) coordinates; each section names the member who owns the code |
 | Previous design | HW2 shared Calendar adoption: [docs/HW2_DESIGN.md](docs/HW2_DESIGN.md) |
@@ -29,7 +29,7 @@ flowchart LR
     subgraph run["Team 5 API service (Cloud Run, project ospsd-team5)"]
         api["Workflow endpoint<br/>validate, order steps, compensate,<br/>map errors (app/workflow.py)"]
         api --> ip["IssueProvider<br/>issue-tracker-contract 1.1.0<br/>Team 4's TrelloIssueProvider,<br/>imported package (PR #52)"]
-        api --> cs["CalendarService<br/>calendar-contract v0.1.0-rc.1<br/>Google adapters (our HW2 code)"]
+        api --> cs["CalendarService<br/>calendar-contract v0.1.0<br/>our team5-calendar package (PR #57)"]
         api --> ss["SummaryStore<br/>cloud-storage-api 0.3.1<br/>HttpDocumentStorage (PR #55)"]
     end
     ip -- "Trello REST API" --> tr["Team 5 test Trello list"]
@@ -42,7 +42,7 @@ All three verticals run inside one FastAPI application. Separate boxes are separ
 
 | Vertical | Shared contract | Implementation | Selected by | Owner |
 | --- | --- | --- | --- | --- |
-| Calendar | `calendar-contract` tag `v0.1.0-rc.1` (`1c1cad7`) | Team 5 Google adapters | `CALENDAR_IMPLEMENTATION=google` (PR #54) | Member 2 (Jim) |
+| Calendar | `calendar-contract` tag `v0.1.0` (`db73e62`) | our `team5-calendar` package (the HW2 Google adapters, packaged in PR #57 and released as `team5-calendar-v0.1.0`; Teams 1 and 4 import the same package) | `CALENDAR_IMPLEMENTATION=google` (PR #54) | Member 2 (Jim) |
 | Issue tracker | `issue-tracker-contract` tag `issue-tracker-contract-v1.1.0` (`18fb7ae`) | Team 4's `team-4-issue-tracker-trello` package, tag `team-4-issue-tracker-trello-v1.0.0` (`c88ce2f`), run in our process against our Trello list | `ISSUE_TRACKER_IMPLEMENTATION=team4_trello` (PR #52) | Member 3 (Juno) |
 | Cloud storage | `cloud-storage-api` tag `0.3.1` (`664afc9`) | Team 3's hosted service over HTTP; swap to Team 1 | `STORAGE_BASE_URL`, `STORAGE_ROOT_PATH` (PR #55) | Member 4 (Kristie) |
 | Composition | none (our endpoint) | `app/workflow.py` | not configurable | Member 1 (Niriti) |
@@ -149,7 +149,8 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 | Failure | Trigger | State left behind | Caller sees | Recovery | Test |
 | --- | --- | --- | --- | --- | --- |
 | Invalid input | Blank title, `end` before `start` | nothing | `422`, `step: validate`, `retryable: false` | fix the request | `tests/test_workflow.py` (the shape is wrong today, see below) |
-| Trello down or token rejected | Trello outage, expired token, list removed | nothing | `502`/`503`, `step: issue`, `retryable` from the provider error | retry later, or replace the token | controlled fake |
+| Trello token rejected | Expired or revoked key or token (Trello `401`/`403`, which Team 4's package reports as `ACCESS_DENIED`) | nothing | `403`, `step: issue`, `retryable: false` | replace the token in Secret Manager | controlled fake |
+| Trello fails | Outage, rate limit, list removed, or another definite rejection | nothing | `502`, `step: issue`, `retryable: false` | retry later, or fix the list | controlled fake |
 | Issue response lost | Timeout after send | issue may exist | `502`, `step: issue`, leftover issue `uncertain`, `retryable: false` | check Trello by title before retrying | controlled fake |
 | Calendar auth expired | Revoked or expired token | issue deleted by compensation | `step: event`, `retryable: false` until an operator refreshes the token | run `scripts/google_calendar_auth.py`, update the secret | HW2 Level 5 auth-failure test, plus workflow fake |
 | Event response lost | Timeout after Google receives the insert | issue exists, event may exist | `502`, `step: event`, leftovers issue `created`, event `uncertain`, `retryable: false` | find the event by title and time in Google Calendar; delete both by hand or keep both | controlled fake |
@@ -159,7 +160,7 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 | Compensation fails | Delete call fails after a definite failure | records that could not be deleted | original error, with those records in `leftovers` | delete by hand using the IDs | controlled fake |
 | Service stops mid-request | Instance restart or request timeout between steps | earlier writes, with no record on our side | connection error, no body | find records by title in each provider; accepted risk for one test account | none; documented limit |
 | Same request sent twice | Client resends after a timeout | two issues and two events | two successful results | delete the duplicate by hand; accepted risk until idempotency (open question 3) | none; documented limit |
-| Issue tracker or Calendar not configured | Missing `TRELLO_*` setting or Google token | nothing | `503` before any write | fix configuration | dependency test |
+| Issue tracker or Calendar not configured | Missing `TRELLO_*` setting or Google token | nothing | `503` before any write (the issue-tracker case lacks `step` today, see below) | fix configuration | dependency test |
 
 **The handout's retry case** (event created, summary save fails, caller retries): after a *definite* storage failure, the event and issue are deleted and `leftovers` is empty, so a retry cannot duplicate anything; `retryable` follows the storage error (false for a rejection such as a name conflict, because the same request would fail again). After an *uncertain* storage failure, both records stay, `retryable` is false, and the caller gets their IDs, from which the summary name follows. The caller should not resend the request: a new request creates a new issue and event, so the service cannot recognize it as a retry. A safe automatic retry needs the caller to send an idempotency key that the service stores with the IDs, plus a storage read to check for the summary; both are open question 3.
 
@@ -170,7 +171,7 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 | Check | Kind | Evidence |
 | --- | --- | --- |
 | Step order, Markdown, compensation, error mapping | Controlled: fakes for all three contracts | `tests/test_workflow.py` in CI on the submitted commit |
-| Each adapter against its contract | Controlled | `tests/` for PRs #52, #54 and #55; #52 and #55 also have live probe records (Trello, Team 3) |
+| Each adapter against its contract | Controlled | `tests/` for PRs #52, #54, #55 and #57; #52 and #55 also have live probe records (Trello, Team 3) |
 | Full workflow through the **deployed** endpoint | Real providers, test account | response body; the issue seen in Trello, the event in Google Calendar, the file in Team 3 storage, each checked directly, not through our API |
 | Swap storage from Team 3 to Team 1 | Real, configuration only | the deployment diff shows only a setting change; the same workflow run with the file found in Team 1 storage |
 | Controlled failure | A failing storage implementation, selected by configuration in a separate `verify` deployment (never the `demo` one) | the caller receives the documented error with `step: summary`, and the issue and event are gone from Trello and Google |
@@ -198,5 +199,8 @@ The handout requires review within the team and by another team before submissio
 | Date | Reviewer | Question or comment | Response or change |
 | --- | --- | --- | --- |
 | 2026-11-14 | Jim (Team 5) | `422` and `503` errors lack `step` and `leftovers` (PR #53) | Open: Niriti to fix |
-| pending | Team 5 | Internal review of this draft | |
+| 2026-11-16 | Juno (Team 5) | A rejected Trello token returns `403` (`ACCESS_DENIED` from Team 4's package), not `502`/`503`; separate it from configuration and outage failures | Split into "Trello token rejected" (`403`) and "Trello fails" (`502`); missing configuration stays `503`. Checked against Team 4's `provider.py` and `_issue_failure` in PR #53 |
+| 2026-11-16 | Juno (Team 5) | Use #57's stable Calendar contract and package details | Calendar now cites `calendar-contract` `v0.1.0` and the `team5-calendar` package (PR #57) |
+| 2026-11-16 | Juno (Team 5) | Update the storage architecture once its approach is settled | Open: waiting for the TA's answer on HTTP versus importing Team 3's package (open question 1) |
+| pending | Team 5 | Internal review by Jim, Niriti and Kristie | |
 | pending | Outside team (to arrange) | Integration design review | |
