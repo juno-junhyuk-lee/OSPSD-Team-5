@@ -102,7 +102,8 @@ Dockerfile and build context now include the local package before `uv sync`.
 The path dependency is non-editable so the installed module survives the runtime
 image's separate filesystem stage. An actual Docker build could not run because
 the local Docker daemon was not running; deployment/image execution is not
-claimed. The CI wheel check was added but has not run remotely before push.
+claimed. At this November 15 pre-push checkpoint, the CI wheel check had not
+yet run remotely; the November 16 section records later CI separately.
 
 This does not establish the complete deployed three-vertical workflow, Team 1's
 own deployment/account setup, or independent teammate verification. New tags,
@@ -124,10 +125,11 @@ is separate from the prior live Google run; no new provider writes were needed
 for this installation check. Subsequent documentation changes do not relabel
 that tested commit or the original wheel/live evidence.
 
-## November 16: stable-contract follow-up (uncommitted)
+## November 16: stable-contract follow-up
 
-Juno's follow-up candidate on `hw3/calendar-package`, based on
-`df6bb55cc4fa577a880add58cc9d7d4d809119cd`, repins both active dependency
+Juno committed and pushed the follow-up as
+`d19165f9b5e17ed5b63f1d21328513d61334da46` on `hw3/calendar-package`, based on
+`df6bb55cc4fa577a880add58cc9d7d4d809119cd`. It repins both active dependency
 declarations to stable `calendar-contract` tag `v0.1.0`, commit
 `db73e6261a93b0c3cc6aa0a48c4687f742aacc9b`. The package remains version 0.1.0;
 its factory and Google operation behavior are unchanged. Historical sections
@@ -160,8 +162,63 @@ contract commit, and both installers' results. No Google writes or OAuth setup
 were performed for this follow-up. The prior live Google run remains evidence
 for its original `rc.1` candidate, not a new stable-contract provider run.
 
-The stable candidate is not committed/pushed, has no new GitHub CI result, and
-has no published immutable implementation tag. Remote installation from the
-old pinned SHA still installs the older `rc.1` metadata. Final reviewed-commit
-checks, independent verifier reproduction, actual-tag installation, and GitHub
-Release publication remain on the [release checklist](CALENDAR_PACKAGE_RELEASE.md).
+GitHub push and [PR CI](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43915964747)
+passed for `d19165f`: application checks and all three infrastructure jobs.
+The stable candidate can be installed remotely at its fixed commit using the
+[package README](../packages/team5-calendar/README.md). Remote installation from
+the old `b1d6e7f` pinned SHA still installs the older `rc.1` metadata.
+No immutable implementation tag or GitHub Release has been published. Final
+reviewed-commit checks, independent verifier reproduction, actual-tag installation,
+and release publication remain on the [release checklist](CALENDAR_PACKAGE_RELEASE.md).
+
+## November 16: review and documentation refresh
+
+Jim's follow-up review, executed with Codex assistance, checked Juno's
+`d19165f9b5e17ed5b63f1d21328513d61334da46` against its parent. No blocking code
+defect was found: the package dependency, root uv source, lockfile, and provenance
+checks consistently select stable contract commit `db73e626`. Factory, Google
+CRUD, OAuth, and the internal workflow handoff did not change. The new regression
+case rejects the old `rc.1` commit even though both distributions report 0.1.0.
+
+This checkpoint tested that commit with a documentation-only working-tree diff:
+the package README, consumer guide, release draft, and this record. The edits
+replace stale pre-push status with the available fixed Git revision and retain
+the earlier evidence's original source and provider-run provenance.
+
+On Python 3.14.8, the following checks passed:
+
+```sh
+uv sync --frozen --reinstall-package team5-calendar
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run mypy scripts/check_calendar_wheel.py scripts/verify_calendar_package_live.py scripts/verify_put_live.py scripts/deploy_release.py
+CALENDAR_LIVE_CONFORMANCE=0 CALENDAR_DEPLOYED_CONFORMANCE=0 uv run pytest -q
+uv build packages/team5-calendar --out-dir /tmp/calendar-package-review-2026-11-16/dist
+uv run python scripts/check_calendar_wheel.py /tmp/calendar-package-review-2026-11-16/dist/team5_calendar-0.1.0-py3-none-any.whl --installer uv
+uv run python scripts/check_calendar_wheel.py /tmp/calendar-package-review-2026-11-16/dist/team5_calendar-0.1.0-py3-none-any.whl --installer pip
+git diff --check
+```
+
+- Full offline suite: **773 passed, 58 opt-in tests skipped**, with the existing
+  Starlette TestClient deprecation warning. Lint, formatting, strict typing
+  (79 application/package/test sources plus four scripts), and builds passed.
+- The local wheel includes the updated package README, with no runtime code
+  changes. Its SHA-256 is
+  `9fe73d46cf36edbf9526a01885c5ec8e26475c23669b3b838855e38f15d7997b`.
+- Separate uv and pip consumers installed that wheel alongside an explicit
+  stable contract dependency, without overrides. uv used a fresh project,
+  lockfile resolution, and frozen sync.
+- A third independent consumer installed the implementation directly from
+  GitHub at `d19165f9b5e17ed5b63f1d21328513d61334da46`, using the README's
+  subdirectory reference alongside the explicit stable contract. Installed
+  metadata confirmed that exact implementation commit and contract `db73e626`.
+- All three consumers preserved their own `app` namespace, imported from their
+  installed environment without the Team 5 checkout or framework SDK, and passed
+  eight missing/malformed authorization checks each with provider socket
+  connections blocked. The 13 local document links also resolved.
+
+No Google writes or new OAuth setup were performed in this review. The GitHub
+CI linked above belongs to `d19165f`; it does not establish CI for this local
+documentation diff. This checkpoint does not replace independent teammate or
+release-tag verification, and no implementation release is claimed.

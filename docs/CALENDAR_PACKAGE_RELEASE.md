@@ -1,7 +1,11 @@
 # Draft: team5-calendar 0.1.0 release
 
-Status: preparation only. No tag or GitHub Release has been created. The
-stable-contract follow-up is uncommitted and cannot yet be installed remotely.
+Status: release preparation only. No implementation tag or GitHub Release has
+been created. The stable-contract follow-up is committed and pushed at
+`d19165f9b5e17ed5b63f1d21328513d61334da46`, under review in
+[PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57). The
+[package README](../packages/team5-calendar/README.md) provides its pinned GitHub
+installation command; that review candidate is available before release.
 
 ## Changes for consumers
 
@@ -28,7 +32,7 @@ Google setup, shared errors, and the [verification record](CALENDAR_PACKAGE_VERI
 
 ## Publication checklist
 
-- Choose the final reviewed commit after the uncommitted follow-up is approved.
+- Choose the final reviewed commit after the stable-contract follow-up is approved.
 - Name a coordinator and a different teammate verifier under the repo release rules.
 - Run the required checks, build artifacts, and fresh uv/pip consumer installation
   from the selected revision; associate matching CI/evidence links with it.

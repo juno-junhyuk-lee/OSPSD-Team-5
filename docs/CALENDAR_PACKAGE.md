@@ -18,10 +18,12 @@ repository. Team 5's existing `get_calendar_service` FastAPI dependency remains
 the internal handoff for the composed workflow. External consumers use the
 ordinary Python factory below instead of importing Team 5's `app` package.
 
-The [package README](../packages/team5-calendar/README.md) contains local-wheel
-installation and OAuth commands for this stable-contract candidate. Earlier
-pinned GitHub installation evidence used `rc.1`; the current changes must be
-committed/published before an equivalent new remote install is available.
+The [package README](../packages/team5-calendar/README.md) contains a fixed GitHub
+install command for stable-contract candidate
+`d19165f9b5e17ed5b63f1d21328513d61334da46`, plus local-wheel installation and OAuth
+commands. This candidate is committed and pushed, with [PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57)
+under review. Earlier GitHub installation and live Google evidence used `rc.1`;
+those historical checks remain tied to their recorded revisions.
 A new implementation release tag remains pending. Existing published tags,
 including `v0.1.0-beta.6`, are not moved.
 Implementation versioning is separate from the shared contract version.
@@ -187,8 +189,9 @@ check installs the same two explicit dependencies in a separate seeded environme
 This document describes the package candidate under review. Historical
 pinned-GitHub and live Google results retain their original `rc.1` provenance.
 The verification record separately identifies the new stable-contract checks.
-Commit/publication, an immutable implementation tag, and release publication
-remain after review; see the [release draft](CALENDAR_PACKAGE_RELEASE.md).
+The stable-contract code is already committed and pushed. Teammate approval,
+independent release verification, an immutable implementation tag, and GitHub
+Release publication remain; see the [release draft](CALENDAR_PACKAGE_RELEASE.md).
 
 The final handoff to Team 1 consists of the fixed install revision, exact import
 and factory example, supported Python version, OAuth/token setup, shared error

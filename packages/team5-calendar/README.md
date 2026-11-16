@@ -12,12 +12,21 @@ test account and externally supplied OAuth token file.
 
 ## Install and configure
 
-This working-tree candidate depends directly on the stable contract. No new
-implementation tag has been published. Earlier pinned-commit installation
-evidence used `rc.1`; it does not identify this uncommitted update.
+The stable-contract candidate is committed and pushed at
+[`d19165f9b5e17ed5b63f1d21328513d61334da46`](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/commit/d19165f9b5e17ed5b63f1d21328513d61334da46)
+and is under review in [PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57).
+Install that fixed candidate with:
 
-Until the updated candidate is committed and published, build and install its
-wheel from the repository root:
+```sh
+pip install "team5-calendar @ git+https://github.com/juno-junhyuk-lee/OSPSD-Team-5.git@d19165f9b5e17ed5b63f1d21328513d61334da46#subdirectory=packages/team5-calendar"
+```
+
+No implementation release tag has been published. Earlier pinned-commit
+installation and live Google evidence used `rc.1`; those records do not establish
+a new stable-contract live run. See the [verification record](../../docs/CALENDAR_PACKAGE_VERIFICATION.md)
+for each check's revision and scope.
+
+To test local changes instead, build and install a wheel from the repository root:
 
 ```sh
 uv build --wheel packages/team5-calendar --out-dir /tmp/team5-calendar-dist
