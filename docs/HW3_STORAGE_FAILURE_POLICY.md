@@ -6,7 +6,7 @@ current behavior and proposed follow-up acceptance criteria. It changes no code,
 claims no new provider verification. Package integration has since become
 mandatory; apply these certainty rules to the package boundary under the
 [transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md). HTTP-specific examples
-below describe the existing implementation or historical proposals, not the
+below describe the historical implementation or proposals, not the
 selected final integration.
 
 ## Decision rules
@@ -32,7 +32,38 @@ complete rollback. Attempt both earlier-resource deletions even if one fails.
 no leftovers. A definitely failed write alone does not make retryable true.
 The real store currently defaults it to false; this plan does not change that.
 
-## Current behavior and desired classification
+## Implemented package classification (task 5)
+
+The production package factory uses a Team 3-specific summary-store subclass;
+the generic shared store does not infer transport phases from provider names.
+This classification depends on pinned Team 3 `fde60d4`, its preserved explicit
+exception causes, and the SDK retry counts set to zero by our factory.
+
+| Creation or readback outcome | Workflow action |
+| --- | --- |
+| Known shared conflict, permission, input/operation, size or not-found rejection during create | Compensate event then issue; do not delete any summary |
+| Create raises shared ProviderUnavailableError whose exact builtin ConnectionError cause preserves requests ConnectTimeout | Definitely pre-send; compensate event then issue |
+| Same preserved chain contains requests ConnectionError wrapping urllib3 MaxRetryError with NewConnectionError reason | Definitely failed to establish a connection; compensate event then issue |
+| Generic ConnectionError, read timeout, missing/unrecognized cause chain or unknown shared error | Keep issue/event and uncertain summary; no retry |
+| Upload applied but reply was lost | Keep all resources; no automatic retry or summary cleanup |
+| Upload confirmed, then any readback failure, including ConnectTimeout or 404 | Keep all resources; a later connection failure cannot undo earlier creation |
+| Malformed package metadata or unexpected untyped package exception | Sanitize and preserve uncertainty rather than return an unhandled error without leftovers |
+
+The phase classifier never examines messages. A generic connection exception
+whose text says "connection refused" remains uncertain. These rules must be
+rechecked when upgrading the provider or SDK/transport. Missing cause information
+is not a reason to guess or probe for absence. Operation failures remain 502;
+pre-workflow configuration failures remain 503.
+
+Controlled tests exercise both real Team 3 translation layers by injecting SDK
+failures. They check event-before-issue cleanup, continued issue cleanup after
+event deletion fails, NOT_FOUND treated as absent, unresolved cleanup leftovers,
+one upload attempt, no summary deletion/metadata probe, known path retention and
+sanitized responses/logs. They also simulate applied-but-lost replies and bad
+metadata. This establishes offline behavior; no real network fault, Dropbox
+inspection or live controlled-failure evidence is claimed.
+
+## Historical HTTP baseline and original acceptance plan
 
 | Scenario | Current baseline | Required follow-up behavior |
 | --- | --- | --- |

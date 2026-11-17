@@ -109,10 +109,28 @@ HTTP modules remain temporarily: `storage_path` is imported by the summary and
 configuration boundaries, and the old opt-in live probe/tests still use the
 HTTP adapter. Audit/extract path validation and convert the probe before removing
 those modules in a separate cleanup scope. No HTTP fallback exists in the
-current workflow. Package failure-certainty refinements remain task 5.
+current workflow. Task 5's package failure-certainty implementation follows below.
 Task 4 validation: 77 focused tests passed; full suite **928 passed, 58 skipped**,
 with the existing Starlette TestClient warning. Ruff lint/format, strict mypy
 and `git diff --check` passed.
+
+### Task 5: failure certainty and cleanup
+
+Package-specific classification now recognizes typed pre-send connection timeout
+and new-connection failure evidence through the pinned Team 3 cause chain.
+Generic connection failures remain uncertain. Confirmed upload dominates all
+subsequent readback failures. Unexpected package errors or malformed metadata
+are sanitized as uncertain failures with the known summary path.
+
+The generic summary boundary uses an explicit list of definite shared rejections;
+unknown shared exceptions no longer implicitly mean no write. The workflow's
+public response schema, retry policy and orchestration code are unchanged.
+See [implemented package classification](HW3_STORAGE_FAILURE_POLICY.md#implemented-package-classification-task-5)
+for exact rules and limitations. Ka Pui can review the implementation/tests;
+this does not record approval or live fault-injection evidence.
+Validation: 13 new SDK-boundary regression cases; full suite **941 passed,
+58 skipped**, with the existing Starlette TestClient warning. Ruff lint/format,
+strict mypy and `git diff --check` passed. No real credentials/provider calls.
 
 - Hari's help-channel clarification, supplied by Kristie: adding the other
   team's package as a dependency is a hard requirement. The planned implementation

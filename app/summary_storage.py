@@ -7,9 +7,13 @@ bytes through the shared contract. Controlled stores can still be substituted.
 from typing import Protocol
 
 from cloud_storage_api import (
+    ConflictError,
     DocumentStorage,
-    ProviderError,
-    ProviderUnavailableError,
+    FileTooLargeError,
+    InvalidOperationError,
+    InvalidRequestError,
+    NotFoundError,
+    PermissionDeniedError,
     StorageError,
 )
 from pydantic import BaseModel
@@ -60,6 +64,20 @@ class DocumentSummaryStore:
         self._storage = storage
         self._root = storage_path(root_path)
 
+    def _creation_may_have_applied(self, error: StorageError) -> bool:
+        # Unknown shared errors do not guarantee that a write was rejected.
+        return not isinstance(
+            error,
+            (
+                ConflictError,
+                FileTooLargeError,
+                InvalidOperationError,
+                InvalidRequestError,
+                NotFoundError,
+                PermissionDeniedError,
+            ),
+        )
+
     def save_summary(self, name: str, markdown: str) -> StoredSummary:
         if (
             not name
@@ -88,12 +106,18 @@ class DocumentSummaryStore:
                     may_have_applied=True,
                     path=path,
                 )
+            # Keep metadata access inside the uncertainty boundary too.
+            return StoredSummary(id=info.id or info.path)
+        except SummaryStorageError:
+            raise
         except StorageError as error:
             raise SummaryStorageError(
                 "Summary storage request failed.",
-                may_have_applied=created
-                or isinstance(error, (ProviderError, ProviderUnavailableError)),
+                may_have_applied=created or self._creation_may_have_applied(error),
                 path=path,
             ) from None
-        # The shared contract permits id=None (for example S3).
-        return StoredSummary(id=info.id or info.path)
+        except Exception:
+            # A package defect or untyped failure provides no absence guarantee.
+            raise SummaryStorageError(
+                "Summary storage request failed.", may_have_applied=True, path=path
+            ) from None

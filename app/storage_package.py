@@ -12,7 +12,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from cloud_storage_api import DocumentStorage, InvalidRequestError
+from cloud_storage_api import (
+    DocumentStorage,
+    InvalidRequestError,
+    ProviderUnavailableError,
+    StorageError,
+)
 
 from app.storage_client import storage_path
 from app.summary_storage import DocumentSummaryStore, SummaryStorageError
@@ -20,6 +25,37 @@ from app.summary_storage import DocumentSummaryStore, SummaryStorageError
 
 class _Closeable(Protocol):
     def close(self) -> None: ...
+
+
+class _PackageSummaryStore(DocumentSummaryStore):
+    def _creation_may_have_applied(self, error: StorageError) -> bool:
+        if not super()._creation_may_have_applied(error):
+            return False
+        # The pinned Team 3 code preserves SDK -> builtin -> shared causes.
+        # Only typed connection-establishment evidence proves no request was sent.
+        from requests.exceptions import (
+            ConnectionError as RequestsConnectionError,
+        )
+        from requests.exceptions import (
+            ConnectTimeout,
+        )
+        from urllib3.exceptions import MaxRetryError, NewConnectionError
+
+        cause = error.__cause__
+        if (
+            isinstance(error, ProviderUnavailableError)
+            and type(cause) is ConnectionError
+        ):
+            sdk_error = cause.__cause__
+            if isinstance(sdk_error, ConnectTimeout):
+                return False
+            if isinstance(sdk_error, RequestsConnectionError) and sdk_error.args:
+                pool_error = sdk_error.args[0]
+                if isinstance(pool_error, MaxRetryError) and isinstance(
+                    pool_error.reason, NewConnectionError
+                ):
+                    return False
+        return True
 
 
 def _configuration_error() -> SummaryStorageError:
@@ -102,6 +138,6 @@ def package_summary_store() -> Iterator[DocumentSummaryStore]:
     except Exception:
         raise _configuration_error() from None
     try:
-        yield DocumentSummaryStore(storage, settings.root_path)
+        yield _PackageSummaryStore(storage, settings.root_path)
     finally:
         sdk.close()
