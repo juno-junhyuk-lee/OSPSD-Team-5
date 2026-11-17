@@ -11,7 +11,11 @@ live end-to-end evidence is claimed yet.
 | --- | --- | --- |
 | Issue tracker (`IssueProvider`) | Member 3 | Wired via `get_issue_provider` (PR #52); live verification pending |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Kristie (Member 4) | Configured shared HTTP adapter; Team 3 probe passed, direct Dropbox verification and real swap pending |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | HTTP currently wired; mandatory package transition planned; package CRUD and swap pending |
+
+See the [storage package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md) for
+the active decision and proposed file ownership with Niriti and Ka Pui. This
+documentation update does not change workflow wiring or claim their agreement.
 
 ## Endpoint
 

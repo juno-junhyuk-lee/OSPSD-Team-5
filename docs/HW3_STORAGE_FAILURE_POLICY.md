@@ -3,7 +3,11 @@
 Owner: Kristie (Member 4), with Niriti (Member 1) for workflow behavior and Ka Pui
 (Member 5) for integration review. Baseline: `4cbe546`. This document describes
 current behavior and proposed follow-up acceptance criteria. It changes no code,
-claims no new provider verification, and does not resolve the HTTP/package choice.
+claims no new provider verification. Package integration has since become
+mandatory; apply these certainty rules to the package boundary under the
+[transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md). HTTP-specific examples
+below describe the existing implementation or historical proposals, not the
+selected final integration.
 
 ## Decision rules
 

@@ -7,6 +7,13 @@ verification; the student owner remains responsible for understanding the work.
 
 ## Status and evidence
 
+Package integration is now required following Hari's clarification reported by
+Kristie. The code on this branch still uses HTTP; migration is planned in the
+[package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md). HTTP evidence below
+is historical and does not establish package integration. John approved Team 3
+commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. OAuth login,
+package CRUD and composed-workflow verification remain pending.
+
 The storage adapter is connected to the local scheduled-issue workflow. Team 3's
 real test service passed summary creation, exact UTF-8 download comparison,
 duplicate-create conflict, original-content preservation and cleanup. This does
@@ -28,11 +35,14 @@ is made for this local branch.
 | Remaining evidence | Owner or dependency |
 | --- | --- |
 | Direct Dropbox inspection and cleanup confirmation | Kristie (Member 4) with Team 3's account owner |
-| Real configuration-only Team 1 swap | Kristie (Member 4); reachable endpoint/tunnel and test access needed |
+| Real configuration-only Team 1 package swap | Kristie (Member 4); supported package, namespace and shared-contract alignment pending Team 1 reply |
 | Deployed composed workflow against both configurations | Kristie (Member 4) and Members 1 and 5 with the other integration owners |
 | Integrated checks, design/code reviews and submission | Component owners and Member 5 |
 
 ## Architecture and contract
+
+See [package feasibility research](HW3_STORAGE_PACKAGE_RESEARCH.md) for isolated
+consumer installation findings and the remaining package-swap requirements.
 
 ```text
 Member 1 workflow: issue -> Calendar -> Markdown and filename
