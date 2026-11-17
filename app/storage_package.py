@@ -126,18 +126,23 @@ def _create_storage(
 
 
 @contextmanager
-def package_summary_store() -> Iterator[DocumentSummaryStore]:
-    """Own the SDK lifetime; only construction errors are configuration failures.
-
-    Token validity is checked by Dropbox on first use, not during construction.
-    Operation/body errors retain their original certainty and are not remapped.
-    """
-    settings = PackageStorageSettings.from_environment()
+def package_document_storage(
+    settings: PackageStorageSettings,
+) -> Iterator[DocumentStorage]:
+    """Share scoped SDK construction between the workflow and opt-in live probe."""
     try:
         storage, sdk = _create_storage(settings)
     except Exception:
         raise _configuration_error() from None
     try:
-        yield _PackageSummaryStore(storage, settings.root_path)
+        yield storage
     finally:
         sdk.close()
+
+
+@contextmanager
+def package_summary_store() -> Iterator[DocumentSummaryStore]:
+    """Read explicit configuration; preserve operation errors after construction."""
+    settings = PackageStorageSettings.from_environment()
+    with package_document_storage(settings) as storage:
+        yield _PackageSummaryStore(storage, settings.root_path)

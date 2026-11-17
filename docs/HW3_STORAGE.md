@@ -7,6 +7,9 @@ verification; the student owner remains responsible for understanding the work.
 
 ## Status and evidence
 
+Current package setup and probe commands:
+[Team 5 Dropbox authorization](HW3_STORAGE_AUTH.md).
+
 Package integration is now required following Hari's clarification reported by
 Kristie. The workflow now uses Team 3's imported package through the scoped
 factory described in the [package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md).

@@ -106,8 +106,9 @@ the test. Missing settings and a failing SDK constructor return 503 before any
 issue/event write. These are offline checks, not real Dropbox evidence.
 
 HTTP modules remain temporarily: `storage_path` is imported by the summary and
-configuration boundaries, and the old opt-in live probe/tests still use the
-HTTP adapter. Audit/extract path validation and convert the probe before removing
+configuration boundaries, and legacy adapter tests still use HTTP directly.
+The opt-in probe is converted to package operations by task 6. Audit/extract
+path validation and review remaining callers before removing
 those modules in a separate cleanup scope. No HTTP fallback exists in the
 current workflow. Task 5's package failure-certainty implementation follows below.
 Task 4 validation: 77 focused tests passed; full suite **928 passed, 58 skipped**,
@@ -150,6 +151,33 @@ strict mypy and `git diff --check` passed. No real credentials/provider calls.
   Team 3's account for this run. Never put credentials or token contents in git.
 - Team 1 has not replied with a supported package solution. This blocks the
   alternative-provider swap, not Team 3 implementation.
+
+## Authorization and probe progress
+
+### Task 6: authorization guide and package probe tooling
+
+The [authorization guide](HW3_STORAGE_AUTH.md) provides Team5-Review app/account
+checks, external absolute token-file setup, session environment variables,
+operator-only OAuth login and the dedicated app-folder test path. App reuse is
+approved; actual authorization and live verification are still pending.
+
+`scripts/verify_storage_live.py` now uses Team 3 package operations through the
+same scoped `package_document_storage` SDK factory as the workflow. Its UUID
+scratch-file cleanup policy is deliberately separate from production recovery.
+It records installed distribution versions/Git provenance, Python, application
+HEAD and source/lockfile hashes. It refuses existing output files and still
+requires `--execute`; no endpoint URL or HTTP transport is used.
+
+Offline probe tests cover success, preexisting files, conflict, uncertain upload,
+readback mismatch, cleanup failures (including untyped failures), health and
+construction failures, explicit execution, evidence preservation, provenance and
+exit status. CLI tests mock the probe; provider tests use the real Team 3 wrapper
+with a fake lower-level client and SDK. No OAuth, account check or real file
+operation was executed. Historical HTTP evidence is unchanged.
+Validation: 15 probe tests and 21 package-construction tests passed. Full suite:
+**948 passed, 58 skipped**, with the existing Starlette TestClient warning.
+Ruff lint/format, strict mypy and the probe-specific mypy check using
+`--explicit-package-bases` passed; `git diff --check` passed.
 
 ## Branch and PR snapshot
 
