@@ -11,7 +11,7 @@ live end-to-end evidence is claimed yet.
 | --- | --- | --- |
 | Issue tracker (`IssueProvider`) | Member 3 | Wired via `get_issue_provider` (PR #52); live verification pending |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Kristie (Member 4) | Team 3 package wired; controlled workflow tests passed; live package CRUD and swap pending |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | Team 3 package wired; live storage probe passed; full-workflow verification, independent inspection and Team 1 swap pending |
 
 See the [storage package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md) for
 the active decision and proposed file ownership with Niriti and Ka Pui. This

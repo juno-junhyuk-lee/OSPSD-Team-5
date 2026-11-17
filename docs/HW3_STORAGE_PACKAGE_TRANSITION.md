@@ -2,8 +2,8 @@
 
 Owner: Kristie (Member 4). November 16, 2026. Baseline: `f7c59d1`.
 Codex assisted with inspection and this plan. This commit scope is documentation
-only. Subsequent dependency and wiring progress is recorded below; live
-verification remains pending.
+only. Subsequent dependency, wiring and live storage-probe progress is recorded
+below; composed-workflow verification remains pending.
 
 ## Dependency installation progress
 
@@ -159,7 +159,8 @@ strict mypy and `git diff --check` passed. No real credentials/provider calls.
 The [authorization guide](HW3_STORAGE_AUTH.md) provides Team5-Review app/account
 checks, external absolute token-file setup, session environment variables,
 operator-only OAuth login and the dedicated app-folder test path. App reuse is
-approved; actual authorization and live verification are still pending.
+approved; authorization and live storage verification were subsequently reported
+by Kristie in task 7 below.
 
 `scripts/verify_storage_live.py` now uses Team 3 package operations through the
 same scoped `package_document_storage` SDK factory as the workflow. Its UUID
@@ -178,6 +179,26 @@ Validation: 15 probe tests and 21 package-construction tests passed. Full suite:
 **948 passed, 58 skipped**, with the existing Starlette TestClient warning.
 Ruff lint/format, strict mypy and the probe-specific mypy check using
 `--explicit-package-bases` passed; `git diff --check` passed.
+
+## Live verification progress
+
+### Task 7: live storage probe evidence
+
+Kristie ran the package probe at application base `50ad496`, reporting OAuth
+success for the intended Team 5 account, the prepared test folder and exit code 0.
+[Recorded JSON](evidence/HW3_STORAGE_TEAM3_PACKAGE_20261116-211419.json) shows
+health, upload/UTF-8 readback, duplicate conflict, byte preservation and final
+absence all passed on November 16, 2026, 21:14:20–21:14:27 America/New_York.
+All six source hashes match the checkout; the recorded payload hash, 104-byte
+size, path and reference are internally consistent. Package Git pins match the
+approved Team 3 revision and existing shared contract. No credential file was
+opened or secret values requested during review.
+
+This completes the storage probe portion of task 7, not the entire task:
+Kristie did not inspect the file in Dropbox, and the probe immediately cleaned
+it. Independent account inspection/cleanup confirmation, the composed workflow
+and Team 1 swap are still pending. Preserve the evidence JSON unchanged and
+arrange the remaining full-workflow run with an authorized Team 5 teammate.
 
 ## Branch and PR snapshot
 

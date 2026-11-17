@@ -16,8 +16,34 @@ factory described in the [package transition plan](HW3_STORAGE_PACKAGE_TRANSITIO
 Use its runtime configuration table; the HTTP setup sections below describe the
 previous adapter and probe, not the current workflow setup. HTTP evidence below
 is historical and does not establish package integration. John approved Team 3
-commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. OAuth login,
-package CRUD and composed-workflow verification remain pending.
+commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. Kristie
+reports successful OAuth with the intended Team 5 account. The package storage
+probe passed; composed-workflow verification and independent inspection remain
+pending.
+
+### Package live verification
+
+[Package evidence](evidence/HW3_STORAGE_TEAM3_PACKAGE_20261116-211419.json) ran
+November 16, 2026, 21:14:20–21:14:27 America/New_York (November 17, 02:14 UTC),
+at application base `50ad4960e3792f5fad9cf44cbfee17e3c48d32db`, Python 3.14.8.
+Installed Team 3 implementation/internal interface both resolve to approved
+`fde60d4fb648df6defb918ff815fe940c525adc7`; shared contract tag `0.3.1` resolves
+to `664afc9` (distribution version `0.2.0`); Dropbox SDK is `12.2.5`.
+
+Provider health, summary upload/exact UTF-8 readback, duplicate-create conflict,
+original-byte preservation and cleanup all passed. The 104-byte UUID file under
+`/ospsd-team5-hw3` was confirmed absent by package metadata lookup after deletion.
+Kristie reports exit code 0. Review matched all six recorded source/lockfile
+hashes against the current checkout, and independently reconstructed the probe
+payload hash/size and checked the metadata path/reference for consistency.
+
+Kristie did not observe the file in the Dropbox web UI. Direct contents inspection
+and independent cleanup confirmation are therefore not established; retain the
+JSON's `direct_provider_verification=pending`. The probe does not exercise
+`POST /workflows/scheduled-issues`, deployed composition, Team 1 swapping or live
+failure injection. No credential values were included in the evidence.
+
+### Historical HTTP verification
 
 The storage adapter is connected to the local scheduled-issue workflow. Team 3's
 real test service passed summary creation, exact UTF-8 download comparison,
@@ -39,7 +65,7 @@ is made for this local branch.
 
 | Remaining evidence | Owner or dependency |
 | --- | --- |
-| Direct Dropbox inspection and cleanup confirmation | Kristie (Member 4) with Team 3's account owner |
+| Direct Dropbox contents inspection and independent cleanup confirmation | Kristie (Member 4) with an authorized Team 5 teammate on the selected account |
 | Real configuration-only Team 1 package swap | Kristie (Member 4); supported package, namespace and shared-contract alignment pending Team 1 reply |
 | Deployed composed workflow against both configurations | Kristie (Member 4) and Members 1 and 5 with the other integration owners |
 | Integrated checks, design/code reviews and submission | Component owners and Member 5 |
@@ -54,7 +80,7 @@ Member 1 workflow: issue -> Calendar -> Markdown and filename
   -> SummaryStore.save_summary(name, markdown)
      DocumentSummaryStore: configured folder + filename; UTF-8 encoding
        -> DocumentStorage.create(path, bytes)
-          HttpDocumentStorage -> configured service's POST /files
+          Team 3 DropboxDocumentStorage -> DropboxClient -> injected Dropbox SDK
        -> DocumentStorage.download(path); compare exact bytes
   <- StoredSummary.id -> combined workflow response
 ```
