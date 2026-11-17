@@ -1,0 +1,31 @@
+{
+  "application_base_commit": "e2616dd52a7aef6803896c48661f0464800ef71b",
+  "execution": "local FastAPI route with real providers",
+  "started_at": "2026-11-17T02:52:58.393335+00:00",
+  "request": {
+    "title": "team5-hw3-workflow-5ef8b3616f30459a83bfc0f94463e0e3",
+    "start": "2026-11-18T02:52:57+00:00",
+    "end": "2026-11-18T03:07:57+00:00"
+  },
+  "result": "created",
+  "cleanup": "not performed",
+  "independent_inspection": "not performed",
+  "http_status": 201,
+  "response": {
+    "issue": {
+      "id": "6afbc18c764edd02e5588e2b",
+      "title": "team5-hw3-workflow-5ef8b3616f30459a83bfc0f94463e0e3"
+    },
+    "event": {
+      "id": "ig4e63tio1j5cahjh3qa4mando",
+      "title": "team5-hw3-workflow-5ef8b3616f30459a83bfc0f94463e0e3",
+      "start": "2026-11-17T21:52:57-05:00",
+      "end": "2026-11-17T22:07:57-05:00"
+    },
+    "summary": {
+      "id": "id:ceeRv-cWOxkAAAAAAAAACg",
+      "markdown": "# team5\\-hw3\\-workflow\\-5ef8b3616f30459a83bfc0f94463e0e3\n\n| Field | Value |\n| --- | --- |\n| Issue ID | `6afbc18c764edd02e5588e2b` |\n| Issue title | team5\\-hw3\\-workflow\\-5ef8b3616f30459a83bfc0f94463e0e3 |\n| Event ID | `ig4e63tio1j5cahjh3qa4mando` |\n| Start | 2026\\-11\\-17T21:52:57\\-05:00 |\n| End | 2026\\-11\\-17T22:07:57\\-05:00 |\n"
+    }
+  },
+  "finished_at": "2026-11-17T02:53:04.042426+00:00"
+}

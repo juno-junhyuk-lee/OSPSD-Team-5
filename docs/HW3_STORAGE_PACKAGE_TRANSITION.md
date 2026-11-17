@@ -194,11 +194,13 @@ size, path and reference are internally consistent. Package Git pins match the
 approved Team 3 revision and existing shared contract. No credential file was
 opened or secret values requested during review.
 
-This completes the storage probe portion of task 7, not the entire task:
-Kristie did not inspect the file in Dropbox, and the probe immediately cleaned
-it. Independent account inspection/cleanup confirmation, the composed workflow
-and Team 1 swap are still pending. Preserve the evidence JSON unchanged and
-arrange the remaining full-workflow run with an authorized Team 5 teammate.
+The storage-only probe did not establish composed-workflow execution or direct
+inspection. Subsequently Kristie completed a local real-provider workflow at
+`e2616dd`, followed by successful issue/Calendar/summary readback and cleanup:
+see [workflow evidence](WORKFLOW.md#local-real-provider-workflow-evidence).
+The local composition portion of task 7 is now complete. Independent account
+inspection/cleanup confirmation, deployed execution and Team 1 swap remain
+pending. Preserve both original execution records and their distinct scopes.
 
 ## Branch and PR snapshot
 

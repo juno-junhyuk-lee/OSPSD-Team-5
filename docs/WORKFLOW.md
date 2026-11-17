@@ -3,15 +3,40 @@
 ## Status
 
 Endpoint structure, orchestration, Markdown generation, and failure handling are
-implemented and tested offline with controlled dependencies. Live issue, Calendar,
-and storage integrations are connected as they become available. No deployed or
-live end-to-end evidence is claimed yet.
+implemented and tested offline with controlled dependencies. The local FastAPI
+route also passed a real Trello -> Google Calendar -> Dropbox run, followed by
+provider readback and cleanup. This is local composition evidence, not deployed
+verification or independent human inspection.
 
 | Integration | Owner | State |
 | --- | --- | --- |
-| Issue tracker (`IssueProvider`) | Member 3 | Imported Team 4 Trello provider from merged #52; component live evidence in ISSUE_TRACKER_VERIFICATION.md; composed run pending |
+| Issue tracker (`IssueProvider`) | Member 3 | Imported Team 4 provider; local composed create, fresh read and cleanup passed |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Kristie (Member 4) | Team 3 package wired; live storage probe passed; full-workflow verification, independent inspection and Team 1 swap pending |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | Imported Team 3 package; local composed upload, exact readback and cleanup passed; independent inspection and Team 1 swap pending |
+
+## Local real-provider workflow evidence
+
+Kristie (Member 4) executed the commands with Codex assistance at application
+commit `e2616dd52a7aef6803896c48661f0464800ef71b` on November 16, 2026:
+
+- [Creation](evidence/HW3_WORKFLOW_LOCAL_5ef8b3616f30459a83bfc0f94463e0e3.json):
+  21:52:58–21:53:04 America/New_York, local FastAPI TestClient using normal
+  dependencies and real provider accounts, no dependency overrides. One request
+  returned 201 with issue, event and Markdown summary references.
+- [Readback and cleanup](evidence/HW3_WORKFLOW_LOCAL_5ef8b3616f30459a83bfc0f94463e0e3_READBACK_CLEANUP.json):
+  21:54:19–21:54:24 America/New_York. The imported issue provider's fresh read
+  matched; the Calendar package's read matched ID/title/time instants; the storage
+  package's metadata and downloaded UTF-8 bytes matched the response summary.
+  Cleanup ran summary -> event -> issue and confirmed each absent afterward.
+
+Review checked evidence linkage, response titles, UTC/local time equivalence,
+summary path derived from the issue/event IDs, and downloaded-content SHA-256
+against response Markdown. Keep creation's original `cleanup=not performed`:
+the separate later record establishes cleanup. These ad-hoc execution records
+do not include the storage probe's full source-hash/package-provenance manifest;
+they identify the application commit and reported readback results. No credentials
+are recorded, no new test was rerun to create this documentation, and no deployed
+run, independent teammate inspection or live failure injection is claimed.
 
 See the [storage package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md) for
 the active decision and proposed file ownership with Niriti and Ka Pui. This

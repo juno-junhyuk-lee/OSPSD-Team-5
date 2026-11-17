@@ -18,8 +18,14 @@ previous adapter and probe, not the current workflow setup. HTTP evidence below
 is historical and does not establish package integration. John approved Team 3
 commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. Kristie
 reports successful OAuth with the intended Team 5 account. The package storage
-probe passed; composed-workflow verification and independent inspection remain
-pending.
+probe and local real-provider composed workflow passed. Independent inspection,
+deployed workflow verification and the Team 1 swap remain pending.
+
+Local composition at `e2616dd` returned 201, then passed issue fresh read,
+Calendar readback, exact summary-byte verification and summary/event/issue
+cleanup with absence checks. See [workflow evidence](WORKFLOW.md#local-real-provider-workflow-evidence)
+for the creation and separate cleanup records. This does not turn the earlier
+storage-only probe into deployed or independently inspected evidence.
 
 ### Package live verification
 

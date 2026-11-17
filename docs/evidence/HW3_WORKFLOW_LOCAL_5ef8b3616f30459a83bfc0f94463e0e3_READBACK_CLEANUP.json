@@ -1,0 +1,19 @@
+{
+  "source_evidence": "HW3_WORKFLOW_LOCAL_5ef8b3616f30459a83bfc0f94463e0e3.json",
+  "started_at": "2026-11-17T02:54:19.412129+00:00",
+  "readback": {
+    "issue": "passed",
+    "event": "passed",
+    "summary": "passed"
+  },
+  "cleanup": {
+    "summary": "confirmed absent",
+    "event": "confirmed absent",
+    "issue": "confirmed absent"
+  },
+  "independent_inspection": "not performed",
+  "result": "passed",
+  "summary_path": "/ospsd-team5-hw3/scheduled-issue-6afbc18c764edd02e5588e2b-ig4e63tio1j5cahjh3qa4mando.md",
+  "summary_sha256": "b47365eda61360dca35cd858308635815be43c3d0ade7846d4aec187caf952af",
+  "finished_at": "2026-11-17T02:54:24.095268+00:00"
+}
