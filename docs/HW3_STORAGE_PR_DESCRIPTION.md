@@ -38,7 +38,9 @@ Dropbox account. The alternative Team 1 package swap remains unverified.
 
 ## How I tested this
 
-- [x] Existing tests pass locally: **948 passed, 58 opt-in tests skipped**.
+- [x] Current suite after HTTP cleanup: **892 passed, 58 opt-in tests skipped**.
+  Removed 70 obsolete HTTP-only cases and added 14 provider-independent path cases;
+  package/workflow/probe regression coverage remains.
 - [x] Added/updated package construction, workflow failure and probe tests.
 - [x] Manually verified real providers using the local FastAPI route.
 
@@ -53,8 +55,8 @@ Cleanup: summary, event and issue confirmed absent
 ```
 
 The existing Starlette TestClient deprecation warning remains. The package-probe
-script also passed its explicit-package-bases mypy check before upstream
-integration. Local checks/evidence are not deployed verification or remote CI.
+script also passed its explicit-package-bases mypy check after cleanup.
+Local checks/evidence are not deployed verification or remote CI.
 No independent human provider inspection or live fault injection is claimed.
 
 ## Screenshots / output (if applicable)
@@ -82,8 +84,8 @@ conservative uncertainty/readback handling, known paths and scratch cleanup.
 
 Remaining work / next owner:
 
-- Kristie: remove unused HTTP storage code in a separate cleanup commit;
-  retain historical evidence and move the shared path helper first.
+- HTTP storage cleanup is implemented locally: shared path validation moved to
+  `storage_paths.py`; legacy adapter/settings/tests removed; historical evidence retained.
 - Kristie / Team 1: obtain a compatible supported package, implement provider
   selection and demonstrate the configuration-only swap.
 - Kristie / authorized Team 5 teammate: independent contents/cleanup inspection.

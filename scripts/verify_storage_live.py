@@ -126,7 +126,7 @@ def main() -> None:
         "source_sha256": {
             name: hashlib.sha256((repo / name).read_bytes()).hexdigest()
             for name in (
-                "app/storage_client.py",
+                "app/storage_paths.py",
                 "app/storage_package.py",
                 "app/summary_storage.py",
                 "scripts/verify_storage_live.py",

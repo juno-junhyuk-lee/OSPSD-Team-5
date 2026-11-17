@@ -203,7 +203,7 @@ def test_cli_records_provenance_and_exit_status(tmp_path: Path, outcome: str) ->
     evidence = json.loads(output.read_text(encoding="utf-8"))
     assert evidence["result"] == outcome
     assert "app/storage_package.py" in evidence["source_sha256"]
-    assert "app/storage_http.py" not in evidence["source_sha256"]
+    assert "app/storage_paths.py" in evidence["source_sha256"]
     assert (
         evidence["packages"]["dropbox-client-impl"]["direct_url"]["vcs_info"][
             "commit_id"

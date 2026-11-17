@@ -37,7 +37,7 @@ on `f7c59d1` cannot establish checks for the unpushed package implementation.
 | All failures must report the failed step | Semantic workflow validation returns a WorkflowError, but structural request errors still use the generic 400/422 handler; issue dependency configuration still returns generic 503 | Open Niriti follow-up; do not claim #55 fixes all error envelopes |
 | Live workflow verification | Real local FastAPI request returned 201; fresh issue read, Calendar read, summary byte comparison and all cleanup absence checks passed | Local real-provider evidence complete; deployed execution is separate |
 | Team 1 configuration-only swap | Inspected Team 1 package has namespace/metadata/interface gaps; supported solution still awaited | Open Kristie/Team 1 dependency; no implemented storage selector or verified package swap yet |
-| HTTP leftovers in repository | Runtime workflow does not use HTTP storage, but path helper and legacy tests still reference HTTP modules | Separate cleanup commit; retain historical evidence |
+| HTTP leftovers in repository | Follow-up cleanup moves path validation to `storage_paths.py` and removes legacy adapter/settings/tests | Implemented locally in separate cleanup scope; historical evidence retained |
 | Independent review/provider inspection | No independent human inspection was performed in the recorded runs | Open; do not count programmatic readback as teammate approval |
 
 No new code fix is bundled into this documentation scope. Any additional error
@@ -84,3 +84,10 @@ The integrated code passed frozen sync, Ruff lint/format, strict mypy and
 workflow ran at `e2616dd`; evidence was committed at `904691d`. This documentation
 review ran no new provider operation and does not claim fresh CI/test results.
 The generated PR-description draft is [here](HW3_STORAGE_PR_DESCRIPTION.md).
+
+Follow-up HTTP cleanup validation: **892 passed, 58 skipped**; 70 obsolete
+HTTP-only cases removed and 14 path-safety cases added. Ruff lint/format, strict
+mypy and the probe-specific mypy check passed, with the existing TestClient
+warning. All execution/test imports of retired modules were removed. Evidence
+JSON files were not modified and no live verification was repeated. New probe
+records hash `storage_paths.py`; earlier records retain their historical filenames.

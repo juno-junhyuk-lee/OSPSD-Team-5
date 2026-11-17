@@ -18,7 +18,7 @@ from cloud_storage_api import (
 )
 from pydantic import BaseModel
 
-from app.storage_client import storage_path
+from app.storage_paths import storage_path
 
 
 class StoredSummary(BaseModel):

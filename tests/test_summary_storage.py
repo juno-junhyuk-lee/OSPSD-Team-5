@@ -6,13 +6,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-import httpx
 import pytest
+from cloud_storage_api import DocumentStorage
 from fastapi.testclient import TestClient
 
 from app.calendar_service_dependencies import get_calendar_service
 from app.main import app
-from app.storage_client import HttpDocumentStorage
 from app.summary_storage import DocumentSummaryStore, SummaryStorageError
 from app.workflow import WorkflowErrorResponse
 from app.workflow_dependencies import get_workflow_issue_provider
@@ -80,10 +79,6 @@ def test_workflow_uses_storage_and_preserves_failure_certainty(mode: str) -> Non
         with (
             patch("dropbox.Dropbox") as sdk,
             patch("dropbox_client_impl.DropboxClient", return_value=provider),
-            patch(
-                "app.storage_http.StorageHttpTransport.request",
-                side_effect=AssertionError("Unexpected HTTP storage"),
-            ),
         ):
             response = caller.post(
                 "/workflows/scheduled-issues", json={**PAYLOAD, "title": "일정 확인"}
@@ -199,15 +194,12 @@ def test_package_configuration_failure_is_public_503_before_writes(
     "name", ["", ".", "..", "../escape.md", "a/b.md", "a\\b.md", "bad\nname"]
 )
 def test_bad_summary_filename_cannot_escape_root(name: str) -> None:
-    def unexpected(request: httpx.Request) -> httpx.Response:
-        raise AssertionError("unexpected HTTP")
-
-    with httpx.Client(
-        base_url="https://storage.example/", transport=httpx.MockTransport(unexpected)
-    ) as client:
-        store = DocumentSummaryStore(HttpDocumentStorage(client), "/team5")
-        with pytest.raises(SummaryStorageError) as caught:
-            store.save_summary(name, "text")
+    storage = Mock(spec=DocumentStorage)
+    store = DocumentSummaryStore(storage, "/team5")
+    with pytest.raises(SummaryStorageError) as caught:
+        store.save_summary(name, "text")
+    storage.create.assert_not_called()
+    storage.download.assert_not_called()
     assert not caught.value.may_have_applied
 
 

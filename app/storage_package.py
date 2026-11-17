@@ -19,7 +19,7 @@ from cloud_storage_api import (
     StorageError,
 )
 
-from app.storage_client import storage_path
+from app.storage_paths import storage_path
 from app.summary_storage import DocumentSummaryStore, SummaryStorageError
 
 

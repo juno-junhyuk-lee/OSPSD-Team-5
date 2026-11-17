@@ -16,8 +16,7 @@ Current package setup and probe commands:
 Package integration is now required following Hari's clarification reported by
 Kristie. The workflow now uses Team 3's imported package through the scoped
 factory described in the [package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md).
-Use its runtime configuration table; the HTTP setup sections below describe the
-previous adapter and probe, not the current workflow setup. HTTP evidence below
+Use the package authorization guide for runtime configuration. HTTP evidence below
 is historical and does not establish package integration. John approved Team 3
 commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. Kristie
 reports successful OAuth with the intended Team 5 account. The package storage
@@ -98,12 +97,12 @@ The official `cloud-storage-api` dependency comes from
 [contract tag 0.3.1](https://github.com/Dayana20/ospsd26-cloud-storage/tree/0.3.1),
 commit `664afc92f7cc0b2ee51cde6ddfa088cc3b37206c`, subdirectory
 `src/cloud_storage_api`. Its internal package version is `0.2.0`.
-The adapter implements all eight abstract methods: create, replace, download,
+Team 3's imported implementation provides all eight abstract methods: create, replace, download,
 metadata, list, move, delete and provider health. Reads return shared FileInfo
 or bytes; provider SDK types and error messages do not cross our boundary.
 
 Member 1 owns the summary template, filename, orchestration, compensation and
-deployment. Kristie (Member 4) owns transport, settings, storage validation and evidence.
+deployment. Kristie (Member 4) owns package construction, settings, storage validation and evidence.
 The existing internal handoff is `(name, markdown)`, not `(path, bytes)`; the
 bridge supplies the root and encoding without changing the public response.
 `summary.id` is an opaque provider ID, or the path when the contract returns
@@ -112,106 +111,51 @@ the configured root with `summary_name(issue, event)` from `app/workflow.py`.
 
 ## Configuration and use
 
-| Variable | Meaning |
-| --- | --- |
-| `STORAGE_BASE_URL` | Required API base URL. HTTPS, or HTTP on loopback for local testing/tunnels |
-| `STORAGE_ROOT_PATH` | Required isolated folder such as `/ospsd-team5-hw3`; root `/` and traversal are refused |
-| `STORAGE_TIMEOUT_SECONDS` | Default 30; finite, greater than zero and at most 120 |
-| `STORAGE_BEARER_TOKEN` | Optional caller token, supplied outside Git; not needed by Team 3's documented public test service |
+Use [Team 5 Dropbox authorization](HW3_STORAGE_AUTH.md) for package environment
+variables, OAuth and the opt-in probe. Normal installation is `uv sync --frozen`.
+`STORAGE_ROOT_PATH` supplies the isolated app-folder destination; Dropbox
+credentials belong to Team 5, not a remote storage service. The workflow owns
+the SDK lifetime and disables automatic SDK retries. There is no endpoint URL,
+HTTP storage fallback or `STORAGE_BEARER_TOKEN` configuration.
 
-Credentials are never part of URLs or evidence. Provider Dropbox credentials
-stay on the storage team's service. Our HTTP client closes after success or
-failure, does not retry, does not follow redirects and ignores environment proxy
-settings. Team 3's public test service must contain synthetic, non-sensitive data.
+The probe requires `--execute` and a new evidence output path. It checks initial
+absence, creates one UUID file, verifies exact UTF-8 bytes and conflict behavior,
+then cleans only that scratch file and confirms absence. It leaves the folder
+intact. This scratch cleanup policy differs from production recovery.
 
-```powershell
-uv sync --frozen
-$env:STORAGE_BASE_URL = 'https://cloud-storage-service-test-gyesjhieva-uc.a.run.app'
-$env:STORAGE_ROOT_PATH = '/ospsd-team5-hw3'
-uv run python -m scripts.verify_storage_live --execute --output storage-run.json
-```
-
-The explicit `--execute` flag is required: the probe creates/deletes one UUID-named
-file. It checks the path is absent first, never deletes an occupied/conflicting
-path, reconciles uncertain uploads through cleanup, and records cleanup failures.
-It leaves the configured folder intact. Use a fresh output filename to preserve
-older records. The output includes source hashes, API outcomes and file metadata.
-
-To run the composed endpoint locally, also configure the issue service and Google
-credentials following [the workflow](WORKFLOW.md) and existing Calendar setup,
-then run `uv run uvicorn app.main:app`. A request to
-`POST /workflows/scheduled-issues` uses `title`, `start` and `end`. Hosted mode
-requires the existing caller authentication. Member 1 must add the integration
-settings to the managed deployment configuration: exporting local variables does
-not configure Cloud Run, and the current Terraform service does not wire storage
-settings. This storage branch does not deploy or modify infrastructure.
+The local endpoint also requires Trello and Google configuration:
+[workflow setup and evidence](WORKFLOW.md). Hosted bearer authentication and
+Secret Manager/deployment configuration remain the deployment owners' work.
+Local environment variables do not configure Cloud Run.
 
 ## Decisions and failure behavior
 
-See the [failure certainty and cleanup plan](HW3_STORAGE_FAILURE_POLICY.md) for
-current behavior, Ka Pui's pre-send failure feedback, and HTTP/package regression
-criteria. It is a follow-up plan; the connection-failure implementation is unchanged.
+The [failure policy](HW3_STORAGE_FAILURE_POLICY.md) records the implemented
+package rules and historical HTTP proposals. Known pre-send creation failures
+or definite shared rejections compensate event then issue; unknown outcomes
+preserve both and the possible summary. A successful upload followed by failed
+readback stays uncertain. No writes are automatically retried.
 
-| Decision | Constraint, alternative and accepted tradeoff |
-| --- | --- |
-| Depend on shared contracts and HTTP | Allows endpoint-only swaps; importing a team's SDK would tie the workflow to its provider. Revisit when the shared protocol changes, reporting mismatches to its owners. |
-| Read back every summary | Adds one read and latency, but verifies contents before success. Metadata-only success would be cheaper and weaker. Revisit for larger documents. |
-| Treat provider failures as uncertain writes | Timeouts/5xx/invalid write responses may follow a completed upload. Automatic retries could duplicate work. Revisit only with agreed idempotency and certainty guarantees. |
+Configuration failures return 503 before workflow writes. Operation failures
+return 502. Known summary destinations are reported in optional leftover
+`path`, separately from provider `id`; paths do not prove existence. Messages
+and logs do not expose credentials or raw provider errors.
 
-Bad connection/root settings return 503 with `step=summary` and `leftovers=[]`
-before any issue/event write. Definite storage rejections, such as conflict,
-become the existing 502 summary failure and trigger event-then-issue compensation.
-The existing file is never overwritten or deleted. A lost response, malformed
-upload metadata, failed download or mismatched bytes produces a non-retryable
-502 with possible summary state; the workflow keeps its issue and event.
-Reconcile the known destination before retrying. An uncertain summary leftover
-now includes `path` when known, while keeping `id=null` when no provider ID is
-reported. The path comes from the locally constructed root and filename, not
-remote error messages. If the store does not supply a path, the field is omitted.
-No URL or credential is added. Readback errors and mismatched contents also carry
-the destination. This additive field leaves success responses, retry advice and
-compensation behavior unchanged and can be supplied by HTTP or package stores.
-
-Controlled endpoint tests cover these paths. The real probe covers only the
-successful storage path and conflict; it is not the required controlled failure
-demonstration through the deployed composed API. Member 1's separately reviewed
-validation/issue-configuration schema fixes remain outside this storage change.
+The obsolete HTTP adapter/transport/settings and their dedicated tests are now
+removed. `app/storage_paths.py` owns provider-independent path validation;
+package/summary modules and the probe no longer depend on an HTTP adapter.
+Historical evidence is unchanged and retains its original source filenames and
+hashes. Test counts recorded for earlier commits remain historical results.
 
 ## Real implementation swap
 
-Team 3's [HW2 service documentation](https://github.com/Shreyas191/OSPSD-Team-3/blob/3411cdf8d5723a6ebda3e6799ab3e1384819767f/README.md)
-publishes the test endpoint above. Its current submission implementation is on
-`hw2`, not `main`; the exact running revision still needs owner confirmation.
+A Team 1 package swap is still pending. The inspected Team 1 source has generic
+`app` namespace, packaging metadata and shared-interface mismatches; see
+[package research](HW3_STORAGE_PACKAGE_RESEARCH.md). Obtain a supported compatible
+package and construction API, implement provider selection, then verify the
+same workflow under both configurations. A URL change is not the package swap,
+and no completed selector or Team 1 live run is claimed.
 
-Team 1's [deployment guide](https://github.com/Dayana20/sandbox/blob/6567b262559df46c85371182573cc1242b17c031/docs/DEPLOYMENT.md)
-exposes port 8000 only on the OCI VM's loopback. Its README lists localhost
-examples, not an external API URL. The `hw2-milestone3` code has the shared route
-shapes, but its docs reference contract 0.2.0; live compatibility is unverified.
-
-1. Obtain Team 1's reachable HTTPS endpoint or supported tunnel, running revision,
-   any caller authentication, approved scratch folder and direct-provider contact.
-2. Record the application commit. Change only storage URL, required credentials
-   and folder configuration, then restart/redeploy. Do not change workflow or
-   adapter code. Existing files remain in the old service; no migration occurs.
-3. Run the same probe with a fresh evidence output. Then run a fresh complete
-   scenario through the deployed composed endpoint for each configuration.
-4. Compare stored bytes with the returned Markdown; confirm issue/event/file
-   records independently in all providers and record cleanup with their owners.
-5. Attach both configurations' evidence, matching application commit and review
-   responses to the final submission. Report mismatches rather than adding
-   silent provider-specific branches or claiming a successful swap.
-
-Suggested request to Team 1 (draft, not sent):
-
-> Hi Team 1, I'm Kristie (Member 4) from Team 5. For HW3's configuration-only storage swap,
-> could you share your reachable endpoint or supported tunnel, running revision,
-> caller authentication requirements and a scratch folder? We found the shared
-> routes on hw2-milestone3, but the deployment guide lists VM-local port 8000.
-> We'd also like a contact for direct Dropbox verification and cleanup.
-
-Suggested request to Team 3 (draft, not sent):
-
-> Hi Team 3, our summary probe passed against your test endpoint, including exact
-> byte comparison, conflict and cleanup. Could we confirm the running revision
-> and coordinate a /ospsd-team5-hw3 scratch location plus direct Dropbox inspection
-> during our full workflow run? Please arrange access securely, without tokens in chat.
+Independent teammate inspection, deployed workflow/failure verification and
+design/code review completion remain tracked in the
+[review handoff](HW3_STORAGE_REVIEW_HANDOFF.md).
