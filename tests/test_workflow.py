@@ -576,7 +576,7 @@ def test_unconfigured_storage_fails_before_any_write(
     calendar: FakeCalendar,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("STORAGE_BASE_URL", raising=False)
+    monkeypatch.delenv("DROPBOX_APP_KEY", raising=False)
 
     def controlled_issues() -> IssueProvider:
         return issues

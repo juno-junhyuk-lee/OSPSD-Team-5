@@ -8,8 +8,10 @@ verification; the student owner remains responsible for understanding the work.
 ## Status and evidence
 
 Package integration is now required following Hari's clarification reported by
-Kristie. The code on this branch still uses HTTP; migration is planned in the
-[package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md). HTTP evidence below
+Kristie. The workflow now uses Team 3's imported package through the scoped
+factory described in the [package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md).
+Use its runtime configuration table; the HTTP setup sections below describe the
+previous adapter and probe, not the current workflow setup. HTTP evidence below
 is historical and does not establish package integration. John approved Team 3
 commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. OAuth login,
 package CRUD and composed-workflow verification remain pending.

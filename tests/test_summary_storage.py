@@ -1,8 +1,9 @@
 """Controlled checks for summary storage through the normal workflow dependency."""
 
-from email import policy
-from email.parser import BytesParser
-from unittest.mock import patch
+import os
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import httpx
 import pytest
@@ -19,10 +20,14 @@ from tests.test_workflow import PAYLOAD, FakeCalendar, FakeIssues
 
 @pytest.fixture(autouse=True)
 def storage_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STORAGE_BASE_URL", "https://storage.example/")
+    for key in tuple(os.environ):
+        if key.startswith("DROPBOX_") or key.startswith("STORAGE_"):
+            monkeypatch.delenv(key)
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
     monkeypatch.setenv("STORAGE_ROOT_PATH", "/team5")
-    monkeypatch.delenv("STORAGE_BEARER_TOKEN", raising=False)
-    monkeypatch.delenv("STORAGE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.setenv("DROPBOX_APP_KEY", "test-key")
+    monkeypatch.setenv("DROPBOX_APP_SECRET", "test-secret")
+    monkeypatch.setenv("DROPBOX_REFRESH_TOKEN", "test-refresh")
 
 
 @pytest.mark.parametrize(
@@ -32,63 +37,60 @@ def test_workflow_uses_storage_and_preserves_failure_certainty(mode: str) -> Non
     uploaded: dict[str, bytes] = {}
     calls: list[str] = []
 
-    def respond(request: httpx.Request) -> httpx.Response:
-        calls.append(request.method)
-        if request.method == "POST":
-            if mode == "conflict":
-                return httpx.Response(
-                    409, json={"error": {"code": "conflict", "message": "SECRET"}}
-                )
-            if mode == "timeout":
-                raise httpx.ReadTimeout("SECRET", request=request)
-            message = BytesParser(policy=policy.default).parsebytes(
-                b"Content-Type: "
-                + request.headers["content-type"].encode()
-                + b"\r\n\r\n"
-                + request.content
-            )
-            for part in message.iter_parts():
-                key = part.get_param("name", header="content-disposition")
-                value = part.get_payload(decode=True)
-                assert isinstance(key, str) and isinstance(value, bytes)
-                uploaded[key] = value
-            path = uploaded["path"].decode()
-            return httpx.Response(
-                201,
-                json={
-                    "id": None if mode == "no_id" else "stored-id",
-                    "name": path.rsplit("/", 1)[1],
-                    "path": path,
-                    "size": len(uploaded["file"]),
-                    "modified_at": None,
-                    "etag": None,
-                },
-            )
-        assert request.url.path == "/files/download"
-        assert request.url.params["path"] == uploaded["path"].decode()
-        if mode == "read_failure":
-            return httpx.Response(404, json={"error": {"code": "not_found"}})
-        return httpx.Response(
-            200, content=b"wrong bytes" if mode == "mismatch" else uploaded["file"]
+    def upload(local_path: str, path: str, *, overwrite: bool) -> SimpleNamespace:
+        calls.append("create")
+        assert overwrite is False
+        if mode == "conflict":
+            raise FileExistsError("SECRET")
+        if mode == "timeout":
+            raise ConnectionError("SECRET")
+        uploaded["path"] = path.encode()
+        uploaded["file"] = Path(local_path).read_bytes()
+        return SimpleNamespace(
+            id=None if mode == "no_id" else "stored-id",
+            name=path.rsplit("/", 1)[1],
+            path=path,
+            size=len(uploaded["file"]),
+            modified=None,
+            etag=None,
         )
+
+    def download(path: str, local_path: str) -> None:
+        calls.append("download")
+        assert path == uploaded["path"].decode()
+        if mode == "read_failure":
+            raise FileNotFoundError("SECRET")
+        Path(local_path).write_bytes(
+            b"wrong bytes" if mode == "mismatch" else uploaded["file"]
+        )
+
+    provider = Mock()
+    provider.upload_file.side_effect = upload
+    provider.download_file.side_effect = download
 
     issues, calendar = FakeIssues(), FakeCalendar()
     previous = app.dependency_overrides.copy()
     app.dependency_overrides[get_workflow_issue_provider] = lambda: issues
     app.dependency_overrides[get_calendar_service] = lambda: calendar
-    remote = httpx.Client(
-        base_url="https://storage.example/", transport=httpx.MockTransport(respond)
-    )
     caller = TestClient(app)
     try:
-        with patch("app.storage_settings.httpx.Client", return_value=remote):
+        # Keep the real package wrapper and normal FastAPI storage dependency.
+        # Only its lower-level provider client and SDK are controlled.
+        with (
+            patch("dropbox.Dropbox") as sdk,
+            patch("dropbox_client_impl.DropboxClient", return_value=provider),
+            patch(
+                "app.storage_http.StorageHttpTransport.request",
+                side_effect=AssertionError("Unexpected HTTP storage"),
+            ),
+        ):
             response = caller.post(
                 "/workflows/scheduled-issues", json={**PAYLOAD, "title": "일정 확인"}
             )
+            sdk.return_value.close.assert_called_once_with()
     finally:
         app.dependency_overrides = previous
         caller.close()
-    assert remote.is_closed
     assert "SECRET" not in response.text
     if mode in {"success", "no_id"}:
         assert response.status_code == 201
@@ -98,17 +100,17 @@ def test_workflow_uses_storage_and_preserves_failure_certainty(mode: str) -> Non
         assert summary["id"] == (
             uploaded["path"].decode() if mode == "no_id" else "stored-id"
         )
-        assert calls == ["POST", "GET"]
+        assert calls == ["create", "download"]
     else:
         assert response.status_code == 502
         error = WorkflowErrorResponse.model_validate(response.json()).error
         assert error.step == "summary" and not error.retryable
-        assert calls.count("POST") == 1
+        assert calls.count("create") == 1
         if mode == "conflict":
             assert error.leftovers == []
             assert issues.calls[-1] == ("delete", "issue-1")
             assert calendar.calls[-1] == ("delete", "event-1")
-            assert calls == ["POST"]
+            assert calls == ["create"]
         else:
             assert [item.kind for item in error.leftovers] == [
                 "issue",
@@ -151,6 +153,44 @@ def test_bad_root_fails_before_any_write(
     error = WorkflowErrorResponse.model_validate(response.json()).error
     assert error.step == "summary" and error.leftovers == []
     assert not error.retryable
+    assert issues.calls == calendar.calls == []
+
+
+@pytest.mark.parametrize(
+    "failure", ["missing_key", "missing_token", "dotenv", "constructor"]
+)
+def test_package_configuration_failure_is_public_503_before_writes(
+    failure: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if failure == "missing_key":
+        monkeypatch.delenv("DROPBOX_APP_KEY")
+    elif failure == "missing_token":
+        monkeypatch.delenv("DROPBOX_REFRESH_TOKEN")
+    elif failure == "dotenv":
+        monkeypatch.delenv("PYTHON_DOTENV_DISABLED")
+    issues, calendar = FakeIssues(), FakeCalendar()
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_workflow_issue_provider] = lambda: issues
+    app.dependency_overrides[get_calendar_service] = lambda: calendar
+    try:
+        with patch(
+            "dropbox.Dropbox", side_effect=ValueError("SECRET credentials")
+        ) as sdk:
+            with TestClient(app) as caller:
+                response = caller.post("/workflows/scheduled-issues", json=PAYLOAD)
+            assert sdk.call_count == (1 if failure == "constructor" else 0)
+    finally:
+        app.dependency_overrides = previous
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": {
+            "code": "provider_unavailable",
+            "message": "The summary storage is not configured or unavailable.",
+            "retryable": False,
+            "step": "summary",
+            "leftovers": [],
+        }
+    }
     assert issues.calls == calendar.calls == []
 
 

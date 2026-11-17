@@ -11,11 +11,15 @@ live end-to-end evidence is claimed yet.
 | --- | --- | --- |
 | Issue tracker (`IssueProvider`) | Member 3 | Wired via `get_issue_provider` (PR #52); live verification pending |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Kristie (Member 4) | HTTP currently wired; mandatory package transition planned; package CRUD and swap pending |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | Team 3 package wired; controlled workflow tests passed; live package CRUD and swap pending |
 
 See the [storage package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md) for
 the active decision and proposed file ownership with Niriti and Ka Pui. This
-documentation update does not change workflow wiring or claim their agreement.
+plan does not claim their agreement. Task 4 now wires `get_summary_store` to the
+scoped package factory and maps local initialization failures to a sanitized
+503 with `step=summary` and empty leftovers before issue/event writes. Runtime
+package configuration is documented in that plan; `STORAGE_BASE_URL` is no
+longer used by this workflow.
 
 ## Endpoint
 

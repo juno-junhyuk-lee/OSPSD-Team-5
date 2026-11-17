@@ -2,8 +2,8 @@
 
 Owner: Kristie (Member 4). November 16, 2026. Baseline: `f7c59d1`.
 Codex assisted with inspection and this plan. This commit scope is documentation
-only. Subsequent dependency progress is recorded below; runtime wiring and live
-verification remain pending.
+only. Subsequent dependency and wiring progress is recorded below; live
+verification remains pending.
 
 ## Dependency installation progress
 
@@ -48,8 +48,8 @@ was enabled. `git diff --check` also passed.
 
 `app/storage_package.py` now supplies `package_summary_store()`, a scoped factory
 for `DocumentSummaryStore` backed by the imported Team 3 implementation. It is
-not yet wired to `get_summary_store`; the existing workflow remains on HTTP until
-task 4. Once wired, dependency construction must finish before the first write.
+wired to `get_summary_store` by task 4. Dependency construction finishes before
+the first workflow write.
 
 Required runtime configuration:
 
@@ -80,7 +80,7 @@ They contain no raw provider error text, token value or local file path. Errors
 from operations after the store is yielded are not reclassified as configuration
 failures. Token revocation, expiry and granted scopes cannot be established
 without provider contact; they are not validated by this offline constructor.
-Task 4 must map configuration errors into the workflow's existing public error
+Task 4 maps configuration errors into the workflow's existing public error
 shape before issue/event writes. Operation certainty refinement remains task 5.
 
 Offline tests cover invalid settings and token files, precedence, secret-safe
@@ -90,6 +90,29 @@ of operation errors. No real credentials or provider operations were used.
 Task 3 validation: 21 new offline tests passed; the full suite reported
 **924 passed, 58 skipped**, with the existing Starlette TestClient warning.
 Ruff lint/format, strict mypy (75 source files) and `git diff --check` passed.
+
+### Task 4: workflow package wiring
+
+`get_summary_store` now enters `package_summary_store()` before yielding the
+workflow dependency. Initialization errors map to the existing sanitized
+503 response (`step=summary`, `leftovers=[]`, `retryable=false`); operation errors
+after entry are not caught by that mapping. The SDK lifetime covers the request.
+
+Controlled HTTP workflow tests use the actual imported Team 3 wrapper and a fake
+lower-level provider client. They check UTF-8 upload/readback, opaque ID and path
+fallback, conflict compensation, uncertain failure/readback preservation, known
+summary paths and SDK closure. HTTP storage transport calls are forbidden by
+the test. Missing settings and a failing SDK constructor return 503 before any
+issue/event write. These are offline checks, not real Dropbox evidence.
+
+HTTP modules remain temporarily: `storage_path` is imported by the summary and
+configuration boundaries, and the old opt-in live probe/tests still use the
+HTTP adapter. Audit/extract path validation and convert the probe before removing
+those modules in a separate cleanup scope. No HTTP fallback exists in the
+current workflow. Package failure-certainty refinements remain task 5.
+Task 4 validation: 77 focused tests passed; full suite **928 passed, 58 skipped**,
+with the existing Starlette TestClient warning. Ruff lint/format, strict mypy
+and `git diff --check` passed.
 
 - Hari's help-channel clarification, supplied by Kristie: adding the other
   team's package as a dependency is a hard requirement. The planned implementation

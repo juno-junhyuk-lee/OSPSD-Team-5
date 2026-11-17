@@ -4,12 +4,11 @@ Each dependency fails with a public ServiceError before any write when its
 integration is not configured, so the workflow never starts half-wired.
 """
 
-import os
 from collections.abc import Generator
+from contextlib import ExitStack
 from typing import Annotated
 
 from calendar_contract import CalendarService
-from cloud_storage_api import InvalidRequestError
 from fastapi import Depends
 from issue_tracker_contract import IssueProvider
 from issue_tracker_contract import ServiceError as IssueServiceError
@@ -17,13 +16,8 @@ from issue_tracker_contract import ServiceError as IssueServiceError
 from app.calendar_service_dependencies import get_calendar_service
 from app.errors import ErrorCode, ServiceError
 from app.issue_tracker_dependencies import get_issue_provider
-from app.storage_client import HttpDocumentStorage, storage_path
-from app.storage_settings import (
-    StorageConfigurationError,
-    StorageSettings,
-    storage_http_client,
-)
-from app.summary_storage import DocumentSummaryStore, SummaryStore
+from app.storage_package import package_summary_store
+from app.summary_storage import SummaryStorageError, SummaryStore
 from app.workflow import OPERATION, ScheduledIssueWorkflow, WorkflowError
 
 
@@ -51,25 +45,21 @@ def get_workflow_issue_provider() -> Generator[IssueProvider, None, None]:
 
 
 def get_summary_store() -> Generator[SummaryStore, None, None]:
-    """Validate settings before writes; close storage's client after the workflow.
-
-    STORAGE_ROOT_PATH is a required isolated destination folder. The workflow
-    selects each filename; provider credentials remain on the remote service.
-    """
-    try:
-        settings = StorageSettings.from_environment()
-        root = storage_path(os.environ["STORAGE_ROOT_PATH"])
-    except StorageConfigurationError, KeyError, InvalidRequestError:
-        raise WorkflowError(
-            ErrorCode.PROVIDER_UNAVAILABLE,
-            "The summary storage is not configured or unavailable.",
-            step="summary",
-            leftovers=[],
-            retryable=False,
-            provider=False,
-        ) from None
-    with storage_http_client(settings) as client:
-        yield DocumentSummaryStore(HttpDocumentStorage(client), root)
+    """Construct package storage before writes and close its SDK after the request."""
+    with ExitStack() as stack:
+        try:
+            store = stack.enter_context(package_summary_store())
+        except SummaryStorageError:
+            raise WorkflowError(
+                ErrorCode.PROVIDER_UNAVAILABLE,
+                "The summary storage is not configured or unavailable.",
+                step="summary",
+                leftovers=[],
+                retryable=False,
+                provider=False,
+            ) from None
+        # Only construction failures are configuration errors, not operation errors.
+        yield store
 
 
 def get_scheduled_issue_workflow(
