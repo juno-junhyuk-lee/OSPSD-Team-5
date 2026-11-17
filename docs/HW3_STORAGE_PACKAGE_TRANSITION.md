@@ -2,7 +2,45 @@
 
 Owner: Kristie (Member 4). November 16, 2026. Baseline: `f7c59d1`.
 Codex assisted with inspection and this plan. This commit scope is documentation
-only; implementation and verification items below remain pending.
+only. Subsequent dependency progress is recorded below; runtime wiring and live
+verification remain pending.
+
+## Dependency installation progress
+
+Task 2 adds `dropbox-client-impl` and `cloud-storage-client-api` as direct project
+requirements. Both root `[tool.uv.sources]` entries pin full commit
+`fde60d4fb648df6defb918ff815fe940c525adc7` at their respective subdirectories.
+The existing shared-contract tag `0.3.1` / commit `664afc9` is unchanged.
+
+Unlike the earlier standalone pip experiment, normal project resolution succeeds
+using these root source declarations. Operators do not need `--no-sources`,
+manual pip installation or a change to CI's existing frozen-sync command:
+
+```powershell
+uv sync --frozen
+```
+
+The lockfile adds seven packages without changing existing package versions:
+the two Team 3 distributions (`0.1.0`), Dropbox SDK `12.2.5`, python-dotenv `1.2.4`,
+stone `3.5.5`, Jinja2 `3.1.6` and MarkupSafe `3.0.4`.
+
+Frozen installation succeeded in both the current application environment and
+a new external environment using Python 3.14.8 and the complete application
+lockfile. In both environments an offline probe imported Team 5's summary module
+and Team 3's implementation together, checked official `DocumentStorage` identity
+with an injected placeholder, and confirmed missing credentials raise
+`DropboxAuthError`. Distribution provenance matched both full Git pins.
+The probe disabled dotenv loading, cleared Dropbox configuration, selected an
+absent scratch token file and blocked socket/DNS access. It did not read real
+credentials or perform provider operations. This is dependency/import evidence,
+not method conformance, actual package workflow wiring or live Dropbox evidence.
+
+Validation after the dependency update: Ruff lint passed, 115 files passed the
+format check, strict mypy passed for 73 source files, and the full suite passed
+with **903 passed, 58 opt-in tests skipped**. The existing Starlette TestClient
+deprecation warning remains. The initial sandboxed pytest run stalled and was
+interrupted; a normal-environment rerun completed in 10.20 seconds. No live test
+was enabled. `git diff --check` also passed.
 
 ## Decision and confirmed inputs
 

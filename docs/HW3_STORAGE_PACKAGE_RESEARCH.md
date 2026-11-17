@@ -45,6 +45,12 @@ uv source/workspace configuration is not a portable consumer recipe here.
 `--no-sources` plus all three direct requirements resolved and built successfully;
 it is not a proposal to change this application's dependency policy globally.
 
+Follow-up: task 2 successfully uses root project `[tool.uv.sources]` entries for
+both Team 3 packages, so the application's normal `uv sync --frozen` works
+without `--no-sources`. The command above remains the historical isolated pip
+experiment, not the application setup command. See
+[dependency installation progress](HW3_STORAGE_PACKAGE_TRANSITION.md#dependency-installation-progress).
+
 Installed provenance from distribution `direct_url.json`:
 
 - Both Team 3 distributions: full commit `fde60d4fb648df6defb918ff815fe940c525adc7`.

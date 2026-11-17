@@ -10,12 +10,14 @@ dependencies = [
     "ast-serialize==0.12.1",
     "calendar-contract",
     "cloud-storage-api",
+    "cloud-storage-client-api",
     "certifi==2026.7.22",
     "cffi==2.1.1",
     "charset-normalizer==3.5.2",
     "click==8.5.0",
     "colorama==0.4.6",
     "cryptography==50.0.2",
+    "dropbox-client-impl",
     "fastapi==0.142.2",
     "google-api-core==2.40.0",
     "google-api-python-client==2.201.0",
@@ -69,6 +71,8 @@ package = false
 
 [tool.uv.sources]
 cloud-storage-api = { git = "https://github.com/Dayana20/ospsd26-cloud-storage", tag = "0.3.1", subdirectory = "src/cloud_storage_api" }
+cloud-storage-client-api = { git = "https://github.com/Shreyas191/OSPSD-Team-3", rev = "fde60d4fb648df6defb918ff815fe940c525adc7", subdirectory = "src/cloud_storage_client_api" }
+dropbox-client-impl = { git = "https://github.com/Shreyas191/OSPSD-Team-3", rev = "fde60d4fb648df6defb918ff815fe940c525adc7", subdirectory = "src/dropbox_client_impl" }
 calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar", tag = "v0.1.0-rc.1" }
 issue-tracker-contract = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4", tag = "issue-tracker-contract-v1.0.0", subdirectory = "contract" }
 
