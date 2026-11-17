@@ -7,6 +7,9 @@ verification; the student owner remains responsible for understanding the work.
 
 ## Status and evidence
 
+See the [review/design handoff](HW3_STORAGE_REVIEW_HANDOFF.md) for the local versus
+remote PR snapshot, concern-by-concern status and proposed #56 updates.
+
 Current package setup and probe commands:
 [Team 5 Dropbox authorization](HW3_STORAGE_AUTH.md).
 

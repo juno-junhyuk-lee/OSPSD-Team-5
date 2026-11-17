@@ -274,16 +274,16 @@ definitely absent summary. See the [failure policy](HW3_STORAGE_FAILURE_POLICY.m
 
 ## Review and completion checklist
 
-- [ ] Real workflow summary operations call the imported Team 3 implementation.
-- [ ] Frozen install, lint/format, strict typing and relevant offline/full tests
+- [x] Real workflow summary operations call the imported Team 3 implementation.
+- [x] Frozen install, lint/format, strict typing and relevant offline/full tests
   pass for the integrated dependency set; record actual results.
-- [ ] Python 3.14 real package execution is checked, or incompatibility is
+- [x] Python 3.14 real package execution is checked, or incompatibility is
   resolved with the team before changing the repository Python requirement.
-- [ ] Known summary path behavior survives the transition.
-- [ ] Package configuration failure and operation uncertainty satisfy cleanup
+- [x] Known summary path behavior survives the transition.
+- [x] Package configuration failure and operation uncertainty satisfy cleanup
   rules; Ka Pui's failure-classification concern has explicit test evidence.
 - [ ] Latest #52/#53 changes and stacked-PR relationship are reconciled.
-- [ ] Team 5 account authorization, real package CRUD and full-workflow evidence
+- [x] Team 5 account authorization, real package CRUD and local full-workflow evidence
   are recorded separately from historical HTTP checks.
 - [ ] Team 1 supplies a compatible package; configuration-only swap is verified.
 - [ ] Ka Pui reviews the storage handoff and updates the cross-vertical design.
@@ -292,3 +292,8 @@ The listed review concerns come from prior team discussion. This plan is not a
 claim that every review comment is resolved; reconcile the latest review items
 again before marking #55 ready. Detailed installation findings and pinned source
 links remain in [package research](HW3_STORAGE_PACKAGE_RESEARCH.md).
+
+Completed boxes record local implementation/evidence, not reviewer approval or
+deployed verification. The remaining stacked-PR and design items are tracked in
+the [review handoff](HW3_STORAGE_REVIEW_HANDOFF.md), which also records the stale
+remote #55 head and #53 error-envelope gaps.
