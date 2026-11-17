@@ -44,6 +44,53 @@ was enabled. `git diff --check` also passed.
 
 ## Decision and confirmed inputs
 
+### Task 3: package construction boundary
+
+`app/storage_package.py` now supplies `package_summary_store()`, a scoped factory
+for `DocumentSummaryStore` backed by the imported Team 3 implementation. It is
+not yet wired to `get_summary_store`; the existing workflow remains on HTTP until
+task 4. Once wired, dependency construction must finish before the first write.
+
+Required runtime configuration:
+
+| Variable | Requirement |
+| --- | --- |
+| `PYTHON_DOTENV_DISABLED` | Exactly `1`, set before provider import; prevents Team 3's implicit dotenv loading |
+| `STORAGE_ROOT_PATH` | Valid isolated destination below the app root; `/` and traversal are rejected |
+| `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET` | Nonblank app credentials supplied by the operator |
+| `DROPBOX_REFRESH_TOKEN` | Nonblank refresh token, or use the token file below |
+| `DROPBOX_TOKEN_FILE` | Explicit absolute path to OAuth JSON containing a nonblank string `refresh_token`, when no environment refresh token is supplied |
+
+The environment refresh token takes precedence over the file. There is no
+working-directory token-file fallback and no short-lived `DROPBOX_ACCESS_TOKEN`
+fallback in this factory. OAuth login remains a separate operator command, not
+an API action. No redirect URI is needed for ordinary runtime construction.
+The provider CLI's default `.dropbox_token.json` filename is now gitignored as
+an additional guard; the recommended token location remains outside the repo.
+
+The factory constructs the official SDK with a 30-second timeout and both SDK
+error/rate-limit retry counts set to zero, then injects it into Team 3's
+`DropboxClient` and `DropboxDocumentStorage`. This keeps real storage operations
+inside Team 3's package while controlling credentials and SDK lifetime locally.
+The SDK is closed on context exit and if wrapper construction fails.
+
+Local settings/file/import/construction failures produce a fixed-message
+`SummaryStorageError(configured=False, may_have_applied=False, retryable=False)`.
+They contain no raw provider error text, token value or local file path. Errors
+from operations after the store is yielded are not reclassified as configuration
+failures. Token revocation, expiry and granted scopes cannot be established
+without provider contact; they are not validated by this offline constructor.
+Task 4 must map configuration errors into the workflow's existing public error
+shape before issue/event writes. Operation certainty refinement remains task 5.
+
+Offline tests cover invalid settings and token files, precedence, secret-safe
+settings representation, real SDK/package construction with network disabled,
+disabled retries, sanitized constructor failures, SDK cleanup and preservation
+of operation errors. No real credentials or provider operations were used.
+Task 3 validation: 21 new offline tests passed; the full suite reported
+**924 passed, 58 skipped**, with the existing Starlette TestClient warning.
+Ruff lint/format, strict mypy (75 source files) and `git diff --check` passed.
+
 - Hari's help-channel clarification, supplied by Kristie: adding the other
   team's package as a dependency is a hard requirement. The planned implementation
   imports and uses that package for summary operations; merely installing it

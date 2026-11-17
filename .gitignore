@@ -110,6 +110,7 @@ gha-creds-*.json
 client_secret*.json
 token.json
 tokens.json
+.dropbox_token.json
 .terraform/
 *.tfstate
 *.tfstate.*
