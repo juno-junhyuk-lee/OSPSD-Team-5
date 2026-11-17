@@ -2,7 +2,7 @@
 
 | Item | Value |
 | --- | --- |
-| Status | **Draft for team and outside-team review.** Endpoint in [PR #53](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/53), issue adapter in [PR #52](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/52) (merged), Calendar selection in [PR #54](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/54) and the `team5-calendar` package in [PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57) (both merged), storage adapter in [PR #55](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/55); deployment not started. Behavior below describes those PRs as of 2026-11-16. Per-vertical detail (arriving with #53 and #55) lives in [WORKFLOW.md](docs/WORKFLOW.md), [ISSUE_TRACKER_INTEGRATION.md](docs/ISSUE_TRACKER_INTEGRATION.md), [HW3_CALENDAR_HANDOFF.md](docs/HW3_CALENDAR_HANDOFF.md) and [HW3_STORAGE.md](docs/HW3_STORAGE.md); this document holds the combined design and links to them instead of repeating them. |
+| Status | **Draft for team and outside-team review.** Endpoint in [PR #53](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/53), issue adapter in [PR #52](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/52) (merged), Calendar selection in [PR #54](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/54) and the `team5-calendar` package in [PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57) (both merged), Team 3's storage package in [PR #55](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/55); deployment not started. Behavior below describes those PRs as of 2026-11-16 (#55 at `2314595`). Per-vertical detail (arriving with #53 and #55) lives in [WORKFLOW.md](docs/WORKFLOW.md), [ISSUE_TRACKER_INTEGRATION.md](docs/ISSUE_TRACKER_INTEGRATION.md), [HW3_CALENDAR_HANDOFF.md](docs/HW3_CALENDAR_HANDOFF.md) and [HW3_STORAGE.md](docs/HW3_STORAGE.md); this document holds the combined design and links to them instead of repeating them. |
 | Milestone | HW3 Milestone 1, "Compose the Services", due November 18, 2026, before class |
 | Owner | Member 5 (Ka Pui) coordinates; each section names the member who owns the code |
 | Previous design | HW2 shared Calendar adoption: [docs/HW2_DESIGN.md](docs/HW2_DESIGN.md) |
@@ -19,7 +19,7 @@ Not in scope for this milestone: a language model, an interface, more than one u
 
 **Which steps need judgment later.** Today the caller supplies the title and time slot. In Milestone 2 an agent can choose those (what to call the task, which free slot to book, what the summary says). Validation, write order, compensation and error reporting stay fixed code, because they protect provider state.
 
-**If another team's service is unavailable.** The operation fails before or at that step with a documented error, and nothing is faked or replaced silently. For a longer outage we switch to another team's implementation through configuration (the same mechanism as the planned storage swap) and tell the owning team.
+**If another team's service is unavailable.** The operation fails before or at that step with a documented error, and nothing is faked or replaced silently. For a longer outage we switch to another team's implementation through configuration (the same setting-based selection the issue tracker and Calendar use; storage has no selector yet) and tell the owning team.
 
 ## How the system fits together
 
@@ -30,12 +30,12 @@ flowchart LR
         api["Workflow endpoint<br/>validate, order steps, compensate,<br/>map errors (app/workflow.py)"]
         api --> ip["IssueProvider<br/>issue-tracker-contract 1.1.0<br/>Team 4's TrelloIssueProvider,<br/>imported package (PR #52)"]
         api --> cs["CalendarService<br/>calendar-contract v0.1.0<br/>our team5-calendar package (PR #57)"]
-        api --> ss["SummaryStore<br/>cloud-storage-api 0.3.1<br/>HttpDocumentStorage (PR #55)"]
+        api --> ss["SummaryStore<br/>cloud-storage-api 0.3.1<br/>Team 3's DropboxDocumentStorage,<br/>imported package (PR #55)"]
     end
     ip -- "Trello REST API" --> tr["Team 5 test Trello list"]
     cs -- "Google Calendar API" --> gc["Test account's<br/>primary calendar"]
-    ss -- "HTTPS POST /files" --> t3["Team 3 storage service<br/>(Dropbox behind it;<br/>swap target: Team 1)"]
-    sm[("Secret Manager<br/>Google OAuth token, API bearer token,<br/>Trello key and token")] -.-> run
+    ss -- "Dropbox API" --> db["Team 5 Dropbox account<br/>(folder STORAGE_ROOT_PATH)"]
+    sm[("Secret Manager<br/>Google OAuth token, API bearer token,<br/>planned: Trello key and token,<br/>Dropbox app key, secret, refresh token")] -.-> run
 ```
 
 All three verticals run inside one FastAPI application. Separate boxes are separate contract boundaries, not separate services.
@@ -44,10 +44,10 @@ All three verticals run inside one FastAPI application. Separate boxes are separ
 | --- | --- | --- | --- | --- |
 | Calendar | `calendar-contract` tag `v0.1.0` (`db73e62`) | our `team5-calendar` package (the HW2 Google adapters, packaged in PR #57 and released as `team5-calendar-v0.1.0`; Teams 1 and 4 import the same package) | `CALENDAR_IMPLEMENTATION=google` (PR #54) | Member 2 (Jim) |
 | Issue tracker | `issue-tracker-contract` tag `issue-tracker-contract-v1.1.0` (`18fb7ae`) | Team 4's `team-4-issue-tracker-trello` package, tag `team-4-issue-tracker-trello-v1.0.0` (`c88ce2f`), run in our process against our Trello list | `ISSUE_TRACKER_IMPLEMENTATION=team4_trello` (PR #52) | Member 3 (Juno) |
-| Cloud storage | `cloud-storage-api` tag `0.3.1` (`664afc9`) | Team 3's hosted service over HTTP; swap to Team 1 | `STORAGE_BASE_URL`, `STORAGE_ROOT_PATH` (PR #55) | Member 4 (Kristie) |
+| Cloud storage | `cloud-storage-api` tag `0.3.1` (`664afc9`; its package metadata says `0.2.0`) | Team 3's `dropbox-client-impl` and `cloud-storage-client-api` packages at commit `fde60d4` (no release tag yet), run in our process against Team 5's Dropbox account | nothing to select yet: `get_summary_store` always builds Team 3's package; settings `STORAGE_ROOT_PATH` and `DROPBOX_*` (PR #55) | Member 4 (Kristie) |
 | Composition | none (our endpoint) | `app/workflow.py` | not configurable | Member 1 (Niriti) |
 
-Credentials never enter the repository. Locally they come from git-ignored files and environment variables. In the deployment they come from Secret Manager through the HW2 Terraform configuration. The issue tracker needs our Trello key, token and list ID (`TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_LIST_ID`), kept locally in ignored `.env.trello`. Team 3's test storage service needs no caller token; `STORAGE_BEARER_TOKEN` exists for a service that does, and Dropbox credentials stay with Team 3.
+Credentials never enter the repository. Locally they come from git-ignored files and environment variables. In the deployment they come from Secret Manager through the HW2 Terraform configuration. The issue tracker needs our Trello key, token and list ID (`TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_LIST_ID`), kept locally in ignored `.env.trello`. Storage needs Team 5's Dropbox app key and secret (`DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`) and a refresh token (`DROPBOX_REFRESH_TOKEN`, or an absolute path in `DROPBOX_TOKEN_FILE`), plus `STORAGE_ROOT_PATH` and `PYTHON_DOTENV_DISABLED=1`, because Team 3's package otherwise loads a `.env` file when imported. The Trello and Dropbox secrets are not in Secret Manager or the deployment yet (open question 5).
 
 ### A request traced end to end
 
@@ -66,7 +66,7 @@ The `step` column is the value an error reports. IDs below are illustrative unti
 | `validate` | none; checks the title against both contracts (issue: 1 to 256 characters with a non-space; Calendar: not blank) and the times against the Calendar contract's start/end rules | nothing written |
 | `issue` | `IssueProvider.create_issue(title)` → Team 4's package → Trello (one attempt; timeout fixed by the package) | issue `T4-123` exists |
 | `event` | `CalendarService.create(CreateEvent(title, start, end))` → Google | event `abc123` exists |
-| `summary` | `render_summary(issue, event)` (pure function: Markdown from provider-confirmed values, titles escaped, IDs in code spans), then `SummaryStore.save_summary(name, markdown)` → Team 3 | file `scheduled-issue-T4-123-abc123.md` exists |
+| `summary` | `render_summary(issue, event)` (pure function: Markdown from provider-confirmed values, titles escaped, IDs in code spans), then `SummaryStore.save_summary(name, markdown)` → Team 3's package → Dropbox (one upload, SDK retries off), then a download compared byte for byte | file `scheduled-issue-T4-123-abc123.md` exists and matches |
 
 The summary name comes from the issue and event IDs (`summary_name` in `app/workflow.py`), so it is unique per attempt and can be found again from the IDs in `leftovers`.
 
@@ -80,14 +80,14 @@ Success is `201`:
 }
 ```
 
-If storage definitely fails, the service deletes the event, then the issue, and returns:
+If storage definitely fails (for example, Dropbox denies permission), the service deletes the event, then the issue, and returns `502`:
 
 ```json
 {
   "error": {
     "code": "provider_error",
-    "message": "The summary could not be stored.",
-    "retryable": true,
+    "message": "Summary storage failed.",
+    "retryable": false,
     "step": "summary",
     "leftovers": []
   }
@@ -99,17 +99,18 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 ### 1. Depend only on the shared contracts; choose each implementation by a setting
 
 - **Constraint:** we must use another team's implementation for two verticals, and swapping teams must need no code change.
-- **Approach:** the endpoint depends only on contract types (`IssueProvider`, `CalendarService`, `SummaryStore` over `DocumentStorage`). A dependency factory reads a setting and returns the implementation. The two other-team verticals currently reach their implementations in different ways:
-  - **Issue tracker:** we import Team 4's package and run it against our own Trello list (PR #52). This follows Tyler's November 15 clarification of the TA's expectation, and replaced an earlier HTTP adapter that could not pass `fresh=True` through Team 4's cached API.
-  - **Storage:** we call Team 3's hosted service through an HTTP adapter for `cloud-storage-api` (PR #55), so the swap to Team 1 is a URL change.
-- **Alternative:** one approach for both. Importing storage too would put Dropbox credentials in our project; calling Team 4 over HTTP brings back the cache problem.
-- **Tradeoff:** importing means we own Trello credentials and inherit the package's fixed timeout; HTTP adds a network hop and depends on the other team's hosting. Two approaches also mean two kinds of setting and swap to explain.
-- **Revisit when:** staff confirm whether HTTP use of another team's hosted service counts as "using their implementation" (open question 1); if not, storage moves to an imported package as well.
+- **Approach:** the endpoint depends only on contract types (`IssueProvider`, `CalendarService`, `SummaryStore` over `DocumentStorage`). A dependency factory reads a setting and returns the implementation. Both other-team verticals import the other team's package and run it in our process against our own provider account:
+  - **Issue tracker:** Team 4's package against our Trello list (PR #52). This follows Tyler's November 15 clarification of the TA's expectation, and replaced an earlier HTTP adapter that could not pass `fresh=True` through Team 4's cached API.
+  - **Storage:** Team 3's package against our Dropbox account (PR #55). It replaced an earlier HTTP adapter for Team 3's hosted service after Hari answered in the course help channel that a package dependency is required.
+- **Alternative:** call each team's hosted service over HTTP. It keeps provider credentials with the other team, but the course does not count it as using their implementation, and Team 4's cached reads broke `fresh=True`.
+- **Tradeoff:** we own the Trello and Dropbox credentials and inherit each package's behavior: Team 4's fixed timeout, and Team 3's `.env` loading on import, which we turn off. A swap now means a different package plus a setting that selects it, not just a URL. Storage has no such setting yet.
+- **Revisit when:** Team 1's storage package satisfies the same contract; then storage gets a selector setting like the other two verticals (open question 2).
 
 ### 2. Never retry a write; undo only after a definite failure; report what may remain
 
 - **Constraint:** the Calendar and issue-tracker contracts both report an uncertain write as a non-retryable `provider_error` and forbid retrying it; we apply the same rule to storage. No vertical gives us an idempotency key we have verified.
 - **Approach:** each write runs once. If a later step *definitely* did nothing, earlier writes are deleted newest first (a `not_found` during cleanup counts as removed). If a write's outcome is *uncertain*, nothing is deleted. The error lists every resource that may still exist (`leftovers`, each `created` or `uncertain`). `retryable` is true only when the failed step allows a retry **and** nothing from this attempt remains.
+- **Storage certainty (PR #55):** a storage failure counts as definite only for a typed rejection (name conflict, permission, invalid input or operation, size, not found) or a connection that could not be opened (connect timeout or new-connection failure, read from the exception's type chain, never its message). Anything else, and any failure after the upload was acknowledged, is uncertain. These rules depend on Team 3's pinned commit and must be rechecked when it or the Dropbox SDK changes.
 - **Alternative:** retry with idempotency keys (Team 4's package has tagged-creation helpers we leave disabled), or a saga that records state and finishes later.
 - **Tradeoff:** an uncertain failure needs a person to reconcile, guided by `leftovers`. In return, the service never creates duplicates and never claims unfinished work succeeded.
 - **Revisit when:** all three implementations offer idempotency we can verify across restarts.
@@ -125,7 +126,7 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 ### Boundaries and rules that must hold
 
 - Input is validated once, in step 1, before any write. Contract-level validation inside adapters is a second guard, not the main one.
-- Implementations are chosen in `app/workflow_dependencies.py` from settings. An unconfigured integration fails during dependency resolution with `503`, before any write.
+- Implementations are built in `app/workflow_dependencies.py` from settings. Trello and storage settings and the Calendar selector are checked during dependency resolution, so a missing one fails with `503` before any write. Google credentials are read only when the event is created, so a missing or revoked token fails at `step: event` after the issue exists, and the issue is deleted.
 - Remote error messages are never forwarded. Messages are fixed text and logs are sanitized (HW1 Level 5 rules).
 - Even when a dependency fails: no write is retried, no uncertain write is undone, and `retryable` is never true while anything from the attempt may remain.
 
@@ -135,7 +136,7 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 | --- | --- | --- | --- |
 | Create | `create` | `create_issue` | `save_summary` (our `SummaryStore` protocol) |
 | Delete, for compensation | `delete` | `delete_issue` | not needed: storage is the last step |
-| Find, to reconcile an uncertain write | by ID only | by ID only (`get_issue(fresh=True)` reads Trello directly) | `download` or `metadata` at the known path (root + `summary_name`); `SummaryStore` itself exposes only `save_summary`, so reconciliation is manual today |
+| Find, to reconcile an uncertain write | by ID only | by ID only (`get_issue(fresh=True)` reads Trello directly) | the error gives the known path in the summary leftover's `path` (its `id` stays `null`); `SummaryStore` exposes only `save_summary`, so reconciliation is manual today |
 | Verify a write | not done | not done | every summary is downloaded and compared byte for byte before success (PR #55) |
 
 ### Mismatches with other teams' implementations
@@ -152,40 +153,41 @@ If storage definitely fails, the service deletes the event, then the issue, and 
 | Trello token rejected | Expired or revoked key or token (Trello `401`/`403`, which Team 4's package reports as `ACCESS_DENIED`) | nothing | `403`, `step: issue`, `retryable: false` | replace the token in Secret Manager | controlled fake |
 | Trello fails | Outage, rate limit, list removed, or another definite rejection | nothing | `502`, `step: issue`, `retryable: false` | retry later, or fix the list | controlled fake |
 | Issue response lost | Timeout after send | issue may exist | `502`, `step: issue`, leftover issue `uncertain`, `retryable: false` | check Trello by title before retrying | controlled fake |
-| Calendar auth expired | Revoked or expired token | issue deleted by compensation | `step: event`, `retryable: false` until an operator refreshes the token | run `scripts/google_calendar_auth.py`, update the secret | HW2 Level 5 auth-failure test, plus workflow fake |
+| Calendar authorization fails | Missing, revoked or expired Google token (read only when the event is created) | issue deleted by compensation | `step: event`, `retryable: false` until an operator refreshes the token | run `scripts/google_calendar_auth.py`, update the secret | HW2 Level 5 auth-failure test, plus workflow fake |
 | Event response lost | Timeout after Google receives the insert | issue exists, event may exist | `502`, `step: event`, leftovers issue `created`, event `uncertain`, `retryable: false` | find the event by title and time in Google Calendar; delete both by hand or keep both | controlled fake |
-| Storage rejects the summary | Team 3 returns a definite rejection, such as a name conflict | event then issue deleted | `502`, `step: summary`, `leftovers: []`, `retryable: false` | fix the cause; a retry would fail again | controlled fake |
-| Storage misconfigured | Missing or invalid `STORAGE_BASE_URL` or `STORAGE_ROOT_PATH` | nothing (checked before the issue is created) | `503`, `step: summary`, `leftovers: []` | fix configuration | `tests/test_storage_http.py` (PR #55) |
-| Storage response lost or unverified | Timeout, `5xx`, malformed upload response, or downloaded bytes differ (PR #55 treats all as uncertain) | issue and event exist, summary may exist | `502`, `step: summary`, leftovers issue+event `created`, summary `uncertain`, `retryable: false` | look for `scheduled-issue-<issue>-<event>.md` in storage; finish or delete by hand | controlled fake |
+| Storage rejects the summary | Team 3's package reports a definite rejection (name conflict, permission, invalid input or operation, size, not found), or the connection to Dropbox could not be opened | event then issue deleted | `502`, `step: summary`, `leftovers: []`, `retryable: false` | fix the cause, then send a new request | controlled: injected Dropbox SDK failures through Team 3's real error translation (PR #55) |
+| Storage misconfigured | Missing or invalid `STORAGE_ROOT_PATH` or Dropbox credentials, or `PYTHON_DOTENV_DISABLED` not `1` | nothing (checked before the issue is created) | `503`, `step: summary`, `leftovers: []` | fix configuration | `tests/test_storage_package.py`, `tests/test_workflow.py` (PR #55) |
+| Storage response lost or unverified | Read timeout, lost reply, unrecognized error, any failure after the upload was acknowledged, or downloaded bytes differ | issue and event exist, summary may exist | `502`, `step: summary`, leftovers issue+event `created`, summary `uncertain` with its `path`, `retryable: false` | look for the file at that path in Team 5's Dropbox; finish or delete by hand | controlled, as above |
 | Compensation fails | Delete call fails after a definite failure | records that could not be deleted | original error, with those records in `leftovers` | delete by hand using the IDs | controlled fake |
 | Service stops mid-request | Instance restart or request timeout between steps | earlier writes, with no record on our side | connection error, no body | find records by title in each provider; accepted risk for one test account | none; documented limit |
 | Same request sent twice | Client resends after a timeout | two issues and two events | two successful results | delete the duplicate by hand; accepted risk until idempotency (open question 3) | none; documented limit |
-| Issue tracker or Calendar not configured | Missing `TRELLO_*` setting or Google token | nothing | `503` before any write (the issue-tracker case lacks `step` today, see below) | fix configuration | dependency test |
+| Issue tracker or Calendar not configured | Missing `TRELLO_*` setting, or `CALENDAR_IMPLEMENTATION` not `google` | nothing | `503` before any write (both cases lack `step` today, see below) | fix configuration | dependency test |
 
-**The handout's retry case** (event created, summary save fails, caller retries): after a *definite* storage failure, the event and issue are deleted and `leftovers` is empty, so a retry cannot duplicate anything; `retryable` follows the storage error (false for a rejection such as a name conflict, because the same request would fail again). After an *uncertain* storage failure, both records stay, `retryable` is false, and the caller gets their IDs, from which the summary name follows. The caller should not resend the request: a new request creates a new issue and event, so the service cannot recognize it as a retry. A safe automatic retry needs the caller to send an idempotency key that the service stores with the IDs, plus a storage read to check for the summary; both are open question 3.
+**The handout's retry case** (event created, summary save fails, caller retries): after a *definite* storage failure, the event and issue are deleted and `leftovers` is empty, so a retry cannot duplicate anything; `retryable` is still false, because PR #55's store reports every definite storage failure as non-retryable (a name conflict, for example, would fail again). After an *uncertain* storage failure, both records stay, `retryable` is false, and the caller gets their IDs and the summary's path. The caller should not resend the request: a new request creates a new issue and event, so the service cannot recognize it as a retry. A safe automatic retry needs the caller to send an idempotency key that the service stores with the IDs, plus a storage read to check for the summary; both are open question 3.
 
-**Known gap:** the `422` validation error and the issue-tracker `503` configuration error currently return only `code`, `message` and `retryable`, while the documented schema also requires `step` and `leftovers` (Jim's review of PR #53). The handout requires every failure to name the failed step, so this must be fixed before submission.
+**Known gap:** the `422` validation error and the issue-tracker and Calendar-selector `503` configuration errors currently return only `code`, `message` and `retryable`, while the documented schema also requires `step` and `leftovers` (Jim's review of PR #53). The handout requires every failure to name the failed step, so this must be fixed before submission.
 
 ## Verification plan
 
 | Check | Kind | Evidence |
 | --- | --- | --- |
 | Step order, Markdown, compensation, error mapping | Controlled: fakes for all three contracts | `tests/test_workflow.py` in CI on the submitted commit |
-| Each adapter against its contract | Controlled | `tests/` for PRs #52, #54, #55 and #57; #52 and #55 also have live probe records (Trello, Team 3) |
-| Full workflow through the **deployed** endpoint | Real providers, test account | response body; the issue seen in Trello, the event in Google Calendar, the file in Team 3 storage, each checked directly, not through our API |
-| Swap storage from Team 3 to Team 1 | Real, configuration only | the deployment diff shows only a setting change; the same workflow run with the file found in Team 1 storage |
-| Controlled failure | A failing storage implementation, selected by configuration in a separate `verify` deployment (never the `demo` one) | the caller receives the documented error with `step: summary`, and the issue and event are gone from Trello and Google |
+| Each adapter against its contract | Controlled | `tests/` for PRs #52, #54, #55 and #57; #52 and #55 also have live probe records (Trello; Team 3's package against Team 5's Dropbox) |
+| Full workflow, run locally | Real providers, test account | done 2026-11-16 at `e2616dd` (PR #55, [WORKFLOW.md](docs/WORKFLOW.md#local-real-provider-workflow-evidence)): `201`, then a fresh issue read, a Calendar read, exact summary bytes, and cleanup confirmed absent. Read by our own scripts; nobody has yet checked the records in the provider web pages |
+| Full workflow through the **deployed** endpoint | Real providers, test account | response body; the issue seen in Trello, the event in Google Calendar, the file in Team 5's Dropbox, each checked directly, not through our API |
+| Swap storage from Team 3 to Team 1 | Real, configuration only | the deployment diff shows only a setting change; the same workflow run with the file found in Team 1 storage. Blocked: Team 1's package has namespace, metadata and interface gaps, and no storage selector exists yet |
+| Controlled failure | A failing storage implementation, selected by configuration in a separate `verify` deployment (never the `demo` one); needs the storage selector that does not exist yet | the caller receives the documented error with `step: summary`, and the issue and event are gone from Trello and Google |
 | Cleanup | Real | all test records deleted, confirmed by direct provider reads |
 
-Success means observable provider records plus the documented API result, never our own logs alone. Each record is checked in its provider: Trello, Google Calendar, and the storage service's Dropbox folder with Team 3.
+Success means observable provider records plus the documented API result, never our own logs alone. Each record is checked in its provider: Trello, Google Calendar, and Team 5's Dropbox folder, viewed in Dropbox itself rather than through Team 3's package.
 
 ## Open questions
 
-1. Does calling Team 3's hosted storage service count as "using another team's implementation" under the TA clarification that led #52 to import Team 4's package? If not, storage must import Team 3's package too. (ask staff; Members 3 and 4)
-2. Does Team 1 expose the same `cloud-storage-api` HTTP shape, so the swap is a `STORAGE_BASE_URL` change? Team 1's endpoint and access are still pending. (Member 4)
+1. ~~Does calling Team 3's hosted storage service count as using their implementation?~~ Resolved 2026-11-16: Hari said in the course help channel that a package dependency is required, so PR #55 imports Team 3's package.
+2. How does storage swap to Team 1? Team 1's package has namespace, metadata and interface gaps, and we have no storage selector yet. (Member 4, with Team 1)
 3. Should callers send an idempotency key, and should the storage adapter read before writing, so a retry after an uncertain write becomes safe?
 4. Does the controlled failure need to run on the deployed service, or is a local run with a failing implementation enough? (ask staff)
-5. Who runs the deployment through the HW2 pipeline, and which settings and secrets does the workflow add (`TRELLO_*`, `STORAGE_*`; the Terraform service does not wire them yet)? (Member 1 owns deployment per PR #52 and #55)
+5. Who runs the deployment through the HW2 pipeline, and which settings and secrets does the workflow add (`TRELLO_*`, `STORAGE_ROOT_PATH`, `DROPBOX_*`, `PYTHON_DOTENV_DISABLED`; the Terraform service does not wire them yet)? (Member 1 owns deployment per PR #52 and #55)
 6. How does the deployed service keep the Google token fresh? HW2 loads a refresh token from Secret Manager at startup; confirm that still holds for the workflow. (Member 2)
 
 ## How to call it
@@ -199,8 +201,10 @@ The handout requires review within the team and by another team before submissio
 | Date | Reviewer | Question or comment | Response or change |
 | --- | --- | --- | --- |
 | 2026-11-14 | Jim (Team 5) | `422` and `503` errors lack `step` and `leftovers` (PR #53) | Open: Niriti to fix |
+| 2026-11-15 | Ka Pui (Team 5) | A refused connection to storage was reported as uncertain, so the issue and event were kept although nothing was written (PR #55) | Implemented in PR #55, review pending: a connect timeout or new-connection failure, read from the exception's type chain, now counts as definite and triggers cleanup; other connection errors stay uncertain |
 | 2026-11-16 | Juno (Team 5) | A rejected Trello token returns `403` (`ACCESS_DENIED` from Team 4's package), not `502`/`503`; separate it from configuration and outage failures | Split into "Trello token rejected" (`403`) and "Trello fails" (`502`); missing configuration stays `503`. Checked against Team 4's `provider.py` and `_issue_failure` in PR #53 |
 | 2026-11-16 | Juno (Team 5) | Use #57's stable Calendar contract and package details | Calendar now cites `calendar-contract` `v0.1.0` and the `team5-calendar` package (PR #57) |
-| 2026-11-16 | Juno (Team 5) | Update the storage architecture once its approach is settled | Open: waiting for the TA's answer on HTTP versus importing Team 3's package (open question 1) |
-| pending | Team 5 | Internal review by Jim, Niriti and Kristie | |
-| pending | Outside team (to arrange) | Integration design review | |
+| 2026-11-16 | Juno (Team 5) | Update the storage architecture once its approach is settled | Storage now imports Team 3's package (Hari's clarification). Diagram, settings, credentials, failure rules, verification and open questions updated from Kristie's handoff in PR #55 |
+| 2026-11-16 | Kristie (Team 5) | Seven storage changes from #55's handoff (`docs/HW3_STORAGE_REVIEW_HANDOFF.md`): package path and pins, Dropbox settings, Hari's answer, failure certainty, local evidence, lazy Google authorization | All seven made in this revision. #53's validation and configuration error shape stays open (Jim's row) |
+| pending | Team 5 | Internal review by Jim and Niriti | |
+| pending | Team 4 (requested by email 2026-11-16) | Integration design review | |
