@@ -1,0 +1,12 @@
+{"step": "provenance", "package_source_commit": "b223c6b03310f98dce4be1da8ed7cd37773ca520", "git_fixture_commit": "5d4b2925e8c5ccc4f722f6c134e64085766adf7f", "verification_script_sha256": "e3d5bd04f3d951851d40a67e09f7028ac23c16ec6a6278cb69b1b7627598c820", "own_app_preserved": true, "installed_package_outside_repo": true, "python": "3.14.8", "contract_version": "0.1.0"}
+{"step": "run", "marker": "team5-package-ae57006e1cbd", "started_utc": "2026-11-15T22:55:28.112613+00:00"}
+{"step": "google_before", "passed": true}
+{"step": "create", "passed": true}
+{"step": "read", "passed": true}
+{"step": "independent_google_read", "passed": true}
+{"step": "replace_and_read", "passed": true}
+{"step": "delete", "passed": true}
+{"step": "read_after_delete", "passed": true}
+{"step": "repeat_delete", "passed": true}
+{"step": "independent_google_cleanup", "passed": true, "active_matches": 0}
+{"step": "external_token_unchanged", "passed": true}

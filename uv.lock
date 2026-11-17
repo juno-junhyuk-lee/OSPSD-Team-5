@@ -104,7 +104,7 @@ wheels = [
 [[package]]
 name = "calendar-contract"
 version = "0.1.0"
-source = { git = "https://github.com/Airbus-A330/OSPSD-Calendar?tag=v0.1.0-rc.1#1c1cad7a0732ddb242a05400d8833d94e4422424" }
+source = { git = "https://github.com/Airbus-A330/OSPSD-Calendar.git?rev=v0.1.0#db73e6261a93b0c3cc6aa0a48c4687f742aacc9b" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -557,8 +557,8 @@ wheels = [
 
 [[package]]
 name = "issue-tracker-contract"
-version = "1.0.0"
-source = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4?subdirectory=contract&tag=issue-tracker-contract-v1.0.0#e2528b1a8b55ea7c74df8d222b9e6555b9d87925" }
+version = "1.1.0"
+source = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=contract&rev=issue-tracker-contract-v1.1.0#18fb7ae6f9c9cf5dbfed7208114d036a582ba54c" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -951,6 +951,8 @@ dependencies = [
     { name = "requests-oauthlib" },
     { name = "ruff" },
     { name = "starlette" },
+    { name = "team-4-issue-tracker-trello" },
+    { name = "team5-calendar" },
     { name = "typing-extensions" },
     { name = "typing-inspection" },
     { name = "uritemplate" },
@@ -964,7 +966,7 @@ requires-dist = [
     { name = "annotated-types", specifier = "==0.8.0" },
     { name = "anyio", specifier = "==4.15.1" },
     { name = "ast-serialize", specifier = "==0.12.1" },
-    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar?tag=v0.1.0-rc.1" },
+    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar.git?rev=v0.1.0" },
     { name = "certifi", specifier = "==2026.7.22" },
     { name = "cffi", specifier = "==2.1.1" },
     { name = "charset-normalizer", specifier = "==3.5.2" },
@@ -987,7 +989,7 @@ requires-dist = [
     { name = "httpx", specifier = "==0.28.1" },
     { name = "idna", specifier = "==3.20" },
     { name = "iniconfig", specifier = "==2.3.0" },
-    { name = "issue-tracker-contract", git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4?subdirectory=contract&tag=issue-tracker-contract-v1.0.0" },
+    { name = "issue-tracker-contract", git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=contract&rev=issue-tracker-contract-v1.1.0" },
     { name = "librt", specifier = "==0.16.0" },
     { name = "mypy", specifier = "==2.4.0" },
     { name = "mypy-extensions", specifier = "==1.1.0" },
@@ -1012,6 +1014,8 @@ requires-dist = [
     { name = "requests-oauthlib", specifier = "==2.0.0" },
     { name = "ruff", specifier = "==0.16.10" },
     { name = "starlette", specifier = "==1.7.0" },
+    { name = "team-4-issue-tracker-trello", git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=team-4-trello-impl&rev=team-4-issue-tracker-trello-v1.0.0" },
+    { name = "team5-calendar", directory = "packages/team5-calendar" },
     { name = "typing-extensions", specifier = "==4.16.0" },
     { name = "typing-inspection", specifier = "==0.4.4" },
     { name = "uritemplate", specifier = "==4.2.0" },
@@ -1281,6 +1285,39 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/65/d5/27f927b87016794feb8995814fde736b1a6fe43da99db448bc9aca6c5d46/stone-3.5.5.tar.gz", hash = "sha256:998e2d0909c859065547f5f54c7d11b66d019882bb4f773e78ec9f2023ca3694", size = 336033, upload-time = "2026-09-23T15:20:18.778Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c6/1c/e14e0618fc10f0e5a18ad29ec10665f4ab7e2b378e34ed0b0b00343f0351/stone-3.5.5-py3-none-any.whl", hash = "sha256:ff04dcfe37efef6bfe744f59f4df1dd1a43716f47e28d7cf1165eb984a0b2c33", size = 204000, upload-time = "2026-09-23T15:20:16.999Z" },
+]
+
+[[package]]
+name = "team-4-issue-tracker-trello"
+version = "1.0.0"
+source = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=team-4-trello-impl&rev=team-4-issue-tracker-trello-v1.0.0#c88ce2fd287f2524ba09ad5d94faf3983fdac08d" }
+dependencies = [
+    { name = "issue-tracker-contract" },
+]
+
+[[package]]
+name = "team5-calendar"
+version = "0.1.0"
+source = { directory = "packages/team5-calendar" }
+dependencies = [
+    { name = "calendar-contract" },
+    { name = "google-api-python-client" },
+    { name = "google-auth" },
+    { name = "google-auth-httplib2" },
+    { name = "google-auth-oauthlib" },
+    { name = "httplib2" },
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "calendar-contract", git = "https://github.com/Airbus-A330/OSPSD-Calendar.git?rev=v0.1.0" },
+    { name = "google-api-python-client", specifier = "==2.201.0" },
+    { name = "google-auth", specifier = "==2.59.1" },
+    { name = "google-auth-httplib2", specifier = "==0.4.4" },
+    { name = "google-auth-oauthlib", specifier = "==1.5.0" },
+    { name = "httplib2", specifier = "==0.32.0" },
+    { name = "requests", specifier = "==2.34.2" },
 ]
 
 [[package]]

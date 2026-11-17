@@ -3,9 +3,9 @@
 import os
 import re
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
-from typing import Literal
+from typing import Literal, cast
 
 from opentelemetry import trace
 from opentelemetry.context import Context
@@ -22,6 +22,7 @@ from opentelemetry.trace import (
 )
 from opentelemetry.util.types import Attributes
 from starlette.types import Scope
+from team5_calendar import set_span_factory
 
 SERVICE = "calendar-team-5"
 GoogleMethod = Literal[
@@ -172,3 +173,10 @@ def google_call(method: GoogleMethod) -> Iterator[None]:
         {"rpc.system": "google_calendar", "rpc.method": method},
     ):
         yield
+
+
+def _package_google_call(method: str) -> AbstractContextManager[None]:
+    return google_call(cast(GoogleMethod, method))
+
+
+set_span_factory(_package_google_call)

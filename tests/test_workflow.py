@@ -60,6 +60,9 @@ class FakeIssues:
     def update_issue(self, issue_id: str, changes: IssueUpdate) -> Issue:
         raise AssertionError("not used")
 
+    def list_issues(self, *, limit: int = 20) -> list[Issue]:
+        raise AssertionError("not used")
+
     def delete_issue(self, issue_id: str) -> None:
         self.calls.append(("delete", issue_id))
         if self.delete_error is not None:
@@ -608,7 +611,7 @@ def test_unconfigured_storage_fails_before_any_write(
 def test_unconfigured_issue_tracker_fails_before_any_write(
     calendar: FakeCalendar, store: FakeStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("ISSUE_TRACKER_BASE_URL", raising=False)
+    monkeypatch.delenv("TRELLO_API_KEY", raising=False)
 
     def controlled_calendar() -> CalendarService:
         return calendar

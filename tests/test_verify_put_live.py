@@ -129,7 +129,11 @@ def test_cleanup_failure_is_reported_and_later_cleanup_requests_still_run(
 
 @pytest.mark.parametrize(
     ("version", "commit"),
-    [("0.2.0", verification.PACKAGE_COMMIT), ("0.1.0", "wrong-commit")],
+    [
+        ("0.2.0", verification.PACKAGE_COMMIT),
+        ("0.1.0", "wrong-commit"),
+        ("0.1.0", "1c1cad7a0732ddb242a05400d8833d94e4422424"),
+    ],
 )
 def test_wrong_package_fails_before_credentials_or_google_are_used(
     script_google: MagicMock,

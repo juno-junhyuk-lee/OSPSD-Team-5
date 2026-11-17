@@ -24,6 +24,10 @@ jobs:
           python-version: "3.14"
       - name: Sync dependencies
         run: uv sync --frozen
+      - name: Check installed Calendar package
+        run: |
+          uv build --wheel packages/team5-calendar --out-dir "$RUNNER_TEMP/calendar-wheel"
+          uv run python scripts/check_calendar_wheel.py "$RUNNER_TEMP/calendar-wheel/team5_calendar-0.1.0-py3-none-any.whl"
       - name: Lint
         run: uv run ruff check .
       - name: Check formatting
@@ -33,6 +37,8 @@ jobs:
           uv run mypy
           uv run mypy scripts/deploy_release.py
           uv run mypy scripts/verify_put_live.py
+          uv run mypy scripts/check_calendar_wheel.py
+          uv run mypy scripts/verify_calendar_package_live.py
       - name: Test
         run: uv run pytest --ignore=tests/test_shared_conformance.py
       - name: Shared conformance (controlled provider)

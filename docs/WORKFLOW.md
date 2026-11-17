@@ -9,7 +9,7 @@ live end-to-end evidence is claimed yet.
 
 | Integration | Owner | State |
 | --- | --- | --- |
-| Issue tracker (`IssueProvider`) | Member 3 | Wired via `get_issue_provider` (PR #52); live verification pending |
+| Issue tracker (`IssueProvider`) | Member 3 | Imported Team 4 Trello provider from merged #52; component live evidence in ISSUE_TRACKER_VERIFICATION.md; composed run pending |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
 | Summary storage (`SummaryStore`) | Kristie (Member 4) | Team 3 package wired; live storage probe passed; full-workflow verification, independent inspection and Team 1 swap pending |
 
@@ -22,6 +22,28 @@ package configuration is documented in that plan; `STORAGE_BASE_URL` is no
 longer used by this workflow.
 
 ## Endpoint
+
+### Integrated candidate prerequisites
+
+Kristie (Member 4), with Codex assistance, reconciled upstream milestone commit
+`a4da568` with storage branch base `2a11f60`. Keep Team 4's implementation and
+issue contract 1.1.0, Calendar's stable contract/local implementation package,
+and Team 3's approved storage pin. The workflow fake now includes `list_issues`;
+the unconfigured issue test checks `TRELLO_API_KEY`, not the retired HTTP URL.
+The OAuth test checks the requested exclusive `0600` open on all platforms and
+actual POSIX mode bits only on POSIX. Frozen sync, Ruff lint/format, strict mypy
+and the full offline suite passed: **948 passed, 58 skipped**, with the existing
+Starlette TestClient warning. Merge staging/commit is left to Kristie.
+
+Before a real run, the operator must configure the same terminal with
+`TRELLO_API_KEY`, `TRELLO_TOKEN`, and a permitted 24-character `TRELLO_LIST_ID`;
+authorize the intended Google account (`token.json` exists locally but its
+validity/account was not checked during this merge); and supply the
+[Dropbox package configuration](HW3_STORAGE_AUTH.md). No credential contents
+were opened, no live workflow was executed, and prior storage evidence remains
+historical to its recorded commit/hash set. Use one uniquely marked workflow
+request and preserve response IDs before any cleanup; never blindly repeat an
+uncertain request. Live request/readback/cleanup evidence is a separate scope.
 
 `POST /workflows/scheduled-issues`
 
@@ -115,8 +137,8 @@ dependency resolution with 503, before any write.
 ## Storage handoff for Kristie (Member 4)
 
 `DocumentSummaryStore` now bridges to tagged `DocumentStorage` through
-`HttpDocumentStorage`; `get_summary_store` validates configuration before writes
-and closes its HTTP client afterward. It raises sanitized `SummaryStorageError`
+the imported Team 3 package; `get_summary_store` validates configuration before writes
+and closes its SDK afterward. It raises sanitized `SummaryStorageError`
 for operation failures and a 503 `WorkflowError` with `step=summary` and no
 leftovers for bad configuration. See [storage setup and remaining evidence](HW3_STORAGE.md).
 
