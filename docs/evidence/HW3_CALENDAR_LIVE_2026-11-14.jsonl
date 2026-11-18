@@ -1,0 +1,16 @@
+{"step": "provenance", "commit": "05808ccc7c5753a2d343858d395fb5d4cda1acb3", "started_utc": "2026-11-14T20:11:35.490877+00:00", "run_id": "hw3-member2-f20c15e55ae3", "transport": "in-process HTTP with real Google adapters", "implementation": "google"}
+{"step": "package", "passed": true, "tag": "v0.1.0-rc.1", "version": "0.1.0", "commit": "1c1cad7a0732ddb242a05400d8833d94e4422424"}
+{"step": "independent_google_before", "passed": true, "matching_active_events": 0}
+{"step": "health", "passed": true, "status": 200}
+{"step": "ready", "passed": true, "status": 204}
+{"step": "post", "passed": true, "status": 201, "same_id": true, "title_matches": true, "start_matches": true, "end_matches": true}
+{"step": "get_after_post", "passed": true, "status": 200, "same_id": true, "title_matches": true, "start_matches": true, "end_matches": true}
+{"step": "seed_description", "passed": true}
+{"step": "put", "passed": true, "status": 200, "same_id": true, "title_matches": true, "start_matches": true, "end_matches": true}
+{"step": "get_after_put", "passed": true, "status": 200, "same_id": true, "title_matches": true, "start_matches": true, "end_matches": true}
+{"step": "google_fields_kept", "passed": true, "same_id": true, "title_matches": true, "start_matches": true, "end_matches": true, "description_kept": true}
+{"step": "delete", "passed": true, "status": 204}
+{"step": "get_after_delete", "passed": true, "status": 404}
+{"step": "repeat_delete", "passed": true, "status": 404}
+{"step": "independent_google_cleanup", "passed": true, "matching_active_events": 0}
+{"step": "finished", "finished_utc": "2026-11-14T20:11:39.121954+00:00", "failed_steps": []}

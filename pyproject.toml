@@ -27,8 +27,8 @@ dependencies = [
     "httplib2==0.32.0",
     "httpx==0.28.1",
     "idna==3.20",
-    "issue-tracker-contract==1.0.0",
     "iniconfig==2.3.0",
+    "issue-tracker-contract==1.1.0",
     "librt==0.16.0",
     "mypy==2.4.0",
     "mypy-extensions==1.1.0",
@@ -53,6 +53,8 @@ dependencies = [
     "requests-oauthlib==2.0.0",
     "ruff==0.16.10",
     "starlette==1.7.0",
+    "team-4-issue-tracker-trello==1.0.0",
+    "team5-calendar==0.1.0",
     "typing-extensions==4.16.0",
     "typing-inspection==0.4.4",
     "uritemplate==4.2.0",
@@ -67,8 +69,10 @@ dev = []
 package = false
 
 [tool.uv.sources]
-calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar", tag = "v0.1.0-rc.1" }
-issue-tracker-contract = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4", tag = "issue-tracker-contract-v1.0.0", subdirectory = "contract" }
+calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar.git", rev = "v0.1.0" }
+issue-tracker-contract = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git", rev = "issue-tracker-contract-v1.1.0", subdirectory = "contract" }
+team-4-issue-tracker-trello = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git", rev = "team-4-issue-tracker-trello-v1.0.0", subdirectory = "team-4-trello-impl" }
+team5-calendar = { path = "packages/team5-calendar" }
 
 [tool.ruff]
 target-version = "py314"
@@ -79,6 +83,6 @@ select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.mypy]
 python_version = "3.14"
-files = ["app", "tests"]
+files = ["app", "tests", "packages/team5-calendar/src"]
 strict = true
 untyped_calls_exclude = ["google.oauth2.credentials", "google.auth.exceptions"]

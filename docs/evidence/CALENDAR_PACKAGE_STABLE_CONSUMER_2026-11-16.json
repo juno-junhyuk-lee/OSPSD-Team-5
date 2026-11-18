@@ -1,0 +1,65 @@
+{
+  "date": "2026-11-16",
+  "branch": "hw3/calendar-package",
+  "base_commit": "df6bb55cc4fa577a880add58cc9d7d4d809119cd",
+  "uncommitted_candidate": true,
+  "contract_tag": "v0.1.0",
+  "contract_commit": "db73e6261a93b0c3cc6aa0a48c4687f742aacc9b",
+  "source_sha256": {
+    "pyproject.toml": "fa8ff829c6e5b6d3c27e18800855c360004e632d85ba3efe4202d2b1538bc998",
+    "uv.lock": "af6964bf8490c836bc9865e00dde70cf3fcc4552955ccd92aeee4583be08ec51",
+    "packages/team5-calendar/pyproject.toml": "ecae8ecc5a327da42ac4714d6d77cac6bd333ff714f7610ef71733293c3a907e",
+    "packages/team5-calendar/README.md": "8efcd8b512a88612f5b010d2aff31e827f71df156d5fd4dcfd53bed9e88e7dc5",
+    "packages/team5-calendar/src/team5_calendar/__init__.py": "312897309e58bc888b42e51b8213af6ab2d8b28ccdaeba64b190816e96c97142",
+    "scripts/check_calendar_wheel.py": "68207c3b224e5b5bb30a9abbaeead800479adb82016ebf579c0c5d860aa8f205",
+    "scripts/verify_put_live.py": "b654a43e2c841370c8a8b9072d104da5aee4f5e1b3d856a6d9199a6d1e8c179e"
+  },
+  "consumers": [
+    {
+      "installer": "uv",
+      "checks": [
+        {
+          "step": "isolated_consumer",
+          "passed": true,
+          "own_app_preserved": true,
+          "installed_modules": true,
+          "framework_independent": true,
+          "authorization_checks": 8,
+          "contract_commit": "db73e6261a93b0c3cc6aa0a48c4687f742aacc9b"
+        },
+        {
+          "step": "wheel_boundary",
+          "passed": true,
+          "wheel": "team5_calendar-0.1.0-py3-none-any.whl",
+          "sha256": "5577116b302752a84191848d0a0c4d3180ae069542290d1a54ae51c1ccef1045",
+          "installer": "uv",
+          "explicit_contract_dependency": true
+        }
+      ]
+    },
+    {
+      "installer": "pip",
+      "checks": [
+        {
+          "step": "isolated_consumer",
+          "passed": true,
+          "own_app_preserved": true,
+          "installed_modules": true,
+          "framework_independent": true,
+          "authorization_checks": 8,
+          "contract_commit": "db73e6261a93b0c3cc6aa0a48c4687f742aacc9b"
+        },
+        {
+          "step": "wheel_boundary",
+          "passed": true,
+          "wheel": "team5_calendar-0.1.0-py3-none-any.whl",
+          "sha256": "5577116b302752a84191848d0a0c4d3180ae069542290d1a54ae51c1ccef1045",
+          "installer": "pip",
+          "explicit_contract_dependency": true
+        }
+      ]
+    }
+  ],
+  "provider_writes_performed": false,
+  "tag_or_release_published": false
+}

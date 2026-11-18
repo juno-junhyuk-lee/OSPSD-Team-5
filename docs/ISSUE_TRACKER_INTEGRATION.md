@@ -1,82 +1,71 @@
-# HW3 Member 3: issue tracker integration
+# HW3 Member 3: Team 4 Trello integration
 
-## Status and ownership
+## Architecture and ownership
 
-Member 3 owns the HTTP adapter, dependency configuration, controlled tests, and
-issue-provider verification. Member 1 owns the composed endpoint, Markdown
-summary, public failure mapping, and cross-service recovery. Member 5 owns the
-overall design and independent integration review. Any available teammate can
-review the PR; PR and design reviews are pending.
-
-This change supplies an integration component, not a new public endpoint. It
-does not deploy or modify Team 4's service, change Calendar routes, or establish
-live Trello verification. Required internal and outside-team reviews remain
-pending. This note is the issue-integration design contribution for the overall
-HW3 `DESIGN.md`, which Member 5 will coordinate.
-
-## Dependencies and architecture
-
-The official `issue-tracker-contract==1.0.0` dependency comes from
-[Team 4's tagged contract][contract-tag], subdirectory `contract`, tag
-`issue-tracker-contract-v1.0.0`, commit
-`e2528b1a8b55ea7c74df8d222b9e6555b9d87925`. `uv.lock` records the resolved
-commit. Use Python 3.14 and `uv sync --frozen`, as for the Calendar service.
+Following Tyler's November 15 clarification of the TA's integration expectation,
+our service imports Team 4's implementation package and uses our own Trello test
+account/list. It no longer calls Team 4's hosted API. Member 3 owns this dependency,
+configuration, tests, and issue verification. Member 1 owns orchestration,
+Markdown, public error translation, compensation, and deployment. Member 5 owns
+the combined design and independent review; any free teammate may review the PR.
 
 ```text
-Member 1's composed workflow
+Our composed workflow
   -> issue_tracker_contract.IssueProvider
-  -> HttpIssueProvider (our HTTP adapter)
-  -> Team 4 API
-  -> Team 4's configured issue provider (Trello for the planned verification)
+  -> team_4_issue_tracker_trello.TrelloIssueProvider (Team 4's package)
+  -> Trello using Team 5's credentials and test list
 ```
 
-The adapter imports the official `Issue`, `IssueCreate`, `IssueUpdate`, and
-`ServiceError` types. There is no local copy of the contract or Trello SDK code.
-Team 4 keeps its provider credentials; our integration uses their HTTP API.
-Direct Trello account access for independent verification is arranged separately.
+The previous HTTP adapter and endpoint configuration are superseded. This
+component has no public route of its own and does not establish the complete
+deployed issue/Calendar/storage workflow.
 
-## Decisions
+## Tagged dependencies
 
-**Use HTTP to reuse Team 4's implementation.** The alternative is importing
-their provider implementation and provisioning its credentials in our process.
-HTTP keeps provider setup with its owner and makes the endpoint configurable.
-The cost is an extra network boundary and HTTP behavior that cannot always
-express every Python-interface capability. Revisit this choice if a required
-shared capability cannot be exposed remotely. Do not silently weaken it.
+| Package | Revision | Resolved commit |
+| --- | --- | --- |
+| `team-4-issue-tracker-trello` 1.0.0 | `team-4-issue-tracker-trello-v1.0.0` | `c88ce2fd287f2524ba09ad5d94faf3983fdac08d` |
+| `issue-tracker-contract` 1.1.0 | `issue-tracker-contract-v1.1.0` | `18fb7ae6f9c9cf5dbfed7208114d036a582ba54c` |
 
-**Use a request-scoped, bounded HTTP client.** `get_issue_provider` returns the
-shared interface and closes the client after success or failure. This avoids
-global clients and startup dependencies for existing Calendar-only operations.
-A lifespan-owned pool could reduce connection overhead; revisit if measured
-traffic justifies it. Defaults are 30 seconds per HTTP timeout phase, configurable
-above zero and up to 120 seconds. This is not an overall workflow deadline.
+Both come from [Team 4's repository][team4]. `pyproject.toml` uses `rev` with
+the published tag names, as Team 4 documents, to match the implementation's
+direct contract dependency. `uv.lock` records their commits. Python 3.14 remains
+our application requirement. Install with `uv sync --frozen`.
 
-**Do not retry writes.** A lost response does not prove that creation failed.
-The adapter preserves conservative write uncertainty for Member 1's recovery
-policy. Team 4's optional idempotency header is not enabled or relied upon;
-its deployed persistence/restart guarantees need separate verification before
-adoption. A create can therefore be attempted only once automatically.
+The implementation depends on the contract and standard-library HTTP access;
+it brings no FastAPI app, Google SDK, or automatic telemetry integration.
 
-## Configuration and handoff
+## Configuration
 
-```sh
-export ISSUE_TRACKER_BASE_URL=https://ospsd-team4-issue-tracker.onrender.com
-export ISSUE_TRACKER_TIMEOUT_SECONDS=30
-```
+| Variable | Meaning |
+| --- | --- |
+| `ISSUE_TRACKER_IMPLEMENTATION` | `team4_trello` (default and only supported choice) |
+| `TRELLO_API_KEY` | Our test-account app's API key |
+| `TRELLO_TOKEN` | Our test-account read/write token |
+| `TRELLO_LIST_ID` | Our test list's full 24-character lowercase hexadecimal ID |
 
-The endpoint above is documented by Team 4; its current deployment revision,
-availability, and test-data access must be verified before a live workflow.
-There is no built-in team URL: a different deployment uses different settings.
-A URL prefix such as `https://example.test/api/` is supported.
+Keep local values in ignored `.env.trello`. The factory reads the process
+environment; it does not load files automatically. Load the file explicitly
+with `uv run --env-file .env.trello ...`. Never commit it. Hosted deployment
+must supply the same settings through secrets, owned by Member 1; no credentials
+are included in images, documentation, or evidence. Use the [package setup
+instructions][package] for Trello app/token setup.
 
-Remote URLs must use HTTPS. HTTP is allowed for loopback controlled services.
-Embedded URL credentials, queries, fragments, and invalid timeout settings are
-rejected with a sanitized shared `service_not_configured` error. Environment
-proxy/netrc settings and redirects are not used. No outbound authentication is
-assumed; if Team 4 requires caller authentication, implement and test its agreed
-scheme with credentials supplied externally before using that deployment.
+`get_issue_provider` retains the shared dependency entry point Member 1 already
+uses. Before yielding an imported provider, it validates required configuration
+without contacting Trello. Missing/malformed settings raise shared
+`SERVICE_NOT_CONFIGURED`, `may_have_applied=False`. This prevents obvious
+configuration failures after workflow writes begin. Expired/rejected tokens,
+an inaccessible list, and remote outages can still fail during operations.
+Calendar-only startup remains independent of these settings.
 
-Member 1 can inject the dependency with:
+The provider reads environment variables on each operation, opens/closes its own
+connections, and has a no-op `close()`. The factory calls `close()` on normal or
+exceptional dependency exit. Do not change credentials during a workflow. The
+provider's fixed timeout is 10 seconds per request (`REQUEST_TIMEOUT_SECONDS`),
+controlled by its package, not our former HTTP timeout setting.
+
+## Shared interface and Member 1 handoff
 
 ```python
 from typing import Annotated
@@ -89,115 +78,104 @@ from app.issue_tracker_dependencies import get_issue_provider
 IssueDependency = Annotated[IssueProvider, Depends(get_issue_provider)]
 ```
 
-The factory owns the client lifecycle. Direct users constructing
-`HttpIssueProvider(client)` own and close that client themselves. The factory
-reads configuration only when invoked, so Calendar startup does not require
-issue settings. Tests can override `get_issue_provider` through ordinary FastAPI
-dependency overrides and restore the previous overrides afterward.
+| Method | Result |
+| --- | --- |
+| `create_issue(title)` | `Issue(id, title)` |
+| `get_issue(id, fresh=False)` | `Issue(id, title)` |
+| `update_issue(id, IssueUpdate(...))` | Updated `Issue` |
+| `delete_issue(id)` | None, or shared `NOT_FOUND` if absent |
+| `list_issues(limit=...)` | At most `limit` issues, newest first |
 
-| Shared call | Remote request | Result |
-| --- | --- | --- |
-| `create_issue(title)` | `POST /issues`, JSON `{"title": "..."}` | 201, shared `Issue` |
-| `get_issue(id)` | `GET /issues/{encoded_id}` | 200, shared `Issue` |
-| `update_issue(id, changes)` | `PATCH /issues/{encoded_id}`, shared update fields | 200, shared `Issue` |
-| `delete_issue(id)` | `DELETE /issues/{encoded_id}` | 204, empty body |
+`fresh=True` now works: the imported provider has no cache and reads Trello on
+each call. The former hosted HTTP API's lack of cache bypass no longer limits
+this path. Listing comes from Team 4's implementation; the scheduled-issue
+workflow does not need to add a listing step. Update controlled providers in
+workflow tests to satisfy the 1.1.0 interface where required.
 
-Creation titles are validated with the shared rules before HTTP: 1–256
-characters and at least one non-whitespace character. IDs are opaque and encoded
-as a path segment; no Trello-specific ID pattern is imposed. Empty IDs, dot
-segments, and control characters return `not_found` locally. Remote issue models
-are validated strictly; empty IDs and mismatched get/update IDs are rejected.
-The returned model provides `id` and `title`, not a guaranteed provider URL.
+Validate user requests with shared `IssueCreate`/`IssueUpdate` before writes.
+The provider assumes its caller validated the title and listing limit; do not
+rely on it to enforce HTTP request validation. Issue titles must contain a
+non-space character and be at most 256 characters. The result does not guarantee
+a clickable Trello URL. Provider-specific ID validation stays in their package.
 
-## Known contract limitation: fresh reads
+Member 1 must catch **issue-contract** `ServiceError`, distinct from our local
+application error class, and translate it into our public error shape with the
+failed workflow step and any remaining resources. The package preserves
+`may_have_applied`: do not discard that flag or equate a timeout with no card.
 
-The tagged Python interface requires `get_issue(id, fresh=True)` to bypass saved
-results. Team 4's [HTTP documentation][http-api] states that GET may cache data
-for 30 seconds and has no public cache-bypass parameter. Its HTTP GET handler
-calls `provider.get_issue(issue_id)` without forwarding a freshness option.
+## Failure and recovery decisions
 
-This adapter therefore rejects `fresh=True` before HTTP with shared
-`SERVICE_NOT_CONFIGURED`, cause `fresh_read_unsupported`. It does not claim full
-behavioral conformance to the shared interface. Normal create/get/update/delete
-operations are available; fresh-read support is an explicit open compatibility
-item, not established evidence.
+**Reuse the implementation directly.** This satisfies the clarified composition
+approach and avoids dependence on another team's hosting/cache behavior. The
+tradeoff is owning Trello credentials and upgrading our contract to 1.1.0. The
+HTTP adapter is removed to avoid maintaining two competing milestone paths.
 
-Reproduction for the owning team: inspect the tagged interface's `fresh=True`
-guarantee and the HTTP GET handler's provider call; an ordinary GET cannot
-guarantee observing an external edit within the cache window. Ask Team 4 for a
-supported cache-bypass mechanism and add controlled/live checks once available.
-No issue or message has been sent by this implementation. Direct Trello
-verification is necessary for milestone evidence regardless of API read-back.
+**Validate settings at dependency resolution.** Package construction is lazy;
+our preflight catches missing settings before Member 1 starts writing. It does
+not prove remote authorization. A provider health check would add latency and
+still could not guarantee the next write; operation errors remain necessary.
 
-## Failures and recovery
+**Keep write uncertainty and avoid automatic retries.** The imported provider
+attempts creation once. Explicit Trello rejection and provably unsent connections
+can report `may_have_applied=False`; lost responses and timeouts can report True.
+Later-step compensation/reconciliation is Member 1's responsibility. Never retry
+the entire workflow solely because one provider says a single operation is safe.
 
-The adapter raises **issue-contract** `ServiceError`, which is distinct from
-`app.errors.ServiceError` and Calendar's error class. Member 1 must translate it
-at the composition boundary into our public error model, identify the failed
-step, and preserve write uncertainty. Do not register raw remote exceptions as
-public HTTP responses or blindly forward remote error messages.
+Team 4's tagged-creation helpers are extensions, not our workflow's current
+idempotency policy. They are not enabled here. Optional tracing is also left
+disabled; no automatic exception/event/body capture is introduced.
 
-| Trigger | Shared outcome | State/recovery |
-| --- | --- | --- |
-| Invalid title/configuration | `invalid_input` / `service_not_configured`; `may_have_applied=False` | No HTTP call; correct input/configuration |
-| Recognized remote rejection | Shared code and fixed local message | Handle the code; never retry automatically |
-| Lost response, malformed success, or unexpected HTTP result on a write | `provider_error`; `may_have_applied=True` | A write may exist; reconcile directly before retrying |
-| Transport/response failure on a read | `provider_error`; `may_have_applied=False` | The read itself changed nothing |
-| Remote creation still in progress | `request_in_progress`; write uncertainty retained | Do not initiate another creation |
-| Remote delete returns 204 with a body | `provider_error`; `may_have_applied=True` | Verify deletion directly |
+## Controlled and live verification
 
-Only known error codes with their documented HTTP statuses are preserved.
-Unrecognized or inconsistent envelopes become `provider_error`. Remote bodies,
-validation details, arbitrary messages, and headers are never copied into the
-shared exception. The adapter adds no logs; the composed HTTP request should
-produce the existing single sanitized outcome log. `provider_involved=True`
-records an attempted remote-service call, not proof that Trello was contacted.
-
-An HTTP failure does not expose the provider's internal `may_have_applied` flag.
-The adapter treats remote 5xx writes conservatively as uncertain except for
-`service_not_configured`, and also preserves uncertainty for in-progress writes.
-Even a connection failure is treated conservatively on writes. There are no
-local mirrors, automatic compensating deletes, or workflow-level retry records
-in this component. Member 1 must account for these outcomes in recovery design.
-
-## Verification plan and remaining evidence
-
-Controlled tests use `httpx.MockTransport`: no internet, provider credentials,
-or existing Trello cards. They cover request shapes, validation, IDs, errors,
-write uncertainty, no retries/redirects, dependency substitution, configuration,
-client cleanup, and the explicit freshness limitation. These are adapter tests,
-not the shared HTTP conformance suite or evidence of live Trello operation.
-
-Local checks on the uncommitted candidate based on HW2 commit `7859542` passed:
-frozen dependency sync, Ruff lint/format, strict mypy, and whitespace checks.
-The full suite reported 773 passed and 58 opt-in checks skipped, including 80
-new offline issue-integration tests. GitHub CI and live verification are separate
-pending evidence.
+Offline tests inject controlled responses at Team 4's transport while retaining
+the actual imported implementation and our normal dependency. They cover CRUD,
+external-change visibility on fresh reads, listing, configuration preflight,
+errors, write certainty, no creation retry, cleanup, and dependency substitution.
+Verification-script tests cover success, read failure, unknown creation,
+cleanup failure, wrong-list preflight, and explicit write opt-in.
 
 ```sh
-uv run pytest -v tests/test_issue_tracker_client.py tests/test_issue_tracker_dependencies.py
+uv sync --frozen
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
+uv run mypy scripts/verify_issue_tracker_live.py
 uv run pytest -v
 git diff --check
 ```
 
-Before making live writes, arrange a dedicated test list and permission to
-create/delete cards, access for direct Trello verification, endpoint availability,
-and any caller authentication. Do not write into an unarranged shared list.
+The live script creates and deletes a real card; only run it against the agreed
+test list:
 
-Live evidence is **pending**. Record the following when access is available:
+```sh
+uv run --env-file .env.trello python -m scripts.verify_issue_tracker_live --allow-writes
+```
 
-1. Our checked commit and Team 4's observed deployed revision/endpoint.
-2. A uniquely tagged test title and the create result (201, ID/title).
-3. API read-back and direct Trello confirmation of the same ID/title.
-4. Cleanup through delete, direct confirmation, and any known leftovers.
-5. Sanitized actual results, date, verifier, and evidence links.
+It preflights the list through a separate Trello HTTP client, creates one uniquely
+marked `team5-hw3-...` card through our dependency, fresh-reads through Team 4's
+provider, independently checks ID/title/list in Trello, and attempts known-ID
+cleanup in `finally`. It independently verifies deletion with a direct 404.
+It does not assert on list counts or delete unrelated cards. No automatic
+creation or deletion retry occurs. After an uncertain creation without an ID,
+it reports the unique marker for manual inspection instead of creating again
+or claiming cleanup. Output excludes tokens, headers, IDs, and unrelated records.
 
-A 404 from the API alone does not establish cleanup across cached workers;
-direct provider inspection is part of verification. Do not claim an issue was
-never created after a timeout unless provider evidence establishes it.
+Record the source revision, dirty-tree provenance, package commits, timestamps,
+marker, actual checks, and cleanup. An independent API read is separate from an
+independent teammate walkthrough. Neither establishes the deployed composed
+workflow, storage swap, or all real-provider failure modes.
 
-[contract-tag]: https://github.com/Tyler-Arciniaga/OSPSD-Team-4/tree/issue-tracker-contract-v1.0.0/contract
-[http-api]: https://github.com/Tyler-Arciniaga/OSPSD-Team-4/blob/f0054d5cc328133a46479c20de77ae029c422e29/docs/api.md#read-freshness-and-caching
+Local checks passed: frozen sync, Ruff lint/format, strict application and script
+mypy, and whitespace checks. The full suite reported 718 passed and 58 opt-in
+checks skipped, including 25 package-integration and verification-script cases.
+The smaller total replaces the superseded HTTP adapter's 80 tests with tests
+for the imported implementation. The existing TestClient warning remains.
+
+The [November 15 live record](ISSUE_TRACKER_VERIFICATION.md) reports successful
+creation, fresh read, independent Trello read-back, and confirmed cleanup. This
+migration still needs integration into Member 5's design. The initial live run
+preceded its commit/publication; the record also includes a successful rerun on
+clean commit `d7072ba`. GitHub CI and independent teammate verification are separate.
+
+[team4]: https://github.com/Tyler-Arciniaga/OSPSD-Team-4
+[package]: https://github.com/Tyler-Arciniaga/OSPSD-Team-4/tree/team-4-issue-tracker-trello-v1.0.0/team-4-trello-impl
