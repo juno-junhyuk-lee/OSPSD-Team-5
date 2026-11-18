@@ -35,6 +35,7 @@ OPERATIONS = {
     "delete_event": "delete",
     "update_event": "patch",
     "get_calendar": "get_calendar",
+    "create_scheduled_issue": "workflow",
     "health": "health",
     "ready": "ready",
 }
@@ -65,6 +66,8 @@ def request_operation(scope: Scope) -> tuple[str, str]:
     method = scope["method"]
     if path == "/events" and method == "POST":
         return "create_event", "create"
+    if path == "/workflows/scheduled-issues" and method == "POST":
+        return "create_scheduled_issue", "workflow"
     if path.startswith("/events/") and path.count("/") == 2 and path[8:]:
         handlers = {
             "GET": "get_event",

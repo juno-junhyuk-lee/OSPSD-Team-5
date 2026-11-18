@@ -29,6 +29,12 @@ covers configuration, controlled tests, and the handoff to the composed workflow
 The [Trello verification record](docs/ISSUE_TRACKER_VERIFICATION.md) documents
 live creation, fresh reads, independent provider checks, and cleanup.
 
+Member 1's [scheduled-issue workflow](docs/WORKFLOW.md) adds
+`POST /workflows/scheduled-issues`. It creates an issue, then a Calendar event,
+then stores a Markdown summary, and reports failed steps and leftovers. It is
+tested offline with controlled dependencies. Summary storage is a placeholder
+that returns 503 until Member 4's adapter is connected.
+
 ## Calendar service — HW2 shared contract adoption
 
 Juno Lee owns `GET /calendars/{calendar_id}`, Kristie Lee owns
