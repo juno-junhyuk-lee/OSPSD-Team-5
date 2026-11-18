@@ -52,6 +52,18 @@ Every error from this endpoint (400, 403, 422, 502, 503) has all five fields and
 matches `WorkflowErrorResponse` in OpenAPI, including request-body validation and
 configuration failures.
 
+Request-body structure and shared issue/Calendar input constraints are checked
+before provider dependencies are constructed. Empty or malformed JSON returns
+400; invalid fields or event times return 422. Both use `step="validate"` and
+`leftovers=[]`, even when an integration is unconfigured. A valid request still
+returns 503 with the integration's step when its configuration is missing.
+
+In hosted mode, authentication middleware runs before this validation. Missing
+or invalid bearer credentials return 401 with `WWW-Authenticate: Bearer` and the
+existing three-field shared error (`code`, `message`, `retryable`), without
+`step` or `leftovers`. This is an authentication response before workflow dispatch;
+the five-field workflow error envelope applies after authentication.
+
 | Failure | Action | Leftovers |
 | --- | --- | --- |
 | Malformed or empty JSON | None (400, step `validate`) | none |
@@ -112,3 +124,7 @@ provider bodies or credentials in messages.
   evidence.
 - Deploy the endpoint (bearer authentication already covers all non-health paths).
 - Member 5: fold this into the HW3 `DESIGN.md` and the end-to-end test plan.
+
+Validation precedence regression tests are in
+`tests/test_workflow_validation_precedence.py`. They retain normal dependency
+wiring and assert invalid input never constructs a provider.
