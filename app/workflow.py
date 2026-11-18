@@ -7,18 +7,28 @@ the error reports what may remain so the caller can reconcile.
 """
 
 import re
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from calendar_contract import CalendarError, CalendarService, CreateEvent, Event
-from fastapi import Request
+from fastapi import Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from issue_tracker_contract import ErrorCode as IssueErrorCode
 from issue_tracker_contract import Issue, IssueCreate, IssueProvider
 from issue_tracker_contract import ServiceError as IssueServiceError
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from app.errors import ErrorCode, ErrorDetails, ServiceError, log_failure
+from app.errors import (
+    INVALID_REQUEST_MESSAGE,
+    ErrorCode,
+    ErrorDetails,
+    ServiceError,
+    log_failure,
+    request_validation_status,
+)
 from app.observability import record_failure
 from app.summary_storage import StoredSummary, SummaryStorageError, SummaryStore
 
@@ -70,6 +80,7 @@ class WorkflowError(ServiceError):
         retryable: bool,
         provider: bool,
         leftovers: list[Leftover] | None = None,
+        status: int | None = None,
     ) -> None:
         super().__init__(
             code,
@@ -77,6 +88,7 @@ class WorkflowError(ServiceError):
             operation=OPERATION,
             retryable=retryable,
             provider=provider,
+            status=status,
         )
         self.step = step
         self.leftovers = leftovers or []
@@ -243,6 +255,44 @@ class WorkflowErrorDetails(ErrorDetails):
 
 class WorkflowErrorResponse(BaseModel):
     error: WorkflowErrorDetails
+
+
+def not_configured(integration: str, step: Step) -> WorkflowError:
+    """A pre-write configuration failure; step names the integration."""
+    return WorkflowError(
+        ErrorCode.PROVIDER_UNAVAILABLE,
+        f"The {integration} is not configured or unavailable.",
+        step=step,
+        leftovers=[],
+        retryable=False,
+        provider=False,
+    )
+
+
+class WorkflowRoute(APIRoute):
+    """Report errors raised outside run() in the workflow error shape."""
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        handler = super().get_route_handler()
+
+        async def route_handler(request: Request) -> Response:
+            try:
+                return await handler(request)
+            except RequestValidationError as error:
+                raise WorkflowError(
+                    ErrorCode.INVALID_INPUT,
+                    INVALID_REQUEST_MESSAGE,
+                    step="validate",
+                    retryable=False,
+                    provider=False,
+                    status=await request_validation_status(request, error),
+                ) from None
+            except CalendarError:
+                # run() translates every Calendar call, so this came from the
+                # Calendar dependency's configuration check, before any write.
+                raise not_configured("calendar", "event") from None
+
+        return route_handler
 
 
 def workflow_error_handler(request: Request, error: Exception) -> JSONResponse:

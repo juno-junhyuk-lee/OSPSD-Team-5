@@ -1,7 +1,9 @@
 """Select the providers the scheduled-issue workflow composes.
 
-Each dependency fails with a public ServiceError before any write when its
-integration is not configured, so the workflow never starts half-wired.
+Each dependency fails with a WorkflowError before any write when its
+integration is not configured, so the workflow never starts half-wired. The
+error's step names the affected integration. The shared Calendar dependency
+raises CalendarError instead; WorkflowRoute translates it the same way.
 """
 
 from collections.abc import Generator
@@ -13,20 +15,9 @@ from issue_tracker_contract import IssueProvider
 from issue_tracker_contract import ServiceError as IssueServiceError
 
 from app.calendar_service_dependencies import get_calendar_service
-from app.errors import ErrorCode, ServiceError
 from app.issue_tracker_dependencies import get_issue_provider
 from app.summary_storage import SummaryStore
-from app.workflow import OPERATION, ScheduledIssueWorkflow
-
-
-def _not_configured(integration: str) -> ServiceError:
-    return ServiceError(
-        ErrorCode.PROVIDER_UNAVAILABLE,
-        f"The {integration} is not configured or unavailable.",
-        operation=OPERATION,
-        retryable=False,
-        provider=False,
-    )
+from app.workflow import ScheduledIssueWorkflow, not_configured
 
 
 def get_workflow_issue_provider() -> Generator[IssueProvider, None, None]:
@@ -35,7 +26,7 @@ def get_workflow_issue_provider() -> Generator[IssueProvider, None, None]:
     try:
         provider = next(dependency)
     except IssueServiceError:
-        raise _not_configured("issue tracker") from None
+        raise not_configured("issue tracker", "issue") from None
     try:
         yield provider
     finally:
@@ -44,7 +35,7 @@ def get_workflow_issue_provider() -> Generator[IssueProvider, None, None]:
 
 def get_summary_store() -> SummaryStore:
     """Member 4 replaces this with the storage adapter."""
-    raise _not_configured("summary storage")
+    raise not_configured("summary storage", "summary")
 
 
 def get_scheduled_issue_workflow(

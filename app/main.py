@@ -8,7 +8,7 @@ from calendar_contract import (
     Event,
     ReplaceEvent,
 )
-from fastapi import Depends, FastAPI, Response
+from fastapi import APIRouter, Depends, FastAPI, Response
 from fastapi.exceptions import RequestValidationError
 
 from app.calendar_dependencies import get_calendar_reader
@@ -39,6 +39,7 @@ from app.workflow import (
     ScheduledIssueWorkflow,
     WorkflowError,
     WorkflowErrorResponse,
+    WorkflowRoute,
     workflow_error_handler,
 )
 from app.workflow_dependencies import get_scheduled_issue_workflow
@@ -207,11 +208,14 @@ def delete_event(
 
 
 WORKFLOW_RESPONSES: dict[int | str, dict[str, object]] = {
-    status: {"model": WorkflowErrorResponse} for status in (403, 422, 502, 503)
+    status: {"model": WorkflowErrorResponse} for status in (400, 403, 422, 502, 503)
 }
 
+# WorkflowRoute = every workflow error, including request validation, has step/leftovers.
+workflow_router = APIRouter(route_class=WorkflowRoute)
 
-@app.post(
+
+@workflow_router.post(
     "/workflows/scheduled-issues",
     response_model=ScheduledIssue,
     status_code=201,
@@ -223,3 +227,6 @@ def create_scheduled_issue(
 ) -> ScheduledIssue:
     """Create an issue, schedule a matching event, and store a Markdown summary."""
     return workflow.run(request)
+
+
+app.include_router(workflow_router)

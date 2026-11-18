@@ -48,10 +48,15 @@ Success is `201`:
 Errors keep the existing shape (`code`, `message`, `retryable`) and add `step`
 (`validate`, `issue`, `event`, `summary`) and `leftovers`, the resources that may
 still exist. Messages are fixed text; remote messages are never forwarded.
+Every error from this endpoint (400, 403, 422, 502, 503) has all five fields and
+matches `WorkflowErrorResponse` in OpenAPI, including request-body validation and
+configuration failures.
 
 | Failure | Action | Leftovers |
 | --- | --- | --- |
-| Invalid input | None | none |
+| Malformed or empty JSON | None (400, step `validate`) | none |
+| Invalid input | None (422, step `validate`) | none |
+| Integration not configured | None (503, step of that integration) | none |
 | Issue fails definitively | Stop | none |
 | Issue creation uncertain | Stop; no retry | issue `uncertain` |
 | Event fails definitively | Delete the issue | none, or issue if deletion failed |
@@ -75,14 +80,18 @@ Code mapping: issue `access_denied` → 403, `invalid_input` → 422,
 `service_not_configured` → 503 `provider_unavailable`, everything else → 502
 `provider_error`. Calendar codes pass through, except an uncertain create, which
 is reported as a 502 with leftovers. An unconfigured integration fails during
-dependency resolution with 503, before any write.
+dependency resolution with 503 `provider_unavailable`, before any write; `step`
+names it (`issue` = issue tracker, `event` = Calendar, `summary` = storage).
+`WorkflowRoute` gives request-body validation errors and the shared Calendar
+dependency's configuration error this shape; other routes keep the shared
+three-field error.
 
 ## Code
 
 - `app/workflow.py`: request/response models, Markdown rendering, orchestration,
-  error translation, compensation, and the error handler.
+  error translation, compensation, `WorkflowRoute`, and the error handler.
 - `app/workflow_dependencies.py`: selects the three providers; translates issue
-  configuration errors; storage placeholder.
+  and storage configuration errors; storage placeholder.
 - `app/summary_storage.py`: `SummaryStore` protocol, `StoredSummary`, and
   `SummaryStorageError(may_have_applied, retryable, configured)`.
 - `tests/test_workflow.py`: offline orchestration, Markdown, failure, logging,
