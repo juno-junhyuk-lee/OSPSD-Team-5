@@ -34,3 +34,33 @@ variable "release" {
     error_message = "Supply a full commit SHA, a sha256 image digest and positive integer secret versions."
   }
 }
+
+variable "integration" {
+  type = object({
+    storage_implementation = string
+    storage_root_path      = string
+    trello_list_id         = string
+    secret_versions = object({
+      trello_api_key        = number
+      trello_token          = number
+      dropbox_app_key       = number
+      dropbox_app_secret    = number
+      dropbox_refresh_token = number
+    })
+  })
+  default     = null
+  description = "HW3 workflow settings. Null deploys the Calendar API without Trello or Dropbox configuration."
+
+  validation {
+    condition = var.integration == null ? true : (
+      contains(["team3_dropbox", "team1_dropbox"], var.integration.storage_implementation) &&
+      can(regex("^/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$", var.integration.storage_root_path)) &&
+      can(regex("^[0-9a-f]{24}$", var.integration.trello_list_id)) &&
+      alltrue([
+        for version in values(var.integration.secret_versions) :
+        version >= 1 && floor(version) == version
+      ])
+    )
+    error_message = "Use team3_dropbox or team1_dropbox, an absolute storage root, a 24-character Trello list ID and positive integer secret versions."
+  }
+}

@@ -1,6 +1,24 @@
 locals {
   region = "us-central1"
   name   = "team5-calendar-${var.environment}"
+
+  # HW3 workflow credentials. Each is passed to the container as an env var
+  # pinned to the release manifest's secret version; values never enter state.
+  integration_secrets = {
+    trello_api_key        = "TRELLO_API_KEY"
+    trello_token          = "TRELLO_TOKEN"
+    dropbox_app_key       = "DROPBOX_APP_KEY"
+    dropbox_app_secret    = "DROPBOX_APP_SECRET"
+    dropbox_refresh_token = "DROPBOX_REFRESH_TOKEN"
+  }
+  integration_settings = var.integration == null ? {} : {
+    ISSUE_TRACKER_IMPLEMENTATION = "team4_trello"
+    TRELLO_LIST_ID               = var.integration.trello_list_id
+    STORAGE_IMPLEMENTATION       = var.integration.storage_implementation
+    STORAGE_ROOT_PATH            = var.integration.storage_root_path
+    # Team 3's package calls load_dotenv on import; the app requires the opt-out.
+    PYTHON_DOTENV_DISABLED = "1"
+  }
 }
 
 resource "google_artifact_registry_repository" "images" {
@@ -15,7 +33,7 @@ resource "google_service_account" "runtime" {
 }
 
 resource "google_secret_manager_secret" "runtime" {
-  for_each  = toset(["oauth", "bearer"])
+  for_each  = toset(concat(["oauth", "bearer"], [for key, _ in local.integration_secrets : replace(key, "_", "-")]))
   secret_id = "${local.name}-${each.key}"
 
   replication {
@@ -86,6 +104,27 @@ resource "google_cloud_run_v2_service" "calendar" {
       env {
         name  = "CALENDAR_BEARER_FILE"
         value = "/var/secrets/bearer/key"
+      }
+
+      dynamic "env" {
+        for_each = local.integration_settings
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.integration == null ? {} : local.integration_secrets
+        content {
+          name = env.value
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.runtime[replace(env.key, "_", "-")].secret_id
+              version = tostring(var.integration.secret_versions[env.key])
+            }
+          }
+        }
       }
 
       volume_mounts {

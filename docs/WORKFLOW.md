@@ -206,7 +206,9 @@ leftovers for bad configuration. See [storage setup and remaining evidence](HW3_
   configuration-only Team 3/Team 1 storage swap verification is complete;
   hosted verification remains pending.
 - Run the full workflow against deployed services, including cleanup, and record
-  evidence.
+  evidence. Cloud Run wiring, the Team 3/Team 1 swap, the controlled storage
+  failure and the run/cleanup helper are described in
+  [hosted deployment](HW3_HOSTED_DEPLOYMENT.md); the live runs are pending.
 - Deploy the endpoint (bearer authentication already covers all non-health paths).
 - Member 5: fold this into the HW3 `DESIGN.md` and the end-to-end test plan.
 

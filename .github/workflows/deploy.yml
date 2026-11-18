@@ -5,6 +5,7 @@ on:
     branches:
       - hw2/milestone-3-level-2
       - hw2/milestone-3
+      - hw3/milestone-1
       - main
   workflow_dispatch:
     inputs:
@@ -33,7 +34,7 @@ jobs:
       (vars.CALENDAR_DEPLOY_ENABLED == 'true' ||
         (github.event_name == 'workflow_dispatch' && inputs.rollback_run_id != '')) &&
       github.repository == 'juno-junhyuk-lee/OSPSD-Team-5' &&
-      contains(fromJSON('["refs/heads/hw2/milestone-3-level-2","refs/heads/hw2/milestone-3","refs/heads/main"]'), github.ref)
+      contains(fromJSON('["refs/heads/hw2/milestone-3-level-2","refs/heads/hw2/milestone-3","refs/heads/hw3/milestone-1","refs/heads/main"]'), github.ref)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -53,6 +54,15 @@ jobs:
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       OAUTH_SECRET_VERSION: ${{ vars.OAUTH_SECRET_VERSION }}
       BEARER_SECRET_VERSION: ${{ vars.BEARER_SECRET_VERSION }}
+      # HW3 workflow settings. An empty STORAGE_IMPLEMENTATION deploys without them.
+      STORAGE_IMPLEMENTATION: ${{ vars.STORAGE_IMPLEMENTATION }}
+      STORAGE_ROOT_PATH: ${{ vars.STORAGE_ROOT_PATH }}
+      TRELLO_LIST_ID: ${{ vars.TRELLO_LIST_ID }}
+      TRELLO_API_KEY_SECRET_VERSION: ${{ vars.TRELLO_API_KEY_SECRET_VERSION }}
+      TRELLO_TOKEN_SECRET_VERSION: ${{ vars.TRELLO_TOKEN_SECRET_VERSION }}
+      DROPBOX_APP_KEY_SECRET_VERSION: ${{ vars.DROPBOX_APP_KEY_SECRET_VERSION }}
+      DROPBOX_APP_SECRET_SECRET_VERSION: ${{ vars.DROPBOX_APP_SECRET_SECRET_VERSION }}
+      DROPBOX_REFRESH_TOKEN_SECRET_VERSION: ${{ vars.DROPBOX_REFRESH_TOKEN_SECRET_VERSION }}
       ROLLBACK_RUN_ID: ${{ inputs.rollback_run_id }}
       DEPLOYMENT_OPERATION: ${{ inputs.rollback_run_id && 'rollback' || 'deploy' }}
       TF_DIRECTORY: ${{ github.workspace }}/${{ inputs.rollback_run_id && 'rollback-source/infra' || 'infra' }}
@@ -88,6 +98,17 @@ jobs:
           else
             [[ "$OAUTH_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
             [[ "$BEARER_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+            if [[ -n "$STORAGE_IMPLEMENTATION" ]]; then
+              # Values are checked again by scripts.deploy_release prepare.
+              for name in STORAGE_ROOT_PATH TRELLO_LIST_ID TRELLO_API_KEY_SECRET_VERSION \
+                TRELLO_TOKEN_SECRET_VERSION DROPBOX_APP_KEY_SECRET_VERSION \
+                DROPBOX_APP_SECRET_SECRET_VERSION DROPBOX_REFRESH_TOKEN_SECRET_VERSION; do
+                if [[ -z "${!name}" ]]; then
+                  echo "::error::Missing GitHub Environment variable: $name"
+                  exit 1
+                fi
+              done
+            fi
           fi
       - name: Install smoke test runtime
         uses: astral-sh/setup-uv@v6
@@ -163,9 +184,23 @@ jobs:
         run: |
           set -euo pipefail
           echo "repository=us-central1-docker.pkg.dev/$GCP_PROJECT_ID/team5-calendar-$CALENDAR_ENV/calendar" >> "$GITHUB_OUTPUT"
+      - name: Find an existing commit image
+        id: existing
+        if: inputs.rollback_run_id == ''
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
+        run: |
+          set -euo pipefail
+          # Reuse the pushed image so a configuration-only redeploy keeps its digest.
+          if digest=$(docker buildx imagetools inspect "$IMAGE_REPOSITORY:$GITHUB_SHA" \
+              --format '{{ .Manifest.Digest }}' 2>/dev/null); then
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "Reusing image $IMAGE_REPOSITORY@$digest" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Build and push the commit image
         id: build
-        if: inputs.rollback_run_id == ''
+        if: inputs.rollback_run_id == '' && steps.existing.outputs.digest == ''
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -184,13 +219,30 @@ jobs:
       - name: Prepare release manifest
         if: inputs.rollback_run_id == ''
         env:
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
         run: |
           set -euo pipefail
+          integration=()
+          if [[ -n "$STORAGE_IMPLEMENTATION" ]]; then
+            jq -n --arg implementation "$STORAGE_IMPLEMENTATION" --arg root "$STORAGE_ROOT_PATH" \
+              --arg list "$TRELLO_LIST_ID" \
+              --argjson trello_api_key "$TRELLO_API_KEY_SECRET_VERSION" \
+              --argjson trello_token "$TRELLO_TOKEN_SECRET_VERSION" \
+              --argjson dropbox_app_key "$DROPBOX_APP_KEY_SECRET_VERSION" \
+              --argjson dropbox_app_secret "$DROPBOX_APP_SECRET_SECRET_VERSION" \
+              --argjson dropbox_refresh_token "$DROPBOX_REFRESH_TOKEN_SECRET_VERSION" \
+              '{storage_implementation: $implementation, storage_root_path: $root,
+                trello_list_id: $list,
+                secret_versions: {trello_api_key: $trello_api_key, trello_token: $trello_token,
+                  dropbox_app_key: $dropbox_app_key, dropbox_app_secret: $dropbox_app_secret,
+                  dropbox_refresh_token: $dropbox_refresh_token}}' \
+              > "$RUNNER_TEMP/integration.json"
+            integration=(--integration "$RUNNER_TEMP/integration.json")
+          fi
           python3 -m scripts.deploy_release prepare \
             --commit "$GITHUB_SHA" --digest "$IMAGE_DIGEST" \
             --oauth-version "$OAUTH_SECRET_VERSION" --bearer-version "$BEARER_SECRET_VERSION" \
-            --output "$RUNNER_TEMP/release.tfvars.json"
+            "${integration[@]}" --output "$RUNNER_TEMP/release.tfvars.json"
       - name: Select release identity and pinned secrets
         id: release
         run: |
@@ -251,6 +303,7 @@ jobs:
               echo "Existing Calendar writes are not undone by restoring code and configuration."
             fi
             echo "Image: $IMAGE_REPOSITORY@$IMAGE_DIGEST"
+            echo "Storage implementation: $(jq -r '.integration.storage_implementation // "not configured"' "$RUNNER_TEMP/release.tfvars.json")"
             echo "Environment: $CALENDAR_ENV"
             echo "URL: $url"
             echo "This artifact is not yet recorded as a known-good release."
@@ -335,6 +388,7 @@ jobs:
         run: |
           rm -f -- "$RUNNER_TEMP/deploy.tfplan" "$RUNNER_TEMP/deploy-plan.json" \
             "$RUNNER_TEMP/release.tfvars.json" "$RUNNER_TEMP/deployed-release.json" \
+            "$RUNNER_TEMP/integration.json" \
             "$RUNNER_TEMP/verified-release.json" "$RUNNER_TEMP/running-service.json" \
             "$RUNNER_TEMP/source-run.json" "$RUNNER_TEMP/source-artifacts.json" \
             "$RUNNER_TEMP/rollback-selection.json" "$RUNNER_TEMP/rollback-artifact/verified-release.json" \
