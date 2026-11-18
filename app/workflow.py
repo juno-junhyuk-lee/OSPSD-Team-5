@@ -9,6 +9,8 @@ the error reports what may remain so the caller can reconcile.
 import re
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+from email.message import Message
+from json import JSONDecodeError
 from typing import Any, Literal
 
 from calendar_contract import CalendarError, CalendarService, CreateEvent, Event
@@ -273,27 +275,25 @@ def not_configured(integration: str, step: Step) -> WorkflowError:
 
 
 async def _validate_before_dependencies(request: Request) -> None:
-    # Request caches these bytes for FastAPI's subsequent body handling.
     body = await request.body()
-    media_type = (
-        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-    )
-    is_json = (
-        not media_type
-        or media_type == "application/json"
-        or (media_type.startswith("application/") and media_type.endswith("+json"))
+    # Match FastAPI's strict content-type check before it resolves dependencies.
+    content_type = Message()
+    content_type["content-type"] = request.headers.get("content-type", "")
+    subtype = content_type.get_content_subtype()
+    is_json = content_type.get_content_maintype() == "application" and (
+        subtype == "json" or subtype.endswith("+json")
     )
     try:
-        value = (
-            ScheduledIssueRequest.model_validate_json(body)
-            if is_json
-            else ScheduledIssueRequest.model_validate(body)
+        value = ScheduledIssueRequest.model_validate(
+            await request.json() if is_json else body
         )
-    except ValidationError as error:
-        malformed = is_json and (
-            not body.strip()
-            or any(detail["type"] == "json_invalid" for detail in error.errors())
-        )
+    except (
+        JSONDecodeError,
+        UnicodeDecodeError,
+        RecursionError,
+        ValidationError,
+    ) as error:
+        malformed = not body.strip() or not isinstance(error, ValidationError)
         raise WorkflowError(
             ErrorCode.INVALID_INPUT,
             INVALID_REQUEST_MESSAGE,

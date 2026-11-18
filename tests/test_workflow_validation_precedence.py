@@ -48,8 +48,10 @@ def constructors() -> Iterator[list[Mock]]:
     "body,media,status",
     [
         (b"", "application/json", 400),
+        (b"", None, 400),
         (b"  ", "application/json", 400),
         (b"{", "application/json", 400),
+        (b"\xff", "application/json", 400),
         (b"null", "application/json", 422),
         (b'{"title":"SECRET","start":"2030-01-07T15:00:00Z"}', "application/json", 422),
         (
@@ -62,11 +64,12 @@ def constructors() -> Iterator[list[Mock]]:
         (VALID.replace(b"15:30:00", b"14:30:00"), "application/json", 422),
         (VALID[:-1] + b',"extra":"SECRET"}', "application/json", 422),
         (VALID, "text/plain", 422),
+        (VALID, None, 422),
     ],
 )
 def test_invalid_requests_win_over_provider_configuration(
     body: bytes,
-    media: str,
+    media: str | None,
     status: int,
     configured_issue: bool,
     monkeypatch: pytest.MonkeyPatch,
@@ -78,7 +81,8 @@ def test_invalid_requests_win_over_provider_configuration(
         monkeypatch.setenv("TRELLO_TOKEN", "synthetic")
         monkeypatch.setenv("TRELLO_LIST_ID", "a" * 24)
     with TestClient(app) as client:
-        response = client.post(PATH, content=body, headers={"Content-Type": media})
+        headers = {"Content-Type": media} if media is not None else {}
+        response = client.post(PATH, content=body, headers=headers)
     assert response.status_code == status
     error = WorkflowErrorResponse.model_validate(response.json()).error
     assert error.code.value == "invalid_input"
@@ -89,12 +93,16 @@ def test_invalid_requests_win_over_provider_configuration(
         constructor.assert_not_called()
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16"])
 def test_valid_body_still_reports_missing_issue_configuration(
     constructors: list[Mock],
+    encoding: str,
 ) -> None:
     with TestClient(app) as client:
         response = client.post(
-            PATH, content=VALID, headers={"Content-Type": "application/json"}
+            PATH,
+            content=VALID.decode().encode(encoding),
+            headers={"Content-Type": "application/json"},
         )
     assert response.status_code == 503
     error = WorkflowErrorResponse.model_validate(response.json()).error
