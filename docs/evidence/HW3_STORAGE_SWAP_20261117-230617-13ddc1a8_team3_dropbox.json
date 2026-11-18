@@ -1,0 +1,90 @@
+{
+  "application_base_commit": "bf66e7f77c314a4e7b219706a58fba5a622b4c03",
+  "source_sha256": {
+    "app/storage_paths.py": "49dd661f5c0e3463fe51628dfc69b12e52a4ce97c3f8b0b2ae417960ffd111d6",
+    "app/storage_package.py": "eb1928cd511d2b9f0fe46b99f6fc04e262561139d9c12c310d22eeac6c99877d",
+    "app/summary_storage.py": "18acd567cd2c743a283c816afad919b868e526dc1045ef9c3741e236536a25f5",
+    "scripts/verify_storage_live.py": "25be07864baa59cdc9cfd49e1ae1197db14b906d4a53b969c9b030bbfc7bb327",
+    "uv.lock": "599aa5a6e02367f24858082896a3b85b57b7bec137c3e08b1bec1dc8b8a373e7",
+    "pyproject.toml": "34da0d9d8a1d2ac73f79ba8c8bfc19f64a04cc7cae951bb130051cc6baf7cd7f"
+  },
+  "implementation": "team3_dropbox",
+  "packages": {
+    "cloud-storage-api": {
+      "version": "0.2.0",
+      "direct_url": {
+        "url": "https://github.com/Dayana20/ospsd26-cloud-storage",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "664afc92f7cc0b2ee51cde6ddfa088cc3b37206c",
+          "requested_revision": "0.3.1"
+        },
+        "subdirectory": "src/cloud_storage_api"
+      }
+    },
+    "cloud-storage-client-api": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Shreyas191/OSPSD-Team-3",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "fde60d4fb648df6defb918ff815fe940c525adc7",
+          "requested_revision": "fde60d4fb648df6defb918ff815fe940c525adc7"
+        },
+        "subdirectory": "src/cloud_storage_client_api"
+      }
+    },
+    "dropbox-client-impl": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Shreyas191/OSPSD-Team-3",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "fde60d4fb648df6defb918ff815fe940c525adc7",
+          "requested_revision": "fde60d4fb648df6defb918ff815fe940c525adc7"
+        },
+        "subdirectory": "src/dropbox_client_impl"
+      }
+    },
+    "team1-dropbox-storage": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Dayana20/sandbox.git",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "784be97fc111338c6746b9d7288bf84a333a9b16",
+          "requested_revision": "784be97fc111338c6746b9d7288bf84a333a9b16"
+        },
+        "subdirectory": "packages/team1_dropbox"
+      }
+    },
+    "dropbox": {
+      "version": "12.1.0",
+      "direct_url": null
+    }
+  },
+  "started_at": "2026-11-18T04:06:19.054332+00:00",
+  "integration": "Team3 package import",
+  "python_version": "3.14.8",
+  "path": "/ospsd-team5-hw3/team5-hw3-cc2788b717a344ba9cf1c9520f965b30.md",
+  "sha256": "ff280db8a2276a6e04dfee549d58695b0532fa1d8ef72f5a2c716eda09c457bc",
+  "direct_provider_verification": "pending",
+  "deployed_composed_workflow": "not exercised",
+  "cleanup": "confirmed absent",
+  "provider_health": "passed",
+  "create_and_download_compare": "passed",
+  "reference": "id:ceeRv-cWOxkAAAAAAAAACw",
+  "metadata": {
+    "id": "id:ceeRv-cWOxkAAAAAAAAACw",
+    "name": "team5-hw3-cc2788b717a344ba9cf1c9520f965b30.md",
+    "path": "/ospsd-team5-hw3/team5-hw3-cc2788b717a344ba9cf1c9520f965b30.md",
+    "size": 104,
+    "modified_at": "2026-11-18T04:06:25Z",
+    "etag": "0166085227c5214000000032ed103b1",
+    "type": null
+  },
+  "create_conflict": "passed",
+  "conflict_preserved_bytes": "passed",
+  "result": "passed",
+  "finished_at": "2026-11-18T04:06:26.564998+00:00"
+}

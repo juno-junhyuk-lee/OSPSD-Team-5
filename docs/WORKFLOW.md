@@ -3,17 +3,84 @@
 ## Status
 
 Endpoint structure, orchestration, Markdown generation, and failure handling are
-implemented and tested offline with controlled dependencies. Live issue, Calendar,
-and storage integrations are connected as they become available. No deployed or
-live end-to-end evidence is claimed yet.
+implemented and tested offline with controlled dependencies. The local FastAPI
+route also passed a real Trello -> Google Calendar -> Dropbox run, followed by
+provider readback and cleanup. This is local composition evidence, not deployed
+verification or independent human inspection.
 
 | Integration | Owner | State |
 | --- | --- | --- |
-| Issue tracker (`IssueProvider`) | Member 3 | Wired via `get_issue_provider` (PR #52); live verification pending |
+| Issue tracker (`IssueProvider`) | Member 3 | Imported Team 4 provider; local composed create, fresh read and cleanup passed |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Member 4 | Placeholder: `get_summary_store` returns 503 until the adapter lands |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | Imported Team 3/Team 1 selected by configuration; local paired composition/readback/cleanup passed; independent inspection and hosted verification pending |
+
+## Local real-provider workflow evidence
+
+Kristie (Member 4) executed the commands with Codex assistance at application
+commit `e2616dd52a7aef6803896c48661f0464800ef71b` on November 16, 2026:
+
+- [Creation](evidence/HW3_WORKFLOW_LOCAL_5ef8b3616f30459a83bfc0f94463e0e3.json):
+  21:52:58–21:53:04 America/New_York, local FastAPI TestClient using normal
+  dependencies and real provider accounts, no dependency overrides. One request
+  returned 201 with issue, event and Markdown summary references.
+- [Readback and cleanup](evidence/HW3_WORKFLOW_LOCAL_5ef8b3616f30459a83bfc0f94463e0e3_READBACK_CLEANUP.json):
+  21:54:19–21:54:24 America/New_York. The imported issue provider's fresh read
+  matched; the Calendar package's read matched ID/title/time instants; the storage
+  package's metadata and downloaded UTF-8 bytes matched the response summary.
+  Cleanup ran summary -> event -> issue and confirmed each absent afterward.
+
+Review checked evidence linkage, response titles, UTC/local time equivalence,
+summary path derived from the issue/event IDs, and downloaded-content SHA-256
+against response Markdown. Keep creation's original `cleanup=not performed`:
+the separate later record establishes cleanup. These ad-hoc execution records
+do not include the storage probe's full source-hash/package-provenance manifest;
+they identify the application commit and reported readback results. No credentials
+are recorded, no new test was rerun to create this documentation, and no deployed
+run, independent teammate inspection or live failure injection is claimed.
+
+See the [storage package transition plan](HW3_STORAGE_PACKAGE_TRANSITION.md) for
+the active decision and proposed file ownership with Niriti and Ka Pui. This
+plan does not claim their agreement. Task 4 now wires `get_summary_store` to the
+scoped package factory and maps local initialization failures to a sanitized
+503 with `step=summary` and empty leftovers before issue/event writes. Runtime
+package configuration is documented in that plan; `STORAGE_BASE_URL` is no
+longer used by this workflow.
 
 ## Endpoint
+
+### Paired implementation-swap verification
+
+At `bf66e7f`, Kristie also ran the local composed route with Team 3 then Team 1,
+changing only the implementation selector between runs. Both returned 201 with
+real providers; issue/Calendar/summary readbacks and summary/event/issue cleanup
+absence checks passed. Commit/source manifests were unchanged. See
+[paired swap evidence and limitations](HW3_STORAGE_TEAM1_INTEGRATION.md#step-6-local-configuration-only-swap-evidence).
+These successful normal requests predate #59's validation-precedence fix and do
+not establish deployed or independently inspected verification. Their historical
+`pending_final_53_fix` marker is retained; the integrated fix is covered by offline
+regression tests, and a live run of the final integrated revision remains pending.
+
+### Integrated candidate prerequisites
+
+Kristie (Member 4), with Codex assistance, reconciled upstream milestone commit
+`a4da568` with storage branch base `2a11f60`. Keep Team 4's implementation and
+issue contract 1.1.0, Calendar's stable contract/local implementation package,
+and Team 3's approved storage pin. The workflow fake now includes `list_issues`;
+the unconfigured issue test checks `TRELLO_API_KEY`, not the retired HTTP URL.
+The OAuth test checks the requested exclusive `0600` open on all platforms and
+actual POSIX mode bits only on POSIX. Frozen sync, Ruff lint/format, strict mypy
+and the full offline suite passed: **948 passed, 58 skipped**, with the existing
+Starlette TestClient warning. Merge staging/commit is left to Kristie.
+
+Before a real run, the operator must configure the same terminal with
+`TRELLO_API_KEY`, `TRELLO_TOKEN`, and a permitted 24-character `TRELLO_LIST_ID`;
+authorize the intended Google account (`token.json` exists locally but its
+validity/account was not checked during this merge); and supply the
+[Dropbox package configuration](HW3_STORAGE_AUTH.md). No credential contents
+were opened, no live workflow was executed, and prior storage evidence remains
+historical to its recorded commit/hash set. Use one uniquely marked workflow
+request and preserve response IDs before any cleanup; never blindly repeat an
+uncertain request. Live request/readback/cleanup evidence is a separate scope.
 
 `POST /workflows/scheduled-issues`
 
@@ -41,7 +108,8 @@ Success is `201`:
 4. **Render Markdown** from provider-confirmed values (`render_summary`). Titles
    are escaped and collapsed to one line; IDs stay inside code spans.
 5. **Store the summary** through `SummaryStore.save_summary(name, markdown)`.
-   The suggested name is path-safe; storage may assign its own ID.
+   The name is placed under STORAGE_ROOT_PATH; storage verifies exact UTF-8 bytes
+   through download before returning its opaque reference.
 
 ## Failure handling
 
@@ -63,6 +131,21 @@ or invalid bearer credentials return 401 with `WWW-Authenticate: Bearer` and the
 existing three-field shared error (`code`, `message`, `retryable`), without
 `step` or `leftovers`. This is an authentication response before workflow dispatch;
 the five-field workflow error envelope applies after authentication.
+
+An uncertain summary includes its optional storage `path` when the store knows
+the destination. The provider `id` remains `null` when it is not reported; a path
+is not substituted for an ID in leftovers. Unknown paths are omitted, preserving
+the existing shape for controlled stores and other integrations. For example:
+
+```json
+{"kind": "summary", "id": null, "state": "uncertain", "path": "/team5/summary.md"}
+```
+
+This locator helps manual reconciliation; it does not prove the file exists or
+make retrying safe. Retry and compensation behavior are unchanged.
+
+The [storage failure certainty plan](HW3_STORAGE_FAILURE_POLICY.md) distinguishes
+current behavior from proposed pre-send failure handling and its acceptance tests.
 
 | Failure | Action | Leftovers |
 | --- | --- | --- |
@@ -103,23 +186,25 @@ three-field error.
 - `app/workflow.py`: request/response models, Markdown rendering, orchestration,
   error translation, compensation, `WorkflowRoute`, and the error handler.
 - `app/workflow_dependencies.py`: selects the three providers; translates issue
-  and storage configuration errors; storage placeholder.
+  and storage configuration errors; supplies the scoped storage client.
 - `app/summary_storage.py`: `SummaryStore` protocol, `StoredSummary`, and
-  `SummaryStorageError(may_have_applied, retryable, configured)`.
+  `SummaryStorageError(may_have_applied, retryable, configured, path=None)`.
 - `tests/test_workflow.py`: offline orchestration, Markdown, failure, logging,
   and dependency tests with fakes for all three providers.
 
-## Handoff for Member 4 (storage)
+## Storage handoff for Kristie (Member 4)
 
-Implement `SummaryStore` and replace `get_summary_store` in
-`app/workflow_dependencies.py`. Raise `SummaryStorageError` only, with
-`may_have_applied=True` whenever the write might have happened (for example, a lost
-response), and `configured=False` for missing configuration. Do not include
-provider bodies or credentials in messages.
+`DocumentSummaryStore` now bridges to tagged `DocumentStorage` through
+the imported Team 3 package; `get_summary_store` validates configuration before writes
+and closes its SDK afterward. It raises sanitized `SummaryStorageError`
+for operation failures and a 503 `WorkflowError` with `step=summary` and no
+leftovers for bad configuration. See [storage setup and remaining evidence](HW3_STORAGE.md).
 
 ## Remaining work
 
-- Connect Member 4's storage adapter and verify each integration live.
+- Obtain independent teammate inspection of the provider resources. Local
+  configuration-only Team 3/Team 1 storage swap verification is complete;
+  hosted verification remains pending.
 - Run the full workflow against deployed services, including cleanup, and record
   evidence.
 - Deploy the endpoint (bearer authentication already covers all non-health paths).

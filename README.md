@@ -29,11 +29,15 @@ covers configuration, controlled tests, and the handoff to the composed workflow
 The [Trello verification record](docs/ISSUE_TRACKER_VERIFICATION.md) documents
 live creation, fresh reads, independent provider checks, and cleanup.
 
-Member 1's [scheduled-issue workflow](docs/WORKFLOW.md) adds
-`POST /workflows/scheduled-issues`. It creates an issue, then a Calendar event,
-then stores a Markdown summary, and reports failed steps and leftovers. It is
-tested offline with controlled dependencies. Summary storage is a placeholder
-that returns 503 until Member 4's adapter is connected.
+### Composed workflow and storage
+
+Member 1's [scheduled-issue workflow](docs/WORKFLOW.md) creates an issue and
+Calendar event, then stores a Markdown summary. Kristie (Member 4) connects
+Team 3's imported storage implementation and verifies downloaded UTF-8 bytes.
+See [storage integration](docs/HW3_STORAGE.md) and
+[Dropbox authorization](docs/HW3_STORAGE_AUTH.md) for current package setup.
+The storage-only package probe passed; full composition, independent inspection
+and Team 1's configuration-only package swap remain pending.
 
 ## Calendar service — HW2 shared contract adoption
 

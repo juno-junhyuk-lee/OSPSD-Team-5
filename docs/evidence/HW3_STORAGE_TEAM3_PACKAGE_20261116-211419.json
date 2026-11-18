@@ -1,0 +1,77 @@
+{
+  "application_base_commit": "50ad4960e3792f5fad9cf44cbfee17e3c48d32db",
+  "source_sha256": {
+    "app/storage_client.py": "c1c6abc397719514fa5801566cf47e724d806df8cb371157de6606900a42701a",
+    "app/storage_package.py": "ae6d0be52575666d1596cbaaaa7ca45e7544131da7b59161ebe346e75b260159",
+    "app/summary_storage.py": "3177e545e4edf3f82deff8a70fbcbdc14396cf74ce2c8d3f9575d9b39ad3cbd8",
+    "scripts/verify_storage_live.py": "373a79982acd0bda56468875424ebd4b9ae6c4ecc5fc3bf6da23fd30c4b88e00",
+    "uv.lock": "2bf639881912732b7dfc14f0bd3448fb910e4d7ee13eb28f648741d724c38841",
+    "pyproject.toml": "d1743258c72fe265f8ba221c30d778cd6823fbc7496bc277b383b6fd1aa6a1bf"
+  },
+  "packages": {
+    "cloud-storage-api": {
+      "version": "0.2.0",
+      "direct_url": {
+        "url": "https://github.com/Dayana20/ospsd26-cloud-storage",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "664afc92f7cc0b2ee51cde6ddfa088cc3b37206c",
+          "requested_revision": "0.3.1"
+        },
+        "subdirectory": "src/cloud_storage_api"
+      }
+    },
+    "cloud-storage-client-api": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Shreyas191/OSPSD-Team-3",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "fde60d4fb648df6defb918ff815fe940c525adc7",
+          "requested_revision": "fde60d4fb648df6defb918ff815fe940c525adc7"
+        },
+        "subdirectory": "src/cloud_storage_client_api"
+      }
+    },
+    "dropbox-client-impl": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Shreyas191/OSPSD-Team-3",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "fde60d4fb648df6defb918ff815fe940c525adc7",
+          "requested_revision": "fde60d4fb648df6defb918ff815fe940c525adc7"
+        },
+        "subdirectory": "src/dropbox_client_impl"
+      }
+    },
+    "dropbox": {
+      "version": "12.2.5",
+      "direct_url": null
+    }
+  },
+  "started_at": "2026-11-17T02:14:20.309440+00:00",
+  "integration": "Team3 package import",
+  "python_version": "3.14.8",
+  "path": "/ospsd-team5-hw3/team5-hw3-381e259fe43d47e28c20cc762be9355d.md",
+  "sha256": "f1a9021d9f157e7f6dfe698830951f54b67f6abdd69e2a596a4eeea87791208f",
+  "direct_provider_verification": "pending",
+  "deployed_composed_workflow": "not exercised",
+  "cleanup": "confirmed absent",
+  "provider_health": "passed",
+  "create_and_download_compare": "passed",
+  "reference": "id:ceeRv-cWOxkAAAAAAAAACQ",
+  "metadata": {
+    "id": "id:ceeRv-cWOxkAAAAAAAAACQ",
+    "name": "team5-hw3-381e259fe43d47e28c20cc762be9355d.md",
+    "path": "/ospsd-team5-hw3/team5-hw3-381e259fe43d47e28c20cc762be9355d.md",
+    "size": 104,
+    "modified_at": "2026-11-17T02:14:23Z",
+    "etag": "016606f73ff11c8000000032ed103b1",
+    "type": null
+  },
+  "create_conflict": "passed",
+  "conflict_preserved_bytes": "passed",
+  "result": "passed",
+  "finished_at": "2026-11-17T02:14:27.472811+00:00"
+}

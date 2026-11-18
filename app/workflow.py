@@ -21,7 +21,7 @@ from fastapi.routing import APIRoute
 from issue_tracker_contract import ErrorCode as IssueErrorCode
 from issue_tracker_contract import Issue, IssueCreate, IssueProvider
 from issue_tracker_contract import ServiceError as IssueServiceError
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.errors import (
     INVALID_REQUEST_MESSAGE,
@@ -68,6 +68,7 @@ class Leftover(BaseModel):
     kind: ResourceKind
     id: str | None
     state: ResourceState
+    path: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class WorkflowError(ServiceError):
@@ -187,7 +188,9 @@ class ScheduledIssueWorkflow:
                 leftovers = [
                     Leftover(kind="issue", id=issue.id, state="created"),
                     Leftover(kind="event", id=event.id, state="created"),
-                    Leftover(kind="summary", id=None, state="uncertain"),
+                    Leftover(
+                        kind="summary", id=None, state="uncertain", path=error.path
+                    ),
                 ]
             else:
                 leftovers = self._undo(issue=issue, event=event)

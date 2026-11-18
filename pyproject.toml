@@ -9,12 +9,15 @@ dependencies = [
     "anyio==4.15.1",
     "ast-serialize==0.12.1",
     "calendar-contract",
+    "cloud-storage-api",
+    "cloud-storage-client-api",
     "certifi==2026.7.22",
     "cffi==2.1.1",
     "charset-normalizer==3.5.2",
     "click==8.5.0",
     "colorama==0.4.6",
     "cryptography==50.0.2",
+    "dropbox-client-impl",
     "fastapi==0.142.2",
     "google-api-core==2.40.0",
     "google-api-python-client==2.201.0",
@@ -54,6 +57,7 @@ dependencies = [
     "ruff==0.16.10",
     "starlette==1.7.0",
     "team-4-issue-tracker-trello==1.0.0",
+    "team1-dropbox-storage",
     "team5-calendar==0.1.0",
     "typing-extensions==4.16.0",
     "typing-inspection==0.4.4",
@@ -67,12 +71,21 @@ dev = []
 
 [tool.uv]
 package = false
+# Both providers require the same contract tag through differently spelled URLs.
+# Unify that source without overriding the contract revision or SDK constraints.
+override-dependencies = [
+    "cloud-storage-api @ git+https://github.com/Dayana20/ospsd26-cloud-storage.git@0.3.1#subdirectory=src/cloud_storage_api",
+]
 
 [tool.uv.sources]
+cloud-storage-api = { git = "https://github.com/Dayana20/ospsd26-cloud-storage.git", tag = "0.3.1", subdirectory = "src/cloud_storage_api" }
+cloud-storage-client-api = { git = "https://github.com/Shreyas191/OSPSD-Team-3", rev = "fde60d4fb648df6defb918ff815fe940c525adc7", subdirectory = "src/cloud_storage_client_api" }
+dropbox-client-impl = { git = "https://github.com/Shreyas191/OSPSD-Team-3", rev = "fde60d4fb648df6defb918ff815fe940c525adc7", subdirectory = "src/dropbox_client_impl" }
 calendar-contract = { git = "https://github.com/Airbus-A330/OSPSD-Calendar.git", rev = "v0.1.0" }
 issue-tracker-contract = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git", rev = "issue-tracker-contract-v1.1.0", subdirectory = "contract" }
 team-4-issue-tracker-trello = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git", rev = "team-4-issue-tracker-trello-v1.0.0", subdirectory = "team-4-trello-impl" }
 team5-calendar = { path = "packages/team5-calendar" }
+team1-dropbox-storage = { git = "https://github.com/Dayana20/sandbox.git", rev = "784be97fc111338c6746b9d7288bf84a333a9b16", subdirectory = "packages/team1_dropbox" }
 
 [tool.ruff]
 target-version = "py314"

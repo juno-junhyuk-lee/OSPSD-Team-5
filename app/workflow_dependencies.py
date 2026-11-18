@@ -7,6 +7,7 @@ raises CalendarError instead; WorkflowRoute translates it the same way.
 """
 
 from collections.abc import Generator
+from contextlib import ExitStack
 from typing import Annotated
 
 from calendar_contract import CalendarService
@@ -16,7 +17,8 @@ from issue_tracker_contract import ServiceError as IssueServiceError
 
 from app.calendar_service_dependencies import get_calendar_service
 from app.issue_tracker_dependencies import get_issue_provider
-from app.summary_storage import SummaryStore
+from app.storage_package import package_summary_store
+from app.summary_storage import SummaryStorageError, SummaryStore
 from app.workflow import ScheduledIssueWorkflow, not_configured
 
 
@@ -33,9 +35,15 @@ def get_workflow_issue_provider() -> Generator[IssueProvider, None, None]:
         dependency.close()
 
 
-def get_summary_store() -> SummaryStore:
-    """Member 4 replaces this with the storage adapter."""
-    raise not_configured("summary storage", "summary")
+def get_summary_store() -> Generator[SummaryStore, None, None]:
+    """Construct package storage before writes and close its SDK after the request."""
+    with ExitStack() as stack:
+        try:
+            store = stack.enter_context(package_summary_store())
+        except SummaryStorageError:
+            raise not_configured("summary storage", "summary") from None
+        # Only construction failures are configuration errors, not operation errors.
+        yield store
 
 
 def get_scheduled_issue_workflow(

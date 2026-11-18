@@ -1,0 +1,206 @@
+{
+  "application_base_commit": "bf66e7f77c314a4e7b219706a58fba5a622b4c03",
+  "source_sha256": {
+    "app/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/calendar_dependencies.py": "df3a182c1945b37e73815ab8171843034cc0532bd9e9369a2198286f5dbd8d0f",
+    "app/calendar_provider.py": "782369cf358ea792a6f2457f8ad4de5bbc68f2a764bf9a59fe60c769deef2bd7",
+    "app/calendar_service.py": "ac9aa1d8e5c874680e665897ae1308f2a56f52e658899d2abc0af8bd89cd356d",
+    "app/calendar_service_dependencies.py": "2649c6d07cea5ab22aa428397c00a1ab0efcfb8a5ef797eb4de3d7fc609f0433",
+    "app/cloud_telemetry.py": "74ba2c04debe99903041b5758dce62dc442454a764acc9acdc062f7a74cf3cd5",
+    "app/errors.py": "a7014455e9480583529071e9da4f04414d683e2834c140ee4d25fecdc91328b4",
+    "app/event_creation_dependencies.py": "5c0ee4429db69266b3def7d7880d899d2143704c879c44bd0435b864ad65bd9e",
+    "app/event_creation_provider.py": "90453d2be7a405b8792c2d6d0853083f3568c585294cddfca0fa43b53fa1ab05",
+    "app/event_deletion_dependencies.py": "8d9211ec90f65e3cd6fe4d08f5e8ba6530e790fecdd28c3b1e0eb98a1a60fc0e",
+    "app/event_deletion_provider.py": "ed517458c24cab5336ca418858255a359ceae3c92277d1e6c1b852245f5c0371",
+    "app/event_dependencies.py": "e1e1ae13c48e77ab278d20ba3dd4d0fcb825e193107ede92a058d5d1aeb20d46",
+    "app/event_provider.py": "bd04d78b8a0a5388a271b597bc20a13d7f2a279bf384830ba66cf999696aff16",
+    "app/event_update_dependencies.py": "2eb1c05eb0047bf57ed2a4a1dfc6cd3ecf75d412e096697f368918477560c23e",
+    "app/event_update_provider.py": "cebd448193b42dcd2fd5bda12b9d91f2c9ed7ab5774eb8635f294dacb1862d9d",
+    "app/google_auth.py": "2688c75d29c8bb5a1baa673319c3468298e349e0eb8bc5a33212229e73803b0b",
+    "app/google_calendar.py": "87ac1c7fd2ad83822d9799d178707ba9a9ebe376bdbde0803e8863f312da497e",
+    "app/google_create_events.py": "ec22135813e4a91fb849a56e6bdbb01ff2cac7e4dbdcfb21f148461ca0d99ba4",
+    "app/google_delete_events.py": "6cb95687d6723c2c56805b45b809008e145c819b81d00c618098d92fef5b70fc",
+    "app/google_events.py": "a12d1b2224b16f7fd4effdc392ef0be9f9f2cbdf22d8158f2de524b8773559da",
+    "app/google_update_events.py": "7c2cfec76fd11301457584bd6497ab4b979eca3ab88df552bd454751cb4496b0",
+    "app/issue_tracker_dependencies.py": "cdef9d91c1644c3a6140c881898797e23c9932633160bc32e9ff20ff35573391",
+    "app/main.py": "6c0d4d6a501942464950cdf0c8080a3ae2d082a64819556c9885e7a22dbdfe62",
+    "app/models.py": "618b5e1d9f8e6fa55a62825453cd842f35b4602f056c2c0751cd793f544bdb66",
+    "app/observability.py": "d5f9170793b5fdde5fadecfbe9caf5189fccdc27d91e7376a8d8e5da901c00fd",
+    "app/runtime.py": "eb9a1a64812aac8d8e25e6c0664f429dc0bfc2f3e4f8efdce2d09c06b92daea5",
+    "app/storage_package.py": "eb1928cd511d2b9f0fe46b99f6fc04e262561139d9c12c310d22eeac6c99877d",
+    "app/storage_paths.py": "49dd661f5c0e3463fe51628dfc69b12e52a4ce97c3f8b0b2ae417960ffd111d6",
+    "app/summary_storage.py": "18acd567cd2c743a283c816afad919b868e526dc1045ef9c3741e236536a25f5",
+    "app/tracing.py": "671d620c90718cf4d1cb72d4620cb3fb918244c6872907fcf040a5ea3ccb6c2b",
+    "app/workflow.py": "b5a76e1747c59d5469c17acf15e7d75e3299bd93dc633045c8631032e28d35f2",
+    "app/workflow_dependencies.py": "0b1473c2cb696964855a416ae391637280218e0b40212da8cc4780c2f286ea06",
+    "packages/team5-calendar/src/team5_calendar/__init__.py": "644f0f6e7ebcd32f221e225b320cf6a7be927ecf27a64fe9cfcf786cefc1bab4",
+    "packages/team5-calendar/src/team5_calendar/authorization.py": "8d5d52349c14351bb8f292165d0c4d88bf4c320888b67638cad9b151e8525539",
+    "packages/team5-calendar/src/team5_calendar/authorize.py": "4b2873b94db3b7dd05e3c2c3a5d3061ba1984f31b595832ac86ef438f03e906a",
+    "packages/team5-calendar/src/team5_calendar/calendar_service.py": "6b715e5669c1d18f1240fc0daff4d1131ca87c7b435c46d1dc961f78067c83fe",
+    "packages/team5-calendar/src/team5_calendar/event_creation_provider.py": "e68efd7638c318ddf1e8ed9158a8a94d92ab1a550b053935a7c843b23613e801",
+    "packages/team5-calendar/src/team5_calendar/event_deletion_provider.py": "d6df66329b6b57e9bf4c63c003d2ee846860cbff1a3f5a3b95b91d371c8cf9f4",
+    "packages/team5-calendar/src/team5_calendar/event_provider.py": "379ec0348375076b9163987c5b938ee1f831e3ee27486c968e25188e6d65e8f5",
+    "packages/team5-calendar/src/team5_calendar/event_update_provider.py": "315ee0d647f2a5a7e55a4bc0f46518c261b2f47a2c6b272629d4efeccac12216",
+    "packages/team5-calendar/src/team5_calendar/factory.py": "24f7d9a03a1b6f0fa29d6f9b8f43efd40ab314d25b2d0e939133f8410b2eeb0d",
+    "packages/team5-calendar/src/team5_calendar/google_auth.py": "4db7f405029fe19728b0570083346a00884d21d4e56074fca7e49bdf96fd33f2",
+    "packages/team5-calendar/src/team5_calendar/google_create_events.py": "772a9e8c07b60e1c180971a0cc5d9f20fcd778e2411276694209d48f465babd8",
+    "packages/team5-calendar/src/team5_calendar/google_delete_events.py": "bdffb31da6ac1c3ba9b827cc396fb98ff819e14ae3c6d419b6b18646224e3dbe",
+    "packages/team5-calendar/src/team5_calendar/google_events.py": "92f0f19ca52bbebd2abf41f848040636c70c1410e5a180ebecab76f25a71d276",
+    "packages/team5-calendar/src/team5_calendar/google_update_events.py": "65c6be3cbf0aca179012876a2e24626697394814f271d29a15b66a35b28651ca",
+    "packages/team5-calendar/src/team5_calendar/tracing.py": "7de95c9447c0f98a9c613141cb337b5192437aaf3ea672e9b5b336949790df6e",
+    "pyproject.toml": "34da0d9d8a1d2ac73f79ba8c8bfc19f64a04cc7cae951bb130051cc6baf7cd7f",
+    "uv.lock": "599aa5a6e02367f24858082896a3b85b57b7bec137c3e08b1bec1dc8b8a373e7"
+  },
+  "packages": {
+    "cloud-storage-api": {
+      "version": "0.2.0",
+      "direct_url": {
+        "url": "https://github.com/Dayana20/ospsd26-cloud-storage",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "664afc92f7cc0b2ee51cde6ddfa088cc3b37206c",
+          "requested_revision": "0.3.1"
+        },
+        "subdirectory": "src/cloud_storage_api"
+      }
+    },
+    "dropbox-client-impl": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Shreyas191/OSPSD-Team-3",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "fde60d4fb648df6defb918ff815fe940c525adc7",
+          "requested_revision": "fde60d4fb648df6defb918ff815fe940c525adc7"
+        },
+        "subdirectory": "src/dropbox_client_impl"
+      }
+    },
+    "team1-dropbox-storage": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "https://github.com/Dayana20/sandbox.git",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "784be97fc111338c6746b9d7288bf84a333a9b16",
+          "requested_revision": "784be97fc111338c6746b9d7288bf84a333a9b16"
+        },
+        "subdirectory": "packages/team1_dropbox"
+      }
+    },
+    "dropbox": {
+      "version": "12.1.0",
+      "direct_url": null
+    },
+    "team-4-issue-tracker-trello": {
+      "version": "1.0.0",
+      "direct_url": {
+        "url": "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "c88ce2fd287f2524ba09ad5d94faf3983fdac08d",
+          "requested_revision": "team-4-issue-tracker-trello-v1.0.0"
+        },
+        "subdirectory": "team-4-trello-impl"
+      }
+    },
+    "team5-calendar": {
+      "version": "0.1.0",
+      "direct_url": {
+        "url": "file:///C:/Users/%EC%9D%B4%EC%B1%84%EB%A6%B0/Desktop/NYU/4-1/OpenSourceProgramming/OSPSD-Team-5/packages/team5-calendar",
+        "dir_info": {
+          "editable": false
+        }
+      }
+    }
+  },
+  "runner_sha256": "b236cc005dc6f8351a619c18e9f8b9bd59a18874860ddee9266f282d101d2a34",
+  "execution": "local FastAPI route with real providers",
+  "pending_final_53_fix": true,
+  "independent_inspection": "not performed",
+  "started_at": "2026-11-18T04:32:18.776300+00:00",
+  "runs": [
+    {
+      "started_at": "2026-11-18T04:32:18.863583+00:00",
+      "implementation": "team3_dropbox",
+      "result": "passed",
+      "readback": {
+        "issue": "passed",
+        "event": "passed",
+        "summary": "passed"
+      },
+      "cleanup": {
+        "summary": "confirmed absent",
+        "event": "confirmed absent",
+        "issue": "confirmed absent"
+      },
+      "request": {
+        "title": "team5-hw3-swap-team3_dropbox-c397a090eb0f4848abee8e44c2b3347a",
+        "start": "2026-11-19T04:32:18+00:00",
+        "end": "2026-11-19T04:47:18+00:00"
+      },
+      "http_status": 201,
+      "response": {
+        "issue": {
+          "id": "6afd2a55cb4c06cfedcb86e2",
+          "title": "team5-hw3-swap-team3_dropbox-c397a090eb0f4848abee8e44c2b3347a"
+        },
+        "event": {
+          "id": "1gpoqd9j93v4anfa1bvdm602kc",
+          "title": "team5-hw3-swap-team3_dropbox-c397a090eb0f4848abee8e44c2b3347a",
+          "start": "2026-11-18T23:32:18-05:00",
+          "end": "2026-11-18T23:47:18-05:00"
+        },
+        "summary": {
+          "id": "id:ceeRv-cWOxkAAAAAAAAADQ",
+          "markdown": "# team5\\-hw3\\-swap\\-team3\\_dropbox\\-c397a090eb0f4848abee8e44c2b3347a\n\n| Field | Value |\n| --- | --- |\n| Issue ID | `6afd2a55cb4c06cfedcb86e2` |\n| Issue title | team5\\-hw3\\-swap\\-team3\\_dropbox\\-c397a090eb0f4848abee8e44c2b3347a |\n| Event ID | `1gpoqd9j93v4anfa1bvdm602kc` |\n| Start | 2026\\-11\\-18T23:32:18\\-05:00 |\n| End | 2026\\-11\\-18T23:47:18\\-05:00 |\n"
+        }
+      },
+      "summary_path": "/ospsd-team5-hw3/scheduled-issue-6afd2a55cb4c06cfedcb86e2-1gpoqd9j93v4anfa1bvdm602kc.md",
+      "summary_sha256": "589b95591fa971b835a0d213f248f08842e63f5ed415cf8e3f0909d39c15f37e",
+      "finished_at": "2026-11-18T04:32:26.253834+00:00"
+    },
+    {
+      "started_at": "2026-11-18T04:32:26.384972+00:00",
+      "implementation": "team1_dropbox",
+      "result": "passed",
+      "readback": {
+        "issue": "passed",
+        "event": "passed",
+        "summary": "passed"
+      },
+      "cleanup": {
+        "summary": "confirmed absent",
+        "event": "confirmed absent",
+        "issue": "confirmed absent"
+      },
+      "request": {
+        "title": "team5-hw3-swap-team1_dropbox-fd1774e2ec5144cf9c27de4d69711a2b",
+        "start": "2026-11-19T04:32:18+00:00",
+        "end": "2026-11-19T04:47:18+00:00"
+      },
+      "http_status": 201,
+      "response": {
+        "issue": {
+          "id": "6afd2a5c48a495baf02fa315",
+          "title": "team5-hw3-swap-team1_dropbox-fd1774e2ec5144cf9c27de4d69711a2b"
+        },
+        "event": {
+          "id": "k76u4h03oub66l49qir1glgdh4",
+          "title": "team5-hw3-swap-team1_dropbox-fd1774e2ec5144cf9c27de4d69711a2b",
+          "start": "2026-11-18T23:32:18-05:00",
+          "end": "2026-11-18T23:47:18-05:00"
+        },
+        "summary": {
+          "id": "id:ceeRv-cWOxkAAAAAAAAADg",
+          "markdown": "# team5\\-hw3\\-swap\\-team1\\_dropbox\\-fd1774e2ec5144cf9c27de4d69711a2b\n\n| Field | Value |\n| --- | --- |\n| Issue ID | `6afd2a5c48a495baf02fa315` |\n| Issue title | team5\\-hw3\\-swap\\-team1\\_dropbox\\-fd1774e2ec5144cf9c27de4d69711a2b |\n| Event ID | `k76u4h03oub66l49qir1glgdh4` |\n| Start | 2026\\-11\\-18T23:32:18\\-05:00 |\n| End | 2026\\-11\\-18T23:47:18\\-05:00 |\n"
+        }
+      },
+      "summary_path": "/ospsd-team5-hw3/scheduled-issue-6afd2a5c48a495baf02fa315-k76u4h03oub66l49qir1glgdh4.md",
+      "summary_sha256": "9726fba1da317f524c758cc7f234f87de35e0595828b9a4e1e048aef28e5c9fb",
+      "finished_at": "2026-11-18T04:32:32.152252+00:00"
+    }
+  ],
+  "result": "passed",
+  "finished_at": "2026-11-18T04:32:32.174673+00:00"
+}

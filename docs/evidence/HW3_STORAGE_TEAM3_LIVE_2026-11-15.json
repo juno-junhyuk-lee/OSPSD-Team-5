@@ -1,0 +1,34 @@
+{
+  "application_base_commit": "736efc889f7c1f3539a4bdbb565bb65d74936e17",
+  "source_sha256": {
+    "app/storage_http.py": "459310f700059209d67348045e5e17f2a27da95e05a3c879d1ba4582cc960be8",
+    "app/storage_client.py": "c1c6abc397719514fa5801566cf47e724d806df8cb371157de6606900a42701a",
+    "app/storage_settings.py": "e096ca051c59a4672dfdcb96f606a170b59bf6c25877ebd3ce3677ff36f516bb",
+    "app/summary_storage.py": "d564db2ab82c03062b9c165f533a37f133d587f2b06299702b5c365834414694",
+    "scripts/verify_storage_live.py": "c52a11fcd0668f0d537257bbfc817c583ff0064d238cf28554a158bc30a39947",
+    "uv.lock": "414b106c18ee9ead36cb669fe9fcf2ea7abaf4bfb94aef4886ef737c43064973"
+  },
+  "started_at": "2026-11-15T06:02:50.659963+00:00",
+  "base_url": "https://cloud-storage-service-test-gyesjhieva-uc.a.run.app/",
+  "path": "/ospsd-team5-hw3/team5-hw3-59db7afce97048518c24d2bb689862f2.md",
+  "sha256": "4395fd9bbdb47d8d224296a048f53e63f8f22b485bc44304cfc00283aeb431b2",
+  "direct_provider_verification": "pending",
+  "deployed_composed_workflow": "not exercised",
+  "cleanup": "confirmed absent",
+  "provider_health": "passed",
+  "create_and_download_compare": "passed",
+  "reference": "id:KzOOg5ouvzUAAAAAAAAB5g",
+  "metadata": {
+    "id": "id:KzOOg5ouvzUAAAAAAAAB5g",
+    "name": "team5-hw3-59db7afce97048518c24d2bb689862f2.md",
+    "path": "/ospsd-team5-hw3/team5-hw3-59db7afce97048518c24d2bb689862f2.md",
+    "size": 104,
+    "modified_at": "2026-11-15T06:02:54Z",
+    "etag": "016604a698080c500000003923a8b33",
+    "type": null
+  },
+  "create_conflict": "passed",
+  "conflict_preserved_bytes": "passed",
+  "result": "passed",
+  "finished_at": "2026-11-15T06:02:56.445204+00:00"
+}

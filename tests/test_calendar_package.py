@@ -1,5 +1,6 @@
 """Consumer-facing Calendar factory checks with controlled Google transport."""
 
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -203,13 +204,20 @@ def test_explicit_authorize_command_writes_private_external_token(
     flow.run_local_server.return_value.to_json.return_value = '{"token":"synthetic"}'
     create = Mock(return_value=flow)
     monkeypatch.setattr(InstalledAppFlow, "from_client_secrets_file", create)
+    open_token = Mock(wraps=os.open)
+    monkeypatch.setattr(os, "open", open_token)
     assert authorize.main() == 0
     create.assert_called_once_with(str(client), authorization.SCOPES)
     flow.run_local_server.assert_called_once_with(
         port=0, timeout_seconds=300, authorization_prompt_message=""
     )
     assert destination.read_text(encoding="utf-8") == '{"token":"synthetic"}'
-    assert destination.stat().st_mode & 0o777 == 0o600
+    open_token.assert_called_once_with(
+        destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+    )
+    # Windows mode bits do not represent POSIX owner-only permissions.
+    if os.name == "posix":
+        assert destination.stat().st_mode & 0o777 == 0o600
 
 
 def test_authorize_command_does_not_replace_an_existing_token(

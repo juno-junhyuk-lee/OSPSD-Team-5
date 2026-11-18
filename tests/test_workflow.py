@@ -58,10 +58,10 @@ class FakeIssues:
     def get_issue(self, issue_id: str, *, fresh: bool = False) -> Issue:
         raise AssertionError("not used")
 
-    def list_issues(self, *, limit: int) -> list[Issue]:
+    def update_issue(self, issue_id: str, changes: IssueUpdate) -> Issue:
         raise AssertionError("not used")
 
-    def update_issue(self, issue_id: str, changes: IssueUpdate) -> Issue:
+    def list_issues(self, *, limit: int = 20) -> list[Issue]:
         raise AssertionError("not used")
 
     def delete_issue(self, issue_id: str) -> None:
@@ -570,6 +570,35 @@ def test_http_failure_reports_step_and_leftovers_once(
     assert "Fix login bug" not in caplog.text
 
 
+@pytest.mark.parametrize("path", [None, "/team5/summary.md"])
+def test_summary_failure_path_is_optional_and_separate_from_id(
+    path: str | None,
+    client: TestClient,
+    store: FakeStore,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    store.error = SummaryStorageError(
+        "SECRET remote error", may_have_applied=True, path=path
+    )
+    with caplog.at_level(logging.INFO, logger="calendar_service"):
+        response = client.post(PATH, json=PAYLOAD)
+    assert response.status_code == 502
+    error = response.json()["error"]
+    expected: dict[str, object] = {"kind": "summary", "id": None, "state": "uncertain"}
+    if path is not None:
+        expected["path"] = path
+        assert path not in caplog.text
+    assert error["leftovers"][-1] == expected
+    assert error["retryable"] is False
+    assert "SECRET" not in response.text + caplog.text
+
+
+def test_leftover_path_is_not_required_by_openapi() -> None:
+    schema = app.openapi()["components"]["schemas"]["Leftover"]
+    assert "path" in schema["properties"]
+    assert "path" not in schema["required"]
+
+
 # Default dependency wiring
 
 
@@ -578,6 +607,8 @@ def test_unconfigured_storage_fails_before_any_write(
     calendar: FakeCalendar,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("DROPBOX_APP_KEY", raising=False)
+
     def controlled_issues() -> IssueProvider:
         return issues
 
