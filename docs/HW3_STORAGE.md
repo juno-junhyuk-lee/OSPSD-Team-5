@@ -1,9 +1,9 @@
 # HW3 storage integration
 
 Owner: Kristie Lee (Member 4). This is the storage contribution to Member 5's
-DESIGN.md and the operator handoff. Internal and outside-team design reviews
-remain pending. Codex assisted with inspection, implementation, tests and HTTP
-verification; the student owner remains responsible for understanding the work.
+DESIGN.md and the operator handoff. The design review is recorded in PR #56.
+Codex assisted with inspection, implementation, tests and verification; the
+student owner remains responsible for understanding the work.
 
 ## Status and evidence
 
@@ -20,8 +20,9 @@ Use the package authorization guide for runtime configuration. HTTP evidence bel
 is historical and does not establish package integration. John approved Team 3
 commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. Kristie
 reports successful OAuth with the intended Team 5 account. The package storage
-probe and local real-provider composed workflow passed. Independent inspection,
-deployed workflow verification and final workflow synchronization remain pending.
+probe and local real-provider composed workflow passed. The final #53 changes
+are integrated. Independent inspection and deployed workflow verification remain
+pending.
 The local configuration-only Team 3 -> Team 1 swap has now passed; see
 [paired swap evidence](HW3_STORAGE_TEAM1_INTEGRATION.md#step-6-local-configuration-only-swap-evidence).
 

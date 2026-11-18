@@ -2,8 +2,9 @@
 
 Owner: Kristie (Member 4), with Codex assistance. November 17, 2026.
 Dependency-scope baseline: `3eaa34c` after Kristie merged #58 and fast-forwarded
-the local storage branch. Dependency installation and provider selection are now
-implemented locally; real configuration-only swap evidence is still pending.
+the local storage branch. The configuration-only swap passed with real
+providers locally. See [the paired runs](#step-6-local-configuration-only-swap-evidence).
+Hosted verification remains pending.
 
 ## Pinned candidate and shared installation
 
@@ -158,7 +159,6 @@ The one-off operator helper lives in ignored `.venv`; its source hash is recorde
 and matched during review, but its source is not included in the committed
 evidence. This is local FastAPI TestClient execution with real providers, not a
 deployed endpoint test or an independent human inspection. The record explicitly
-sets `pending_final_53_fix=true`; final #53 validation/hosted-auth follow-up,
-post-sync regression checks, independent inspection and deployment verification
-remain separate tasks. No new live operation was performed during documentation
-review, and no credential values were requested or recorded.
+sets `pending_final_53_fix=true` because these live runs predated the final #53
+fix. The integrated revision passed offline regression checks. Hosted
+verification and independent inspection remain pending.
