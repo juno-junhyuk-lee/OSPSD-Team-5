@@ -2,8 +2,8 @@
 
 Owner: Kristie (Member 4), with Codex assistance. November 17, 2026.
 Dependency-scope baseline: `3eaa34c` after Kristie merged #58 and fast-forwarded
-the local storage branch. This scope installs the candidate; it does not select
-Team 1 in the workflow or establish a configuration-only swap.
+the local storage branch. Dependency installation and provider selection are now
+implemented locally; real configuration-only swap evidence is still pending.
 
 ## Pinned candidate and shared installation
 
@@ -63,5 +63,32 @@ conformance, Team 1 failure certainty or real CRUD. Next scopes add provider
 selection, verify both error mappings and probe provenance, then perform the
 actual configuration-only swap and record new real-provider evidence. Existing
 Team 3 evidence uses its original lock/SDK and remains historical.
+
+## Step 3: configuration-based selection
+
+`PackageStorageSettings` reads `STORAGE_IMPLEMENTATION`, accepting
+`team3_dropbox` (default) and `team1_dropbox` only. The factory imports and builds
+only the chosen implementation using the same SDK, credential snapshot, token
+file behavior, timeout and disabled retries. Unknown direct settings or invalid
+environment selector values fail before SDK construction. Constructor failure
+closes the SDK and returns a sanitized configuration error; it never triggers
+fallback to the other implementation.
+
+Team 3 retains its typed cause-chain summary classification. Team 1 uses the
+generic conservative shared-contract classification for now, so Team 3-specific
+exception-chain assumptions cannot accidentally classify Team 1 failures.
+Provider-specific failure refinements and the cross-provider probe/error matrix
+remain step 4. The probe already records the selected implementation label and
+both installed package provenances to avoid falsely identifying a Team 1 run as
+Team 3. This metadata update is not a claim of a live Team 1 run.
+
+Offline tests verify default/explicit selection, actual implementation types,
+real SDK initialization without network, no fallback on either constructor
+failure, invalid-selector pre-write errors, client cleanup and a real Team 1
+wrapper through the normal workflow route with controlled SDK upload/download.
+No credential file or live provider was used by these tests.
+Step 3 validation: **908 passed, 58 skipped**, including 12 added selector/wiring
+cases. Ruff lint/format, strict mypy, probe-specific mypy and `git diff --check`
+passed; the existing Starlette TestClient warning remains.
 
 Source: [Team 1 README at the pinned candidate](https://github.com/Dayana20/sandbox/blob/784be97fc111338c6746b9d7288bf84a333a9b16/packages/team1_dropbox/README.md).

@@ -153,7 +153,7 @@ def test_bad_root_fails_before_any_write(
 
 
 @pytest.mark.parametrize(
-    "failure", ["missing_key", "missing_token", "dotenv", "constructor"]
+    "failure", ["missing_key", "missing_token", "dotenv", "constructor", "selector"]
 )
 def test_package_configuration_failure_is_public_503_before_writes(
     failure: str, monkeypatch: pytest.MonkeyPatch
@@ -164,6 +164,8 @@ def test_package_configuration_failure_is_public_503_before_writes(
         monkeypatch.delenv("DROPBOX_REFRESH_TOKEN")
     elif failure == "dotenv":
         monkeypatch.delenv("PYTHON_DOTENV_DISABLED")
+    elif failure == "selector":
+        monkeypatch.setenv("STORAGE_IMPLEMENTATION", "unknown")
     issues, calendar = FakeIssues(), FakeCalendar()
     previous = app.dependency_overrides.copy()
     app.dependency_overrides[get_workflow_issue_provider] = lambda: issues
@@ -201,6 +203,54 @@ def test_bad_summary_filename_cannot_escape_root(name: str) -> None:
     storage.create.assert_not_called()
     storage.download.assert_not_called()
     assert not caught.value.may_have_applied
+
+
+def test_team1_selection_uses_the_real_package_for_workflow_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dropbox.files import FileMetadata  # type: ignore[import-untyped]
+
+    monkeypatch.setenv("STORAGE_IMPLEMENTATION", "team1_dropbox")
+    destination = "/team5/scheduled-issue-issue-1-event-1.md"
+    metadata = FileMetadata(
+        name=destination.rsplit("/", 1)[1],
+        id="team1-file-id",
+        client_modified=datetime(2026, 11, 17),
+        server_modified=datetime(2026, 11, 17),
+        rev="123456789",
+        size=1,
+        path_display=destination,
+    )
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_workflow_issue_provider] = FakeIssues
+    app.dependency_overrides[get_calendar_service] = FakeCalendar
+    try:
+        with (
+            patch("dropbox.Dropbox") as sdk_type,
+            patch(
+                "dropbox_client_impl.DropboxDocumentStorage",
+                side_effect=AssertionError("Wrong provider"),
+            ) as team3,
+        ):
+            sdk = sdk_type.return_value
+            sdk.files_upload.return_value = metadata
+            sdk.files_download.side_effect = lambda path: (
+                metadata,
+                SimpleNamespace(content=sdk.files_upload.call_args.args[0]),
+            )
+            with TestClient(app) as caller:
+                response = caller.post("/workflows/scheduled-issues", json=PAYLOAD)
+            assert response.status_code == 201
+            assert response.json()["summary"]["id"] == "team1-file-id"
+            assert sdk.files_upload.call_args.args == (
+                response.json()["summary"]["markdown"].encode("utf-8"),
+                destination,
+            )
+            sdk.files_download.assert_called_once_with(destination)
+            sdk.close.assert_called_once_with()
+            team3.assert_not_called()
+    finally:
+        app.dependency_overrides = previous
 
 
 @pytest.mark.parametrize(

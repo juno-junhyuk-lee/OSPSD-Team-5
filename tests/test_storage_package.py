@@ -9,7 +9,11 @@ from unittest.mock import patch
 import pytest
 from cloud_storage_api import ProviderError
 
-from app.storage_package import PackageStorageSettings, package_summary_store
+from app.storage_package import (
+    PackageStorageSettings,
+    package_document_storage,
+    package_summary_store,
+)
 from app.summary_storage import SummaryStorageError
 
 
@@ -53,6 +57,9 @@ def assert_configuration_failure() -> None:
         ("DROPBOX_APP_KEY", ""),
         ("DROPBOX_APP_SECRET", "  "),
         ("DROPBOX_REFRESH_TOKEN", ""),
+        ("STORAGE_IMPLEMENTATION", ""),
+        ("STORAGE_IMPLEMENTATION", "team1"),
+        ("STORAGE_IMPLEMENTATION", "team1_dropbox "),
     ],
 )
 def test_invalid_settings_stop_before_package_construction(
@@ -126,7 +133,11 @@ def test_real_package_construction_disables_retries_and_closes_sdk() -> None:
         sdk.close.assert_called_once_with()
 
 
-def test_real_sdk_and_package_construct_without_network() -> None:
+@pytest.mark.parametrize("selection", ["team3_dropbox", "team1_dropbox"])
+def test_real_sdk_and_package_construct_without_network(
+    selection: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STORAGE_IMPLEMENTATION", selection)
     with package_summary_store() as store:
         assert store is not None
 
@@ -156,3 +167,68 @@ def test_operation_error_is_not_reclassified_as_configuration_failure() -> None:
                 raise failure
         assert caught.value is failure
         sdk_type.return_value.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize("selection", [None, "team3_dropbox", "team1_dropbox"])
+def test_selection_constructs_only_the_requested_real_implementation(
+    selection: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if selection is not None:
+        monkeypatch.setenv("STORAGE_IMPLEMENTATION", selection)
+    from dropbox_client_impl import DropboxClient, DropboxDocumentStorage
+    from team1_dropbox import Team1DropboxStorage
+
+    selected = selection or "team3_dropbox"
+    expected_type = (
+        Team1DropboxStorage if selected == "team1_dropbox" else DropboxDocumentStorage
+    )
+    with (
+        patch("dropbox.Dropbox") as sdk_type,
+        patch("team1_dropbox.Team1DropboxStorage", wraps=Team1DropboxStorage) as team1,
+        patch(
+            "dropbox_client_impl.DropboxDocumentStorage", wraps=DropboxDocumentStorage
+        ) as team3,
+        patch("dropbox_client_impl.DropboxClient", wraps=DropboxClient) as team3_client,
+    ):
+        settings = PackageStorageSettings.from_environment()
+        assert settings.implementation == selected
+        with package_document_storage(settings) as storage:
+            assert isinstance(storage, expected_type)
+        assert team1.call_count == (1 if selected == "team1_dropbox" else 0)
+        assert (
+            team3.call_count
+            == team3_client.call_count
+            == (0 if selected == "team1_dropbox" else 1)
+        )
+        sdk_type.return_value.close.assert_called_once_with()
+        assert sdk_type.call_args.kwargs["max_retries_on_error"] == 0
+        assert sdk_type.call_args.kwargs["max_retries_on_rate_limit"] == 0
+
+
+@pytest.mark.parametrize("selection", ["team3_dropbox", "team1_dropbox"])
+def test_failed_selected_constructor_does_not_fall_back(
+    selection: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STORAGE_IMPLEMENTATION", selection)
+    with (
+        patch("dropbox.Dropbox") as sdk_type,
+        patch(
+            "team1_dropbox.Team1DropboxStorage", side_effect=RuntimeError("SECRET")
+        ) as team1,
+        patch(
+            "dropbox_client_impl.DropboxDocumentStorage",
+            side_effect=RuntimeError("SECRET"),
+        ) as team3,
+    ):
+        assert_configuration_failure()
+        assert team1.call_count == (1 if selection == "team1_dropbox" else 0)
+        assert team3.call_count == (1 if selection == "team3_dropbox" else 0)
+        sdk_type.return_value.close.assert_called_once_with()
+
+
+def test_invalid_direct_settings_do_not_construct_an_sdk() -> None:
+    settings = PackageStorageSettings("/hw3", "key", "secret", "refresh", "unknown")
+    with patch("dropbox.Dropbox") as sdk, pytest.raises(SummaryStorageError):
+        with package_document_storage(settings):
+            pytest.fail("Unknown implementation must not be yielded")
+    sdk.assert_not_called()

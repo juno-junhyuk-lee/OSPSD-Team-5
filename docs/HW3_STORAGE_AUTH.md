@@ -30,6 +30,7 @@ $env:DROPBOX_TOKEN_FILE = Join-Path $dropboxCredentialDir 'refresh-token.json'
 $env:DROPBOX_REDIRECT_URI = 'http://localhost:8080/oauth/callback'
 $env:PYTHON_DOTENV_DISABLED = '1'
 $env:STORAGE_ROOT_PATH = '/ospsd-team5-hw3'
+$env:STORAGE_IMPLEMENTATION = 'team3_dropbox'
 $env:DROPBOX_APP_KEY = Read-Host 'Team5-Review App key'
 $dropboxSecretInput = Read-Host 'Team5-Review App secret' -AsSecureString
 $env:DROPBOX_APP_SECRET = [System.Net.NetworkCredential]::new('', $dropboxSecretInput).Password
@@ -69,6 +70,15 @@ contact Dropbox; neither proves file CRUD. Report success/failure without token
 values or personal account details. No manual access-token generation is needed.
 
 ## Test folder and opt-in package probe
+
+`STORAGE_IMPLEMENTATION` accepts exactly `team3_dropbox` (default when absent)
+or `team1_dropbox`. Empty, misspelled or whitespace-padded values fail before
+writes; there is no automatic provider fallback. To select Team 1 in this
+terminal, set `$env:STORAGE_IMPLEMENTATION = 'team1_dropbox'` before starting a
+new request/server process. Root and credentials are unchanged; both packages
+accept our scoped SDK with the existing explicit refresh token or token file.
+Do not change provider selection mid-request. Merely setting the variable is
+not evidence of a completed swap; real paired verification is a later step.
 
 In the authorized account's Dropbox web UI, locate the app-specific Team5-Review
 folder and create/confirm its `ospsd-team5-hw3` child folder. The API path is

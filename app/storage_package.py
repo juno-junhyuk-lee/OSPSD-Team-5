@@ -1,7 +1,7 @@
 """Construct package-backed summary storage before any workflow writes.
 
 Only explicit environment configuration and an absolute token-file path are
-used. Importing this module does not import Team 3 or load dotenv/credentials.
+used. Importing this module does not import providers or load dotenv/credentials.
 """
 
 import json
@@ -73,10 +73,14 @@ class PackageStorageSettings:
     app_key: str = field(repr=False)
     app_secret: str = field(repr=False)
     refresh_token: str = field(repr=False)
+    implementation: str = "team3_dropbox"
 
     @classmethod
     def from_environment(cls) -> "PackageStorageSettings":
         try:
+            implementation = os.environ.get("STORAGE_IMPLEMENTATION", "team3_dropbox")
+            if implementation not in {"team3_dropbox", "team1_dropbox"}:
+                raise ValueError
             # Team 3 calls load_dotenv on import. Require its explicit opt-out.
             if os.environ.get("PYTHON_DOTENV_DISABLED") != "1":
                 raise ValueError
@@ -99,15 +103,16 @@ class PackageStorageSettings:
                 raise ValueError
         except KeyError, ValueError, OSError, InvalidRequestError:
             raise _configuration_error() from None
-        return cls(root, key, secret, token)
+        return cls(root, key, secret, token, implementation)
 
 
 def _create_storage(
     settings: PackageStorageSettings,
 ) -> tuple[DocumentStorage, _Closeable]:
     # Lazy imports keep application import independent of package auth setup.
+    if settings.implementation not in {"team3_dropbox", "team1_dropbox"}:
+        raise _configuration_error()
     import dropbox  # type: ignore[import-untyped]
-    from dropbox_client_impl import DropboxClient, DropboxDocumentStorage
 
     sdk = dropbox.Dropbox(
         oauth2_refresh_token=settings.refresh_token,
@@ -118,7 +123,15 @@ def _create_storage(
         max_retries_on_rate_limit=0,
     )
     try:
-        storage = DropboxDocumentStorage(client=DropboxClient(dbx=sdk))
+        storage: DocumentStorage
+        if settings.implementation == "team1_dropbox":
+            from team1_dropbox import Team1DropboxStorage
+
+            storage = Team1DropboxStorage(client=sdk)
+        else:
+            from dropbox_client_impl import DropboxClient, DropboxDocumentStorage
+
+            storage = DropboxDocumentStorage(client=DropboxClient(dbx=sdk))
     except Exception:
         sdk.close()
         raise
@@ -145,4 +158,8 @@ def package_summary_store() -> Iterator[DocumentSummaryStore]:
     """Read explicit configuration; preserve operation errors after construction."""
     settings = PackageStorageSettings.from_environment()
     with package_document_storage(settings) as storage:
-        yield _PackageSummaryStore(storage, settings.root_path)
+        if settings.implementation == "team3_dropbox":
+            yield _PackageSummaryStore(storage, settings.root_path)
+        else:
+            # Team 3's cause-chain assumptions must not be applied to Team 1.
+            yield DocumentSummaryStore(storage, settings.root_path)

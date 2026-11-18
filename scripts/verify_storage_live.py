@@ -32,7 +32,10 @@ def verify(settings: PackageStorageSettings) -> dict[str, object]:
     content = markdown.encode()
     result: dict[str, object] = {
         "started_at": datetime.now(UTC).isoformat(),
-        "integration": "Team3 package import",
+        "integration": "Team1 package import"
+        if settings.implementation == "team1_dropbox"
+        else "Team3 package import",
+        "implementation": settings.implementation,
         "python_version": sys.version.split()[0],
         "path": path,
         "sha256": hashlib.sha256(content).hexdigest(),
@@ -148,6 +151,7 @@ def main() -> None:
                 "cloud-storage-api",
                 "cloud-storage-client-api",
                 "dropbox-client-impl",
+                "team1-dropbox-storage",
                 "dropbox",
             )
         },
