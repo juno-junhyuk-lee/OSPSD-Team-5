@@ -24,6 +24,7 @@ from app.workflow import (
     ScheduledIssueRequest,
     ScheduledIssueWorkflow,
     WorkflowError,
+    WorkflowErrorResponse,
     escape_markdown,
     render_summary,
     summary_name,
@@ -146,6 +147,13 @@ def run(workflow: ScheduledIssueWorkflow, **changes: str) -> WorkflowError:
     with pytest.raises(WorkflowError) as raised:
         workflow.run(ScheduledIssueRequest(**{**PAYLOAD, **changes}))
     return raised.value
+
+
+def assert_workflow_error(body: object, code: str, *, step: str) -> None:
+    """Every workflow error must parse as the documented response model."""
+    error = WorkflowErrorResponse.model_validate(body).error
+    assert (error.code.value, error.step, error.leftovers) == (code, step, [])
+    assert error.retryable is False
 
 
 def leftovers(error: WorkflowError) -> list[dict[str, object]]:
@@ -274,8 +282,28 @@ def test_http_rejects_bad_shapes_without_writes(
     response = client.post(PATH, json=body)
 
     assert response.status_code == 422
-    assert response.json()["error"]["code"] == "invalid_input"
+    assert_workflow_error(response.json(), "invalid_input", step="validate")
     assert issues.calls == []
+
+
+@pytest.mark.parametrize("content", [b"{", b""])
+def test_http_rejects_malformed_json_in_workflow_shape(
+    content: bytes, client: TestClient, issues: FakeIssues
+) -> None:
+    response = client.post(
+        PATH, content=content, headers={"Content-Type": "application/json"}
+    )
+
+    assert response.status_code == 400
+    assert_workflow_error(response.json(), "invalid_input", step="validate")
+    assert issues.calls == []
+
+
+def test_other_routes_keep_the_shared_validation_shape() -> None:
+    response = TestClient(app).post("/events", json={"title": "t"})
+
+    assert response.status_code == 422
+    assert set(response.json()["error"]) == {"code", "message", "retryable"}
 
 
 # Step 1: issue
@@ -605,13 +633,15 @@ def test_unconfigured_storage_fails_before_any_write(
         "step": "summary",
         "leftovers": [],
     }
+    assert_workflow_error(response.json(), "provider_unavailable", step="summary")
     assert issues.calls == calendar.calls == []
 
 
 def test_unconfigured_issue_tracker_fails_before_any_write(
     calendar: FakeCalendar, store: FakeStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("TRELLO_API_KEY", raising=False)
+    for name in ("TRELLO_API_KEY", "TRELLO_TOKEN", "TRELLO_LIST_ID"):
+        monkeypatch.delenv(name, raising=False)
 
     def controlled_calendar() -> CalendarService:
         return calendar
@@ -633,10 +663,42 @@ def test_unconfigured_issue_tracker_fails_before_any_write(
     assert response.json()["error"]["message"] == (
         "The issue tracker is not configured or unavailable."
     )
+    assert_workflow_error(response.json(), "provider_unavailable", step="issue")
     assert calendar.calls == store.saved == []
+
+
+def test_unconfigured_calendar_fails_before_any_write(
+    issues: FakeIssues, store: FakeStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CALENDAR_IMPLEMENTATION", "unsupported")
+
+    def controlled_issues() -> IssueProvider:
+        return issues
+
+    def controlled_store() -> SummaryStore:
+        return store
+
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_workflow_issue_provider] = controlled_issues
+    app.dependency_overrides[get_summary_store] = controlled_store
+    try:
+        response = TestClient(app).post(PATH, json=PAYLOAD)
+    finally:
+        app.dependency_overrides = previous
+
+    assert response.status_code == 503
+    assert response.json()["error"]["message"] == (
+        "The calendar is not configured or unavailable."
+    )
+    assert_workflow_error(response.json(), "provider_unavailable", step="event")
+    assert issues.calls == store.saved == []
 
 
 def test_openapi_documents_workflow() -> None:
     operation = app.openapi()["paths"][PATH]["post"]
 
-    assert set(operation["responses"]) >= {"201", "403", "422", "502", "503"}
+    errors = {"400", "403", "422", "502", "503"}
+    assert set(operation["responses"]) >= {"201", *errors}
+    for status in errors:
+        schema = operation["responses"][status]["content"]["application/json"]
+        assert schema["schema"]["$ref"].endswith("/WorkflowErrorResponse")
