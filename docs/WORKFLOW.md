@@ -12,7 +12,7 @@ verification or independent human inspection.
 | --- | --- | --- |
 | Issue tracker (`IssueProvider`) | Member 3 | Imported Team 4 provider; local composed create, fresh read and cleanup passed |
 | Calendar (`CalendarService`) | Member 2 | Wired via existing `get_calendar_service` |
-| Summary storage (`SummaryStore`) | Kristie (Member 4) | Imported Team 3 package; local composed upload, exact readback and cleanup passed; independent inspection and Team 1 swap pending |
+| Summary storage (`SummaryStore`) | Kristie (Member 4) | Imported Team 3/Team 1 selected by configuration; local paired composition/readback/cleanup passed; independent inspection and hosted verification pending |
 
 ## Local real-provider workflow evidence
 
@@ -47,6 +47,17 @@ package configuration is documented in that plan; `STORAGE_BASE_URL` is no
 longer used by this workflow.
 
 ## Endpoint
+
+### Paired implementation-swap verification
+
+At `bf66e7f`, Kristie also ran the local composed route with Team 3 then Team 1,
+changing only the implementation selector between runs. Both returned 201 with
+real providers; issue/Calendar/summary readbacks and summary/event/issue cleanup
+absence checks passed. Commit/source manifests were unchanged. See
+[paired swap evidence and limitations](HW3_STORAGE_TEAM1_INTEGRATION.md#step-6-local-configuration-only-swap-evidence).
+These successful normal requests do not resolve #53's validation-precedence issue or establish
+deployed/independently inspected verification; the evidence explicitly records
+the pending final #53 fix.
 
 ### Integrated candidate prerequisites
 

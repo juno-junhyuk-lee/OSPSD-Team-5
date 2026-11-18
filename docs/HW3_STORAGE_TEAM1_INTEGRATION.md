@@ -123,3 +123,42 @@ Ruff lint/format, strict mypy, probe-specific mypy and `git diff --check` passed
 The existing Starlette TestClient deprecation warning remains. The known #53
 validation-precedence issue is outside this storage scope and still requires
 the final upstream workflow update.
+
+## Step 6: local configuration-only swap evidence
+
+Kristie executed the checks at unchanged application commit
+`bf66e7f77c314a4e7b219706a58fba5a622b4c03`, Python 3.14.8, with the joint
+lockfile/SDK `12.1.0`. Both implementations were already installed. The operator
+helper changed only `STORAGE_IMPLEMENTATION` between provider runs and checked
+that root/credential values, source manifest and application commit stayed the
+same. Each request used a unique synthetic title and generated new resources;
+the requested event time instants were the same. No source change/reinstall was
+used to switch providers.
+
+| Evidence | Result |
+| --- | --- |
+| [Team 3 probe](evidence/HW3_STORAGE_SWAP_20261117-230617-13ddc1a8_team3_dropbox.json) | Health, upload/exact UTF-8 readback, conflict, byte preservation and cleanup passed |
+| [Team 1 probe](evidence/HW3_STORAGE_SWAP_20261117-230617-13ddc1a8_team1_dropbox.json) | Same checks passed under the same source hashes and installed package provenance |
+| [Paired local workflows](evidence/HW3_WORKFLOW_SWAP_20261117-233215-29b1f2af.json) | Team 3 then Team 1 each returned 201, passed issue/Calendar/summary readback, and confirmed all three resources absent after cleanup |
+
+Storage probes ran November 17, 2026, 23:06:19–23:06:33 America/New_York.
+The successful workflow pair ran 23:32:18–23:32:32 (November 18, 04:32 UTC).
+An initial Trello authentication issue was resolved before the successful pair;
+its diagnostic record is archived locally outside the repository. It is not
+evidence of the required controlled storage-failure demonstration.
+
+Readback used the imported issue provider with `fresh=True`, the Calendar
+package and the selected storage implementation. All matching checks preceded
+cleanup, which ran summary -> event -> issue with absence checks. Review verified
+shared commit/source manifests, package pin records, helper hash, distinct IDs,
+title/time equivalence, summary paths and downloaded-content hashes against the
+returned Markdown. Original JSON files were not edited.
+
+The one-off operator helper lives in ignored `.venv`; its source hash is recorded
+and matched during review, but its source is not included in the committed
+evidence. This is local FastAPI TestClient execution with real providers, not a
+deployed endpoint test or an independent human inspection. The record explicitly
+sets `pending_final_53_fix=true`; final #53 validation/hosted-auth follow-up,
+post-sync regression checks, independent inspection and deployment verification
+remain separate tasks. No new live operation was performed during documentation
+review, and no credential values were requested or recorded.

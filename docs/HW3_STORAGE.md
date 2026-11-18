@@ -21,7 +21,9 @@ is historical and does not establish package integration. John approved Team 3
 commit `fde60d4`; Juno approved reuse of the Team5-Review Dropbox app. Kristie
 reports successful OAuth with the intended Team 5 account. The package storage
 probe and local real-provider composed workflow passed. Independent inspection,
-deployed workflow verification and the Team 1 swap remain pending.
+deployed workflow verification and final workflow synchronization remain pending.
+The local configuration-only Team 3 -> Team 1 swap has now passed; see
+[paired swap evidence](HW3_STORAGE_TEAM1_INTEGRATION.md#step-6-local-configuration-only-swap-evidence).
 
 Local composition at `e2616dd` returned 201, then passed issue fresh read,
 Calendar readback, exact summary-byte verification and summary/event/issue
@@ -74,7 +76,7 @@ is made for this local branch.
 | Remaining evidence | Owner or dependency |
 | --- | --- |
 | Direct Dropbox contents inspection and independent cleanup confirmation | Kristie (Member 4) with an authorized Team 5 teammate on the selected account |
-| Real configuration-only Team 1 package swap | Kristie (Member 4); package jointly installed, provider selection and real swap verification pending |
+| Deployed configuration-only Team 1 package swap | Kristie (Member 4) and deployment owners; local paired probes/workflows/readback/cleanup passed, hosted verification pending |
 | Deployed composed workflow against both configurations | Kristie (Member 4) and Members 1 and 5 with the other integration owners |
 | Integrated checks, design/code reviews and submission | Component owners and Member 5 |
 
@@ -149,13 +151,14 @@ hashes. Test counts recorded for earlier commits remain historical results.
 
 ## Real implementation swap
 
-A Team 1 package swap is still pending. Team 1 supplied a standalone package at
-`784be97`; joint frozen installation/import checks now pass. See
-[Team 1 integration progress](HW3_STORAGE_TEAM1_INTEGRATION.md). Provider
-selection now uses `STORAGE_IMPLEMENTATION`; the cross-provider error/cleanup
-matrix passed offline. Next verify the
-same workflow under both configurations. A URL change is not the package swap,
-and no Team 1 live run or completed swap is claimed.
+A local Team 3 -> Team 1 package swap passed at `bf66e7f`: selector-only
+configuration changes, joint installed dependencies, successful paired storage
+probes and full workflows, provider readback and complete cleanup. See
+[Team 1 integration progress and evidence](HW3_STORAGE_TEAM1_INTEGRATION.md).
+Both packages ran against the authorized Team 5 Dropbox account, using distinct
+UUID/issue/event-derived test paths. This is an implementation swap, not a
+storage account migration. Deployed swap verification and final #53 integration
+are still pending; the local evidence does not establish those outcomes.
 
 Independent teammate inspection, deployed workflow/failure verification and
 design/code review completion remain tracked in the
