@@ -272,6 +272,39 @@ def not_configured(integration: str, step: Step) -> WorkflowError:
     )
 
 
+async def _validate_before_dependencies(request: Request) -> None:
+    # Request caches these bytes for FastAPI's subsequent body handling.
+    body = await request.body()
+    media_type = (
+        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    )
+    is_json = (
+        not media_type
+        or media_type == "application/json"
+        or (media_type.startswith("application/") and media_type.endswith("+json"))
+    )
+    try:
+        value = (
+            ScheduledIssueRequest.model_validate_json(body)
+            if is_json
+            else ScheduledIssueRequest.model_validate(body)
+        )
+    except ValidationError as error:
+        malformed = is_json and (
+            not body.strip()
+            or any(detail["type"] == "json_invalid" for detail in error.errors())
+        )
+        raise WorkflowError(
+            ErrorCode.INVALID_INPUT,
+            INVALID_REQUEST_MESSAGE,
+            step="validate",
+            retryable=False,
+            provider=False,
+            status=400 if malformed else 422,
+        ) from None
+    ScheduledIssueWorkflow._validate(value)
+
+
 class WorkflowRoute(APIRoute):
     """Report errors raised outside run() in the workflow error shape."""
 
@@ -280,6 +313,7 @@ class WorkflowRoute(APIRoute):
 
         async def route_handler(request: Request) -> Response:
             try:
+                await _validate_before_dependencies(request)
                 return await handler(request)
             except RequestValidationError as error:
                 raise WorkflowError(

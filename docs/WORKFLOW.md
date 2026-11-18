@@ -55,9 +55,10 @@ changing only the implementation selector between runs. Both returned 201 with
 real providers; issue/Calendar/summary readbacks and summary/event/issue cleanup
 absence checks passed. Commit/source manifests were unchanged. See
 [paired swap evidence and limitations](HW3_STORAGE_TEAM1_INTEGRATION.md#step-6-local-configuration-only-swap-evidence).
-These successful normal requests do not resolve #53's validation-precedence issue or establish
-deployed/independently inspected verification; the evidence explicitly records
-the pending final #53 fix.
+These successful normal requests predate #59's validation-precedence fix and do
+not establish deployed or independently inspected verification. Their historical
+`pending_final_53_fix` marker is retained; the integrated fix is covered by offline
+regression tests, and a live run of the final integrated revision remains pending.
 
 ### Integrated candidate prerequisites
 
@@ -118,6 +119,18 @@ still exist. Messages are fixed text; remote messages are never forwarded.
 Every error from this endpoint (400, 403, 422, 502, 503) has all five fields and
 matches `WorkflowErrorResponse` in OpenAPI, including request-body validation and
 configuration failures.
+
+Request-body structure and shared issue/Calendar input constraints are checked
+before provider dependencies are constructed. Empty or malformed JSON returns
+400; invalid fields or event times return 422. Both use `step="validate"` and
+`leftovers=[]`, even when an integration is unconfigured. A valid request still
+returns 503 with the integration's step when its configuration is missing.
+
+In hosted mode, authentication middleware runs before this validation. Missing
+or invalid bearer credentials return 401 with `WWW-Authenticate: Bearer` and the
+existing three-field shared error (`code`, `message`, `retryable`), without
+`step` or `leftovers`. This is an authentication response before workflow dispatch;
+the five-field workflow error envelope applies after authentication.
 
 An uncertain summary includes its optional storage `path` when the store knows
 the destination. The provider `id` remains `null` when it is not reported; a path
@@ -189,9 +202,14 @@ leftovers for bad configuration. See [storage setup and remaining evidence](HW3_
 
 ## Remaining work
 
-- Independently verify each integration in its provider and complete the real
-  configuration-only storage swap; the storage adapter is connected locally.
+- Obtain independent teammate inspection of the provider resources. Local
+  configuration-only Team 3/Team 1 storage swap verification is complete;
+  hosted verification remains pending.
 - Run the full workflow against deployed services, including cleanup, and record
   evidence.
 - Deploy the endpoint (bearer authentication already covers all non-health paths).
 - Member 5: fold this into the HW3 `DESIGN.md` and the end-to-end test plan.
+
+Validation precedence regression tests are in
+`tests/test_workflow_validation_precedence.py`. They retain normal dependency
+wiring and assert invalid input never constructs a provider.
