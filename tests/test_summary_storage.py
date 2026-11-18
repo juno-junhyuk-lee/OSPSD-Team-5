@@ -253,6 +253,7 @@ def test_team1_selection_uses_the_real_package_for_workflow_summary(
         app.dependency_overrides = previous
 
 
+@pytest.mark.parametrize("selection", ["team3_dropbox", "team1_dropbox"])
 @pytest.mark.parametrize(
     "scenario,cleanup",
     [
@@ -265,19 +266,29 @@ def test_team1_selection_uses_the_real_package_for_workflow_summary(
         ("applied_lost_reply", "clean"),
         ("read_connect_timeout", "clean"),
         ("read_untyped_error", "clean"),
+        ("read_not_found", "clean"),
+        ("read_mismatch", "clean"),
         ("unknown_shared_error", "clean"),
         ("bad_metadata", "clean"),
         ("untyped_error", "clean"),
         ("invalid_input", "clean"),
+        ("conflict", "clean"),
+        ("permission", "clean"),
     ],
 )
 def test_sdk_failure_phase_controls_workflow_cleanup(
-    scenario: str, cleanup: str, caplog: pytest.LogCaptureFixture
+    scenario: str,
+    cleanup: str,
+    selection: str,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # These SDK failures pass through BOTH real Team 3 translation layers.
+    # Failures pass through the selected package's REAL exception translation.
+    monkeypatch.setenv("STORAGE_IMPLEMENTATION", selection)
     from calendar_contract import CalendarError, ErrorCode
     from cloud_storage_api import StorageError
     from dropbox import files, stone_validators  # type: ignore[import-untyped]
+    from dropbox.exceptions import ApiError  # type: ignore[import-untyped]
     from issue_tracker_contract import ErrorCode as IssueErrorCode
     from issue_tracker_contract import ServiceError as IssueServiceError
     from requests.exceptions import (
@@ -318,6 +329,18 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
             raise RequestsConnectionError("connection refused SECRET")
         if scenario == "invalid_input":
             raise stone_validators.ValidationError("SECRET")
+        if scenario in {"conflict", "permission"}:
+            reason = (
+                files.WriteError.conflict(files.WriteConflictError.file)
+                if scenario == "conflict"
+                else files.WriteError.no_write_permission
+            )
+            raise ApiError(
+                "test",
+                files.UploadError.path(files.UploadWriteFailed(reason=reason)),
+                None,
+                None,
+            )
         if scenario == "unknown_shared_error":
             raise StorageError("SECRET")
         uploaded.append(content)
@@ -330,9 +353,26 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
     def download(*, download_path: str, path: str) -> object:
         order.append("download")
         assert path == destination
+        if scenario == "read_mismatch":
+            Path(download_path).write_bytes(b"wrong")
+            return metadata
+        if scenario == "read_not_found":
+            raise ApiError(
+                "test",
+                files.DownloadError.path(files.LookupError.not_found),
+                None,
+                None,
+            )
         if scenario == "read_untyped_error":
             raise RuntimeError("SECRET")
         raise ConnectTimeout("SECRET")
+
+    def team1_download(path: str) -> object:
+        if scenario == "read_mismatch":
+            order.append("download")
+            assert path == destination
+            return metadata, SimpleNamespace(content=b"wrong")
+        return download(download_path="unused", path=path)
 
     issues, calendar = FakeIssues(), FakeCalendar()
     delete_issue, delete_event = issues.delete_issue, calendar.delete
@@ -364,6 +404,7 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
             sdk = sdk_type.return_value
             sdk.files_upload.side_effect = upload
             sdk.files_download_to_file.side_effect = download
+            sdk.files_download.side_effect = team1_download
             with TestClient(app) as caller:
                 response = caller.post("/workflows/scheduled-issues", json=PAYLOAD)
             sdk.close.assert_called_once_with()
@@ -375,7 +416,12 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
     assert response.status_code == 502
     error = response.json()["error"]
     assert not error["retryable"] and error["step"] == "summary"
-    definite = scenario in {"connect_timeout", "connection_refused", "invalid_input"}
+    definite = scenario in {
+        "connect_timeout",
+        "connection_refused",
+        "conflict",
+        "permission",
+    } or (scenario == "invalid_input" and selection == "team3_dropbox")
     if definite:
         assert uploaded == []
         assert order == ["create", "delete_event", "delete_issue"]
@@ -394,7 +440,13 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
     else:
         assert order == (
             ["create", "download"]
-            if scenario in {"read_connect_timeout", "read_untyped_error"}
+            if scenario
+            in {
+                "read_connect_timeout",
+                "read_untyped_error",
+                "read_not_found",
+                "read_mismatch",
+            }
             else ["create"]
         )
         assert [item["kind"] for item in error["leftovers"]] == [
@@ -412,6 +464,8 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
             "applied_lost_reply",
             "read_connect_timeout",
             "read_untyped_error",
+            "read_not_found",
+            "read_mismatch",
             "bad_metadata",
             "untyped_error",
         }:

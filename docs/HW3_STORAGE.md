@@ -152,8 +152,8 @@ hashes. Test counts recorded for earlier commits remain historical results.
 A Team 1 package swap is still pending. Team 1 supplied a standalone package at
 `784be97`; joint frozen installation/import checks now pass. See
 [Team 1 integration progress](HW3_STORAGE_TEAM1_INTEGRATION.md). Provider
-selection now uses `STORAGE_IMPLEMENTATION`; complete the
-cross-provider error/cleanup matrix, then verify the
+selection now uses `STORAGE_IMPLEMENTATION`; the cross-provider error/cleanup
+matrix passed offline. Next verify the
 same workflow under both configurations. A URL change is not the package swap,
 and no Team 1 live run or completed swap is claimed.
 

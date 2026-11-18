@@ -34,10 +34,17 @@ The real store currently defaults it to false; this plan does not change that.
 
 ## Implemented package classification (task 5)
 
-The production package factory uses a Team 3-specific summary-store subclass;
+The production package factory uses provider-specific summary-store subclasses;
 the generic shared store does not infer transport phases from provider names.
 This classification depends on pinned Team 3 `fde60d4`, its preserved explicit
 exception causes, and the SDK retry counts set to zero by our factory.
+
+Team 1 support (step 4) is pinned to `784be97` with SDK `12.1.0`. Its backend
+preserves the Requests exception directly as the shared error's cause, unlike
+Team 3's intermediate builtin ConnectionError. Its summary-store subclass checks
+that direct cause. Both use the same narrow typed connection-establishment
+predicate; neither infers certainty from text or a generic connection failure.
+Unknown/lost cause chains remain uncertain. Recheck these assumptions on upgrades.
 
 | Creation or readback outcome | Workflow action |
 | --- | --- |

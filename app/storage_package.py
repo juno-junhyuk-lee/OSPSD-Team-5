@@ -27,35 +27,45 @@ class _Closeable(Protocol):
     def close(self) -> None: ...
 
 
+def _connection_was_not_established(error: BaseException | None) -> bool:
+    """Use typed Requests/urllib3 evidence, never provider exception messages."""
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+    from requests.exceptions import ConnectTimeout
+    from urllib3.exceptions import MaxRetryError, NewConnectionError
+
+    if isinstance(error, ConnectTimeout):
+        return True
+    if isinstance(error, RequestsConnectionError) and error.args:
+        pool_error = error.args[0]
+        return isinstance(pool_error, MaxRetryError) and isinstance(
+            pool_error.reason, NewConnectionError
+        )
+    return False
+
+
 class _PackageSummaryStore(DocumentSummaryStore):
     def _creation_may_have_applied(self, error: StorageError) -> bool:
         if not super()._creation_may_have_applied(error):
             return False
         # The pinned Team 3 code preserves SDK -> builtin -> shared causes.
-        # Only typed connection-establishment evidence proves no request was sent.
-        from requests.exceptions import (
-            ConnectionError as RequestsConnectionError,
-        )
-        from requests.exceptions import (
-            ConnectTimeout,
-        )
-        from urllib3.exceptions import MaxRetryError, NewConnectionError
-
         cause = error.__cause__
         if (
             isinstance(error, ProviderUnavailableError)
             and type(cause) is ConnectionError
         ):
-            sdk_error = cause.__cause__
-            if isinstance(sdk_error, ConnectTimeout):
-                return False
-            if isinstance(sdk_error, RequestsConnectionError) and sdk_error.args:
-                pool_error = sdk_error.args[0]
-                if isinstance(pool_error, MaxRetryError) and isinstance(
-                    pool_error.reason, NewConnectionError
-                ):
-                    return False
+            return not _connection_was_not_established(cause.__cause__)
         return True
+
+
+class _Team1SummaryStore(DocumentSummaryStore):
+    def _creation_may_have_applied(self, error: StorageError) -> bool:
+        if not super()._creation_may_have_applied(error):
+            return False
+        # Team 1 784be97 preserves the SDK exception directly as the shared cause.
+        return not (
+            isinstance(error, ProviderUnavailableError)
+            and _connection_was_not_established(error.__cause__)
+        )
 
 
 def _configuration_error() -> SummaryStorageError:
@@ -161,5 +171,4 @@ def package_summary_store() -> Iterator[DocumentSummaryStore]:
         if settings.implementation == "team3_dropbox":
             yield _PackageSummaryStore(storage, settings.root_path)
         else:
-            # Team 3's cause-chain assumptions must not be applied to Team 1.
-            yield DocumentSummaryStore(storage, settings.root_path)
+            yield _Team1SummaryStore(storage, settings.root_path)

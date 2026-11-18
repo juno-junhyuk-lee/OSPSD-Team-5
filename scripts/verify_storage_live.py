@@ -140,6 +140,7 @@ def main() -> None:
     }
     result = {
         **provenance,
+        "implementation": settings.implementation,
         "packages": {
             name: {
                 "version": distribution(name).version,

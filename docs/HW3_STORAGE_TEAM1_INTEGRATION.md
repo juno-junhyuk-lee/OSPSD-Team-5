@@ -92,3 +92,34 @@ cases. Ruff lint/format, strict mypy, probe-specific mypy and `git diff --check`
 passed; the existing Starlette TestClient warning remains.
 
 Source: [Team 1 README at the pinned candidate](https://github.com/Dayana20/sandbox/blob/784be97fc111338c6746b9d7288bf84a333a9b16/packages/team1_dropbox/README.md).
+
+## Step 4: failure matrix and probe provenance
+
+Team 1 now has a provider-specific summary-store subclass. It recognizes only
+typed Requests ConnectTimeout or ConnectionError wrapping urllib3 NewConnectionError
+through its pinned backend's direct shared-error cause. Team 3 retains its
+separate shared -> builtin -> SDK chain check. SDK retry counts remain zero.
+Both preserve unknown outcomes and treat earlier successful creation as dominant
+over any later readback failure. A local SDK validation exception that Team 1
+maps to generic ProviderError stays uncertain; no message-based inference or
+provider-source patch is used to pretend otherwise.
+
+The workflow regression matrix exercises BOTH real imported implementations
+with controlled SDK failures: connection establishment, unknown connection/read
+failure, applied upload with lost reply, definite conflict/permission rejection,
+malformed metadata, unexpected errors, readback 404/mismatch and cleanup failures.
+It checks no write retries, no summary deletion/probe during recovery, known
+leftover paths, event-before-issue compensation and NOT_FOUND cleanup semantics.
+
+Probe tests separately use a controlled shared DocumentStorage boundary under
+each selector, testing scratch ownership, duplicate conflict/byte preservation,
+uncertain-upload cleanup and cleanup failure records. CLI tests verify both
+selected implementation labels, installed Team 1/Team 3 commit provenance,
+successful/failed exit status and evidence preservation. The workflow/constructor
+tests cover actual provider wiring; the probe matrix alone is not package CRUD
+conformance. No live provider calls or evidence-file changes occurred in step 4.
+Validation: **940 passed, 58 skipped** (32 additional matrix/provenance cases).
+Ruff lint/format, strict mypy, probe-specific mypy and `git diff --check` passed.
+The existing Starlette TestClient deprecation warning remains. The known #53
+validation-precedence issue is outside this storage scope and still requires
+the final upstream workflow update.
