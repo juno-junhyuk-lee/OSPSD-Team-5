@@ -10,10 +10,18 @@ locals {
   state_prefix      = "calendar/${var.environment}/"
   state_object_path = "projects/_/buckets/${var.state_bucket}/objects/${local.state_prefix}"
   secret_roles      = toset(["roles/secretmanager.viewer", "roles/secretmanager.secretAccessor"])
-  secret_grants = {
-    for grant in setproduct(["oauth", "bearer"], local.secret_roles) :
-    "${grant[0]}:${grant[1]}" => { secret = grant[0], role = grant[1] }
-  }
+  # Terraform plans read workflow secret metadata only; CI never reads their values.
+  workflow_secrets = ["trello-api-key", "trello-token", "dropbox-app-key", "dropbox-app-secret", "dropbox-refresh-token"]
+  secret_grants = merge(
+    {
+      for grant in setproduct(["oauth", "bearer"], local.secret_roles) :
+      "${grant[0]}:${grant[1]}" => { secret = grant[0], role = grant[1] }
+    },
+    {
+      for secret in local.workflow_secrets :
+      "${secret}:roles/secretmanager.viewer" => { secret = secret, role = "roles/secretmanager.viewer" }
+    },
+  )
 }
 
 resource "google_project_service" "federation" {

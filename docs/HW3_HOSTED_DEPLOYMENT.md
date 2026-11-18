@@ -28,6 +28,17 @@ Container settings when `integration` is set:
 The storage factory accepts `DROPBOX_REFRESH_TOKEN` directly, so no Dropbox token
 file is mounted. Secret values never enter Terraform state or the manifest.
 
+## 0. Repository owner: allow the branch and update CI access
+
+1. In GitHub, Settings > Environments > `calendar-demo` > Deployment branches,
+   add `hw3/milestone-1`.
+2. Apply `infra/ci` for the environment. It adds `refs/heads/hw3/milestone-1` to
+   the Workload Identity trusted refs (otherwise the Google login fails) and
+   grants the deployer `roles/secretmanager.viewer` on the five workflow
+   secrets, so the CI Terraform plan can read their metadata (otherwise 403).
+   CI gets no access to those secret values. Apply this after step 1 below has
+   created the secrets, or the IAM bindings fail on missing secrets.
+
 ## 1. Administrator: apply the new foundations (once per environment)
 
 CI refuses foundation changes, so a deployer with project access applies them.

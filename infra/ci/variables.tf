@@ -54,6 +54,7 @@ variable "trusted_refs" {
   default = [
     "refs/heads/hw2/milestone-3-level-2",
     "refs/heads/hw2/milestone-3",
+    "refs/heads/hw3/milestone-1",
     "refs/heads/main",
   ]
   description = "Branches permitted to deploy; PR refs and tags are excluded."
