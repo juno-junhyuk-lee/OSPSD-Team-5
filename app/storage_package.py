@@ -45,10 +45,8 @@ def _connection_was_not_established(error: BaseException | None) -> bool:
 
 class _PackageSummaryStore(DocumentSummaryStore):
     def _creation_may_have_applied(self, error: StorageError) -> bool:
+        from dropbox import stone_validators  # type: ignore[import-untyped]
         from dropbox.exceptions import ApiError  # type: ignore[import-untyped]
-        from dropbox.stone_validators import (
-            ValidationError,  # type: ignore[import-untyped]
-        )
 
         # The pinned Team 3 code preserves SDK -> builtin -> shared causes.
         cause = error.__cause__
@@ -57,7 +55,7 @@ class _PackageSummaryStore(DocumentSummaryStore):
             # Local staging and cleanup errors can have the same shared types.
             return not (
                 isinstance(error, InvalidRequestError)
-                or isinstance(sdk_error, (ApiError, ValidationError))
+                or isinstance(sdk_error, (ApiError, stone_validators.ValidationError))
             )
         if (
             isinstance(error, ProviderUnavailableError)
@@ -132,7 +130,7 @@ def _create_storage(
     # Lazy imports keep application import independent of package auth setup.
     if settings.implementation not in {"team3_dropbox", "team1_dropbox"}:
         raise _configuration_error()
-    import dropbox  # type: ignore[import-untyped]
+    import dropbox
 
     sdk = dropbox.Dropbox(
         oauth2_refresh_token=settings.refresh_token,

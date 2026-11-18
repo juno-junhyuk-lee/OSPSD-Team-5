@@ -379,7 +379,7 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
             return metadata, SimpleNamespace(content=b"wrong")
         return download(download_path="unused", path=path)
 
-    class UploadDirectory(TemporaryDirectory):
+    class UploadDirectory(TemporaryDirectory[str]):
         def cleanup(self) -> None:
             super().cleanup()
             if scenario == "upload_cleanup_permission" and uploaded:
