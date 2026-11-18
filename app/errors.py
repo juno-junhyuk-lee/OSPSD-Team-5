@@ -120,24 +120,34 @@ def calendar_error_handler(request: Request, error: Exception) -> JSONResponse:
     )
 
 
+INVALID_REQUEST_MESSAGE = "Invalid request. Check required fields, types, and values."
+
+
+async def request_validation_status(
+    request: Request, error: RequestValidationError
+) -> int:
+    """400 = malformed or empty JSON; 422 = valid JSON with invalid fields."""
+    errors = error.errors()
+    malformed_json = any(item["type"] == "json_invalid" for item in errors)
+    if any(item["loc"] == ("body",) for item in errors):
+        malformed_json = malformed_json or not (await request.body()).strip()
+    return 400 if malformed_json else 422
+
+
 async def request_validation_handler(
     request: Request, _error: Exception
 ) -> JSONResponse:
     """Reject invalid requests without exposing validation inputs or bodies."""
     assert isinstance(_error, RequestValidationError)
     operation = getattr(request.scope.get("route"), "name", "request_validation")
-    errors = _error.errors()
-    malformed_json = any(error["type"] == "json_invalid" for error in errors)
-    if any(error["loc"] == ("body",) for error in errors):
-        malformed_json = malformed_json or not (await request.body()).strip()
     return service_error_handler(
         request,
         ServiceError(
             ErrorCode.INVALID_INPUT,
-            "Invalid request. Check required fields, types, and values.",
+            INVALID_REQUEST_MESSAGE,
             operation=operation,
             retryable=False,
             provider=False,
-            status=400 if malformed_json else 422,
+            status=await request_validation_status(request, _error),
         ),
     )
