@@ -74,7 +74,7 @@ is made for this local branch.
 | Remaining evidence | Owner or dependency |
 | --- | --- |
 | Direct Dropbox contents inspection and independent cleanup confirmation | Kristie (Member 4) with an authorized Team 5 teammate on the selected account |
-| Real configuration-only Team 1 package swap | Kristie (Member 4); supported package, namespace and shared-contract alignment pending Team 1 reply |
+| Real configuration-only Team 1 package swap | Kristie (Member 4); package jointly installed, provider selection and real swap verification pending |
 | Deployed composed workflow against both configurations | Kristie (Member 4) and Members 1 and 5 with the other integration owners |
 | Integrated checks, design/code reviews and submission | Component owners and Member 5 |
 
@@ -149,10 +149,10 @@ hashes. Test counts recorded for earlier commits remain historical results.
 
 ## Real implementation swap
 
-A Team 1 package swap is still pending. The inspected Team 1 source has generic
-`app` namespace, packaging metadata and shared-interface mismatches; see
-[package research](HW3_STORAGE_PACKAGE_RESEARCH.md). Obtain a supported compatible
-package and construction API, implement provider selection, then verify the
+A Team 1 package swap is still pending. Team 1 supplied a standalone package at
+`784be97`; joint frozen installation/import checks now pass. See
+[Team 1 integration progress](HW3_STORAGE_TEAM1_INTEGRATION.md). Implement provider
+selection and verify error/cleanup behavior, then verify the
 same workflow under both configurations. A URL change is not the package swap,
 and no completed selector or Team 1 live run is claimed.
 

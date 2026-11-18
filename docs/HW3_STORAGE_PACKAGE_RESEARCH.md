@@ -1,5 +1,10 @@
 # Storage package feasibility investigation
 
+Update, November 17: Team 1 supplied a new standalone package at `784be97`.
+Its joint installation findings are in [Team 1 integration progress](HW3_STORAGE_TEAM1_INTEGRATION.md).
+The service-revision `6567b26` limitations below are historical; they do not
+describe that new package. Workflow selection and real swap remain pending.
+
 Owner: Kristie (Member 4). Investigated November 16, 2026, at application
 baseline `f7c59d1`, with Codex assistance. This is task 3's research record;
 it changes no application code, dependencies, lockfile, or credentials.

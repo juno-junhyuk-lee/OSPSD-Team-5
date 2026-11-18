@@ -6,6 +6,9 @@ resolution-markers = [
     "python_full_version < '3.15'",
 ]
 
+[manifest]
+overrides = [{ name = "cloud-storage-api", git = "https://github.com/Dayana20/ospsd26-cloud-storage.git?subdirectory=src%2Fcloud_storage_api&tag=0.3.1" }]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.5"
@@ -283,7 +286,7 @@ wheels = [
 [[package]]
 name = "cloud-storage-api"
 version = "0.2.0"
-source = { git = "https://github.com/Dayana20/ospsd26-cloud-storage?subdirectory=src%2Fcloud_storage_api&tag=0.3.1#664afc92f7cc0b2ee51cde6ddfa088cc3b37206c" }
+source = { git = "https://github.com/Dayana20/ospsd26-cloud-storage.git?subdirectory=src%2Fcloud_storage_api&tag=0.3.1#664afc92f7cc0b2ee51cde6ddfa088cc3b37206c" }
 
 [[package]]
 name = "cloud-storage-client-api"
@@ -364,15 +367,16 @@ wheels = [
 
 [[package]]
 name = "dropbox"
-version = "12.2.5"
+version = "12.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
+    { name = "six" },
     { name = "stone" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/37/04/b275681559d4d64850c90eb511a43a7a9798310a144e983b17f40bb64b98/dropbox-12.2.5.tar.gz", hash = "sha256:3b7e15a86b7d2e4457acb6b8a9e3dfb82ab4b74415070c058abb60a720238019", size = 1322351, upload-time = "2026-11-13T23:26:02.071Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/98/5b144054aeec6aa42be85d59fdd092b8406950a3a9866cf7ab1ebcd0585f/dropbox-12.1.0.tar.gz", hash = "sha256:8d0a24af75ab8a384902264690504572183078e710a253a8745369f27487c4b3", size = 558544, upload-time = "2026-07-10T04:51:33.015Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/c5/761ffadd35cdea6049ccc0270b4da2c34847fee264c7c9cad1ccc06a88a5/dropbox-12.2.5-py3-none-any.whl", hash = "sha256:2bedb65e49b44894efe284db7d71cab495084cdfc7bc37418f72075819fe1ef1", size = 724878, upload-time = "2026-11-13T23:26:00.414Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/47/c3a2ce147f48ea4620eacbc08839b0ae50f200c5b0223669557e0fa049c5/dropbox-12.1.0-py3-none-any.whl", hash = "sha256:fc3cb59f57d2bcf0fd571ca4390e17c038f78179791788d91420ff236159b023", size = 572299, upload-time = "2026-07-10T04:51:31.318Z" },
 ]
 
 [[package]]
@@ -952,6 +956,7 @@ dependencies = [
     { name = "ruff" },
     { name = "starlette" },
     { name = "team-4-issue-tracker-trello" },
+    { name = "team1-dropbox-storage" },
     { name = "team5-calendar" },
     { name = "typing-extensions" },
     { name = "typing-inspection" },
@@ -971,7 +976,7 @@ requires-dist = [
     { name = "cffi", specifier = "==2.1.1" },
     { name = "charset-normalizer", specifier = "==3.5.2" },
     { name = "click", specifier = "==8.5.0" },
-    { name = "cloud-storage-api", git = "https://github.com/Dayana20/ospsd26-cloud-storage?subdirectory=src%2Fcloud_storage_api&tag=0.3.1" },
+    { name = "cloud-storage-api", git = "https://github.com/Dayana20/ospsd26-cloud-storage.git?subdirectory=src%2Fcloud_storage_api&tag=0.3.1" },
     { name = "cloud-storage-client-api", git = "https://github.com/Shreyas191/OSPSD-Team-3?subdirectory=src%2Fcloud_storage_client_api&rev=fde60d4fb648df6defb918ff815fe940c525adc7" },
     { name = "colorama", specifier = "==0.4.6" },
     { name = "cryptography", specifier = "==50.0.2" },
@@ -1015,6 +1020,7 @@ requires-dist = [
     { name = "ruff", specifier = "==0.16.10" },
     { name = "starlette", specifier = "==1.7.0" },
     { name = "team-4-issue-tracker-trello", git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=team-4-trello-impl&rev=team-4-issue-tracker-trello-v1.0.0" },
+    { name = "team1-dropbox-storage", git = "https://github.com/Dayana20/sandbox.git?subdirectory=packages%2Fteam1_dropbox&rev=784be97fc111338c6746b9d7288bf84a333a9b16" },
     { name = "team5-calendar", directory = "packages/team5-calendar" },
     { name = "typing-extensions", specifier = "==4.16.0" },
     { name = "typing-inspection", specifier = "==0.4.4" },
@@ -1051,6 +1057,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "ply"
+version = "3.11"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/69/882ee5c9d017149285cab114ebeab373308ef0f874fcdac9beb90e0ac4da/ply-3.11.tar.gz", hash = "sha256:00c7c1aaa88358b9c765b6d3000c6eec0ba42abca5351b095321aef446081da3", size = 159130, upload-time = "2018-02-15T19:01:31.097Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/58/35da89ee790598a0700ea49b2a66594140f44dec458c07e8e3d4979137fc/ply-3.11-py2.py3-none-any.whl", hash = "sha256:096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce", size = 49567, upload-time = "2018-02-15T19:01:27.172Z" },
 ]
 
 [[package]]
@@ -1263,6 +1278,15 @@ wheels = [
 ]
 
 [[package]]
+name = "six"
+version = "1.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
 name = "starlette"
 version = "1.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1276,15 +1300,17 @@ wheels = [
 
 [[package]]
 name = "stone"
-version = "3.5.5"
+version = "3.3.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
     { name = "packaging" },
+    { name = "ply" },
+    { name = "six" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/65/d5/27f927b87016794feb8995814fde736b1a6fe43da99db448bc9aca6c5d46/stone-3.5.5.tar.gz", hash = "sha256:998e2d0909c859065547f5f54c7d11b66d019882bb4f773e78ec9f2023ca3694", size = 336033, upload-time = "2026-09-23T15:20:18.778Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/f0/efe39177ad1415ce277160e3186d74e3446d5c47d0b53de089448b7976de/stone-3.3.9.tar.gz", hash = "sha256:8f1298683f60ffa9e43edbfd55beb0a20993235d5c751e7adb3030dc16d17fad", size = 194103, upload-time = "2025-04-01T02:25:07.028Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/1c/e14e0618fc10f0e5a18ad29ec10665f4ab7e2b378e34ed0b0b00343f0351/stone-3.5.5-py3-none-any.whl", hash = "sha256:ff04dcfe37efef6bfe744f59f4df1dd1a43716f47e28d7cf1165eb984a0b2c33", size = 204000, upload-time = "2026-09-23T15:20:16.999Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/53/abeff3103fc2e21f37d0081d5d9693fa7a32ad688553cf4760da5e0ef17d/stone-3.3.9-py3-none-any.whl", hash = "sha256:2008318b8eed65bbf38f8c20dbebb4823dc92a813a2b61c3a09d8b9743a7b14e", size = 162989, upload-time = "2025-04-01T02:25:05.614Z" },
 ]
 
 [[package]]
@@ -1293,6 +1319,16 @@ version = "1.0.0"
 source = { git = "https://github.com/Tyler-Arciniaga/OSPSD-Team-4.git?subdirectory=team-4-trello-impl&rev=team-4-issue-tracker-trello-v1.0.0#c88ce2fd287f2524ba09ad5d94faf3983fdac08d" }
 dependencies = [
     { name = "issue-tracker-contract" },
+]
+
+[[package]]
+name = "team1-dropbox-storage"
+version = "0.1.0"
+source = { git = "https://github.com/Dayana20/sandbox.git?subdirectory=packages%2Fteam1_dropbox&rev=784be97fc111338c6746b9d7288bf84a333a9b16#784be97fc111338c6746b9d7288bf84a333a9b16" }
+dependencies = [
+    { name = "cloud-storage-api" },
+    { name = "dropbox" },
+    { name = "requests" },
 ]
 
 [[package]]
