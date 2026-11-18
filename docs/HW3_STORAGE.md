@@ -136,7 +136,10 @@ The [failure policy](HW3_STORAGE_FAILURE_POLICY.md) records the implemented
 package rules and historical HTTP proposals. Known pre-send creation failures
 or definite shared rejections compensate event then issue; unknown outcomes
 preserve both and the possible summary. A successful upload followed by failed
-readback stays uncertain. No writes are automatically retried.
+readback stays uncertain. For Team 3, a shared rejection type alone does not
+establish that Dropbox rejected the write. Local temporary-file cleanup can
+raise the same type after an upload, so classification checks the SDK cause.
+No writes are automatically retried.
 
 Configuration failures return 503 before workflow writes. Operation failures
 return 502. Known summary destinations are reported in optional leftover

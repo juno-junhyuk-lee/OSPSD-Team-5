@@ -3,11 +3,13 @@
 import os
 from datetime import datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 from cloud_storage_api import DocumentStorage
+from dropbox.exceptions import ApiError  # type: ignore[import-untyped]
 from fastapi.testclient import TestClient
 
 from app.calendar_service_dependencies import get_calendar_service
@@ -41,7 +43,7 @@ def test_workflow_uses_storage_and_preserves_failure_certainty(mode: str) -> Non
         calls.append("create")
         assert overwrite is False
         if mode == "conflict":
-            raise FileExistsError("SECRET")
+            raise FileExistsError("SECRET") from ApiError("test", None, None, None)
         if mode == "timeout":
             raise ConnectionError("SECRET")
         uploaded["path"] = path.encode()
@@ -253,28 +255,32 @@ def test_team1_selection_uses_the_real_package_for_workflow_summary(
         app.dependency_overrides = previous
 
 
-@pytest.mark.parametrize("selection", ["team3_dropbox", "team1_dropbox"])
 @pytest.mark.parametrize(
-    "scenario,cleanup",
+    "selection,scenario,cleanup",
     [
-        ("connect_timeout", "clean"),
-        ("connection_refused", "clean"),
-        ("connect_timeout", "event_failed"),
-        ("connect_timeout", "event_gone_issue_failed"),
-        ("read_timeout", "clean"),
-        ("unknown_connection", "clean"),
-        ("applied_lost_reply", "clean"),
-        ("read_connect_timeout", "clean"),
-        ("read_untyped_error", "clean"),
-        ("read_not_found", "clean"),
-        ("read_mismatch", "clean"),
-        ("unknown_shared_error", "clean"),
-        ("bad_metadata", "clean"),
-        ("untyped_error", "clean"),
-        ("invalid_input", "clean"),
-        ("conflict", "clean"),
-        ("permission", "clean"),
-    ],
+        (selection, scenario, cleanup)
+        for selection in ("team3_dropbox", "team1_dropbox")
+        for scenario, cleanup in (
+            ("connect_timeout", "clean"),
+            ("connection_refused", "clean"),
+            ("connect_timeout", "event_failed"),
+            ("connect_timeout", "event_gone_issue_failed"),
+            ("read_timeout", "clean"),
+            ("unknown_connection", "clean"),
+            ("applied_lost_reply", "clean"),
+            ("read_connect_timeout", "clean"),
+            ("read_untyped_error", "clean"),
+            ("read_not_found", "clean"),
+            ("read_mismatch", "clean"),
+            ("unknown_shared_error", "clean"),
+            ("bad_metadata", "clean"),
+            ("untyped_error", "clean"),
+            ("invalid_input", "clean"),
+            ("conflict", "clean"),
+            ("permission", "clean"),
+        )
+    ]
+    + [("team3_dropbox", "upload_cleanup_permission", "clean")],
 )
 def test_sdk_failure_phase_controls_workflow_cleanup(
     scenario: str,
@@ -288,7 +294,6 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
     from calendar_contract import CalendarError, ErrorCode
     from cloud_storage_api import StorageError
     from dropbox import files, stone_validators  # type: ignore[import-untyped]
-    from dropbox.exceptions import ApiError  # type: ignore[import-untyped]
     from issue_tracker_contract import ErrorCode as IssueErrorCode
     from issue_tracker_contract import ServiceError as IssueServiceError
     from requests.exceptions import (
@@ -374,6 +379,12 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
             return metadata, SimpleNamespace(content=b"wrong")
         return download(download_path="unused", path=path)
 
+    class UploadDirectory(TemporaryDirectory):
+        def cleanup(self) -> None:
+            super().cleanup()
+            if scenario == "upload_cleanup_permission" and uploaded:
+                raise PermissionError("SECRET")
+
     issues, calendar = FakeIssues(), FakeCalendar()
     delete_issue, delete_event = issues.delete_issue, calendar.delete
 
@@ -397,6 +408,10 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
     try:
         with (
             patch("dropbox.Dropbox") as sdk_type,
+            patch(
+                "dropbox_client_impl.document_storage.tempfile",
+                SimpleNamespace(TemporaryDirectory=UploadDirectory),
+            ),
             patch.object(issues, "delete_issue", side_effect=undo_issue),
             patch.object(calendar, "delete", side_effect=undo_event),
             caplog.at_level("INFO", logger="calendar_service"),
@@ -468,6 +483,7 @@ def test_sdk_failure_phase_controls_workflow_cleanup(
             "read_mismatch",
             "bad_metadata",
             "untyped_error",
+            "upload_cleanup_permission",
         }:
             assert len(uploaded) == 1
     assert "SECRET" not in response.text + caplog.text

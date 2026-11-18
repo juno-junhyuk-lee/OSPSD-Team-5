@@ -20,8 +20,12 @@ from uuid import uuid4
 
 from cloud_storage_api import ConflictError, NotFoundError
 
-from app.storage_package import PackageStorageSettings, package_document_storage
-from app.summary_storage import DocumentSummaryStore, SummaryStorageError
+from app.storage_package import (
+    PackageStorageSettings,
+    package_document_storage,
+    summary_store_for,
+)
+from app.summary_storage import SummaryStorageError
 
 
 def verify(settings: PackageStorageSettings) -> dict[str, object]:
@@ -62,7 +66,9 @@ def verify(settings: PackageStorageSettings) -> dict[str, object]:
                 raise ConflictError("Scratch path is occupied")
             may_exist = True
             try:
-                saved = DocumentSummaryStore(storage, root).save_summary(name, markdown)
+                saved = summary_store_for(settings, storage).save_summary(
+                    name, markdown
+                )
             except SummaryStorageError as error:
                 may_exist = error.may_have_applied
                 raise

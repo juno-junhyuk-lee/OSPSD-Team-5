@@ -13,6 +13,7 @@ from cloud_storage_api import (
     NotFoundError,
     ProviderUnavailableError,
 )
+from dropbox.exceptions import ApiError  # type: ignore[import-untyped]
 
 from app.storage_package import PackageStorageSettings
 from scripts.verify_storage_live import main, verify
@@ -71,7 +72,9 @@ def test_probe_records_failures_and_only_cleans_its_own_file(
         nonlocal exists, content
         calls.append(("create", path))
         if exists or mode == "conflict":
-            raise ConflictError("SECRET")
+            translated = FileExistsError("SECRET")
+            translated.__cause__ = ApiError("test", None, None, None)
+            raise ConflictError("SECRET") from translated
         content = uploaded
         if mode != "unknown_no_write":
             exists = True

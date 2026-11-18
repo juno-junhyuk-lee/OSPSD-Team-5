@@ -45,15 +45,25 @@ def _connection_was_not_established(error: BaseException | None) -> bool:
 
 class _PackageSummaryStore(DocumentSummaryStore):
     def _creation_may_have_applied(self, error: StorageError) -> bool:
-        if not super()._creation_may_have_applied(error):
-            return False
+        from dropbox.exceptions import ApiError  # type: ignore[import-untyped]
+        from dropbox.stone_validators import (
+            ValidationError,  # type: ignore[import-untyped]
+        )
+
         # The pinned Team 3 code preserves SDK -> builtin -> shared causes.
         cause = error.__cause__
+        sdk_error = cause.__cause__ if cause is not None else None
+        if not super()._creation_may_have_applied(error):
+            # Local staging and cleanup errors can have the same shared types.
+            return not (
+                isinstance(error, InvalidRequestError)
+                or isinstance(sdk_error, (ApiError, ValidationError))
+            )
         if (
             isinstance(error, ProviderUnavailableError)
             and type(cause) is ConnectionError
         ):
-            return not _connection_was_not_established(cause.__cause__)
+            return not _connection_was_not_established(sdk_error)
         return True
 
 
@@ -168,7 +178,12 @@ def package_summary_store() -> Iterator[DocumentSummaryStore]:
     """Read explicit configuration; preserve operation errors after construction."""
     settings = PackageStorageSettings.from_environment()
     with package_document_storage(settings) as storage:
-        if settings.implementation == "team3_dropbox":
-            yield _PackageSummaryStore(storage, settings.root_path)
-        else:
-            yield _Team1SummaryStore(storage, settings.root_path)
+        yield summary_store_for(settings, storage)
+
+
+def summary_store_for(
+    settings: PackageStorageSettings, storage: DocumentStorage
+) -> DocumentSummaryStore:
+    if settings.implementation == "team3_dropbox":
+        return _PackageSummaryStore(storage, settings.root_path)
+    return _Team1SummaryStore(storage, settings.root_path)
