@@ -1,651 +1,238 @@
-# Team 5: adopting the shared Calendar API
+# Team 5: composing Calendar, issue tracker, and storage
 
 | Item | Value |
 | --- | --- |
-| Status | Implemented through Level 4; design reviews confirmed by the team; release publication and submission access checks pending |
-| Author | Juno Lee, with team input, Niriti Pahadi's review revisions, Kristie Lee's Level 2 updates, Jim Lo's Level 3 work, and Ka Pui Cheung's Level 4 work |
-| Team / vertical | Team 5 / Calendar |
-| Team members | Juno Lee, Jim Lo, Kristie Lee, Ka Pui Cheung, Niriti Pahadi |
-| Last updated | November 11, 2026 |
-| Complete-design reviewer | Niriti Pahadi; [review revisions #42][design-review]; review completion confirmed by the team through Juno on November 11 |
-| Contract-facing reviewer | Completion of the required outside-team review confirmed by the team through Juno on November 11; individual reviewer and review URL are not recorded here |
-| Shared agreement | [Joint decision memo][memo], version 4, October 28, 2026; staff access needs verification |
-| Shared contract revision | [calendar-contract v0.1.0-rc.1][shared-tag], commit `1c1cad7a0732ddb242a05400d8833d94e4422424`; installed distribution version `0.1.0` |
-| Python / HTTP contracts | [Python interface][python-contract] and [HTTP contract][http-contract] at the shared revision above |
-| Implementation work | [Design #40][design-pr], [local PUT #41][put-pr], [package adoption #43][adoption-pr], [conformance #44][conformance-pr], [deployment #46][deployment-pr], [pipeline #48][pipeline-pr], [observability #49][observability-pr], [SLOs #50][slo-pr] |
-| Inspected HW1 baseline | `143be358c1c6086c47035b4088d967895d7f9ebb` |
+| Status | **Reviewed by the team and Team 4; deployed and verified on `demo` (2026-11-19).** Endpoint in [PR #53](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/53), issue adapter in [PR #52](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/52) (merged), Calendar selection in [PR #54](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/54) and the `team5-calendar` package in [PR #57](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/57) (both merged), Team 3's and Team 1's storage packages with a storage selector in [PR #55](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/55), all merged into `hw3/milestone-1` (`dc57c61`, 2026-11-18). Deployed from `hw3/milestone-1` at `e44a105` (2026-11-19) after [PR #60](https://github.com/OSPSD-Team-5/OSPSD-Team-5/pull/60) (Cloud Run wiring) and [PR #61](https://github.com/OSPSD-Team-5/OSPSD-Team-5/pull/61) (repository move fix); hosted evidence in [HW3_HOSTED_DEPLOYMENT.md](docs/HW3_HOSTED_DEPLOYMENT.md#hosted-evidence-2026-11-19). Behavior below describes that commit. Per-vertical detail lives in [WORKFLOW.md](docs/WORKFLOW.md), [ISSUE_TRACKER_INTEGRATION.md](docs/ISSUE_TRACKER_INTEGRATION.md), [HW3_CALENDAR_HANDOFF.md](docs/HW3_CALENDAR_HANDOFF.md) and [HW3_STORAGE.md](docs/HW3_STORAGE.md) and [HW3_STORAGE_TEAM1_INTEGRATION.md](docs/HW3_STORAGE_TEAM1_INTEGRATION.md); this document holds the combined design and links to them instead of repeating them. |
+| Milestone | HW3 Milestone 1, "Compose the Services", due November 18, 2026, before class; submitted November 19 with one slack day |
+| Owner | Member 5 (Ka Pui) coordinates; each section names the member who owns the code |
+| Previous design | HW2 shared Calendar adoption: [docs/HW2_DESIGN.md](docs/HW2_DESIGN.md) |
 
-## Context, goals, and non-goals
+## Goal and scope
 
-A consumer should create, retrieve, replace, and delete a timed event against
-Teams 2, 5, and 7 using the same request shapes and outcome handling. HW1 Team 5
-used `start_time` and `end_time`; callers moving between teams had to change
-serialization. It also ignored unknown body fields and returned 422 for
-malformed JSON. These differences could hide client mistakes or require
-service-specific error handling.
+One API operation turns a task into a tracked, scheduled, documented piece of work. A caller sends a title and a time slot. The service creates an issue, books a calendar event with the same title, writes a Markdown summary that links both, stores the summary, and returns all three references in one result.
 
-PUT was selected as the early Milestone 2 integration operation because it
-exercises replacement requests, the provider boundary, translation, and errors.
-Milestone 3 adds reproducible Cloud Run infrastructure, automated deployment and
-recovery, request observability, and reliability objectives with tested alerts.
-The four levels are integrated into `hw2/milestone-3` through merge commit
-`191b006c1bed59796f36321eb6f905d4768ba85d`. Release publication and final
-submission checks remain separate from implementation and deployment evidence.
+The handout requires fixed steps with no language model, our own implementation for our vertical (Calendar), another team's implementation for each of the other two, configuration-only implementation swapping, failures reported in our HW1 error model with the failed step, deployment through our HW2 pipeline, and one test account with credentials outside the repository.
 
-The current integration branch already contains local PUT and its live evidence
-from #41. Jim's #43 merged shared-package adoption into `hw2/milestone-2`
-on November 4 at commit `b088ad9c182f4de823f728038a724fdb6b88675e`.
-Ka Pui's #44 merged shared conformance wiring into `hw2/milestone-2` on
-November 4 at commit `671b63a913a7275e4cce29f04a283a30077db0cd`.
-Observed runs still apply to their recorded commits; both changes are integrated
-into `hw2/milestone-2`, while the combined PR to `main` remains separate.
+Not in scope for this milestone: a language model, an interface, more than one user, or more than this one scenario. Milestone 2 extends this document with the product, interface, agent, and real-user security.
 
-Listing, all-day support, extra editable fields, data migration, and runtime
-provider switching are excluded from this redesign. Calendar metadata and PATCH
-remain extensions. PATCH keeps full-field replacement behavior. No local event
-mirror is introduced; Google Calendar owns persistent event state.
+**Why this workflow.** Each step writes to a different vertical and depends on the one before it: the summary needs both IDs. That makes every partial failure the handout asks about reachable, and the result is easy to check directly in each provider.
 
-## Architecture and request flow
+**Which steps need judgment later.** Today the caller supplies the title and time slot. In Milestone 2 an agent can choose those (what to call the task, which free slot to book, what the summary says). Validation, write order, compensation and error reporting stay fixed code, because they protect provider state.
 
-This section describes the implementation merged through
-[adoption #43][adoption-pr] into `hw2/milestone-2`. The shared package supplies `Event`, `CreateEvent`,
-`ReplaceEvent`, `CalendarService`, `CalendarError`, `ErrorCode`, and validation.
-Team 5 retains FastAPI, dependency injection, OAuth, Google SDK calls, HTTP
-translation, and logging. The package remains provider-independent.
+**If another team's service is unavailable.** The operation fails before or at that step with a documented error, and nothing is faked or replaced silently. For a longer outage we switch to another team's implementation through configuration (the same setting-based selection all three verticals use) and tell the owning team.
+
+## How the system fits together
+
+```mermaid
+flowchart LR
+    caller["Caller<br/>(curl, test script)"] -- "POST /workflows/scheduled-issues<br/>bearer token" --> api
+    subgraph run["Team 5 API service (Cloud Run, project ospsd-team5)"]
+        api["Workflow endpoint<br/>validate, order steps, compensate,<br/>map errors (app/workflow.py)"]
+        api --> ip["IssueProvider<br/>issue-tracker-contract 1.1.0<br/>Team 4's TrelloIssueProvider,<br/>imported package (PR #52)"]
+        api --> cs["CalendarService<br/>calendar-contract v0.1.0<br/>our team5-calendar package (PR #57)"]
+        api --> ss["SummaryStore<br/>cloud-storage-api 0.3.1<br/>Team 3's or Team 1's Dropbox package,<br/>chosen by STORAGE_IMPLEMENTATION (PR #55)"]
+    end
+    ip -- "Trello REST API" --> tr["Team 5 test Trello list"]
+    cs -- "Google Calendar API" --> gc["Test account's<br/>primary calendar"]
+    ss -- "Dropbox API" --> db["Team 5 Dropbox account<br/>(folder STORAGE_ROOT_PATH)"]
+    sm[("Secret Manager<br/>Google OAuth token, API bearer token,<br/>Trello key and token,<br/>Dropbox app key, secret, refresh token")] -.-> run
+```
+
+All three verticals run inside one FastAPI application. Separate boxes are separate contract boundaries, not separate services.
+
+| Vertical | Shared contract | Implementation | Selected by | Owner |
+| --- | --- | --- | --- | --- |
+| Calendar | `calendar-contract` tag `v0.1.0` (`db73e62`) | our `team5-calendar` package (the HW2 Google adapters, packaged in PR #57 and released as `team5-calendar-v0.1.0`; Teams 1 and 4 import the same package) | `CALENDAR_IMPLEMENTATION=google` (PR #54) | Member 2 (Jim) |
+| Issue tracker | `issue-tracker-contract` tag `issue-tracker-contract-v1.1.0` (`18fb7ae`) | Team 4's `team-4-issue-tracker-trello` package, tag `team-4-issue-tracker-trello-v1.0.0` (`c88ce2f`), run in our process against our Trello list. Still Team 4's latest package tag on 2026-11-17: `team-4-trello-impl/` is unchanged on their `main` since `c88ce2f` | `ISSUE_TRACKER_IMPLEMENTATION=team4_trello` (PR #52) | Member 3 (Juno) |
+| Cloud storage | `cloud-storage-api` tag `0.3.1` (`664afc9`; its package metadata says `0.2.0`) | Team 3's `dropbox-client-impl` and `cloud-storage-client-api` packages at commit `fde60d4` (no release tag yet), or Team 1's `team1-dropbox-storage` 0.1.0 (`Dayana20/sandbox` at `784be97`); both run in our process against Team 5's Dropbox account with the same SDK client | `STORAGE_IMPLEMENTATION=team3_dropbox` (default) or `team1_dropbox`; an unknown value fails before any write and never falls back to the other package; settings `STORAGE_ROOT_PATH` and `DROPBOX_*` (PR #55) | Member 4 (Kristie) |
+| Composition | none (our endpoint) | `app/workflow.py` | not configurable | Member 1 (Niriti) |
+
+Credentials never enter the repository. Locally they come from git-ignored files and environment variables. In the deployment they come from Secret Manager through the HW2 Terraform configuration. The issue tracker needs our Trello key, token and list ID (`TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_LIST_ID`), kept locally in ignored `.env.trello`. Storage needs Team 5's Dropbox app key and secret (`DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`) and a refresh token (`DROPBOX_REFRESH_TOKEN`, or an absolute path in `DROPBOX_TOKEN_FILE`), plus `STORAGE_ROOT_PATH` and `PYTHON_DOTENV_DISABLED=1`, because Team 3's package otherwise loads a `.env` file when imported. The Trello and Dropbox secrets follow the HW2 pattern (wired in PR #60): Terraform creates each secret without a value and gives Cloud Run access to it, and the value is added with `gcloud secrets versions add`. No secret value passes through Terraform variables, so none appears in Terraform state or deployment logs.
+
+### A request traced end to end
+
+```http
+POST /workflows/scheduled-issues
+Authorization: Bearer <from Secret Manager>
+Content-Type: application/json
+
+{"title": "Fix login bug", "start": "2030-01-07T15:00:00Z", "end": "2030-01-07T15:30:00Z"}
+```
+
+The `step` column is the value an error reports. IDs below are illustrative; the hosted evidence records real ones.
+
+| `step` | Call | Intermediate state |
+| --- | --- | --- |
+| `validate` | none; checks the title against both contracts (issue: 1 to 256 characters with a non-space; Calendar: not blank) and the times against the Calendar contract's start/end rules | nothing written |
+| `issue` | `IssueProvider.create_issue(title)` → Team 4's package → Trello (one attempt; timeout fixed by the package) | issue `T4-123` exists |
+| `event` | `CalendarService.create(CreateEvent(title, start, end))` → Google | event `abc123` exists |
+| `summary` | `render_summary(issue, event)` (pure function: Markdown from provider-confirmed values, titles escaped, IDs in code spans), then `SummaryStore.save_summary(name, markdown)` → Team 3's package → Dropbox (one upload, SDK retries off), then a download compared byte for byte | file `scheduled-issue-T4-123-abc123.md` exists and matches |
+
+The summary name comes from the issue and event IDs (`summary_name` in `app/workflow.py`), so it is unique per attempt and can be found again from the IDs in `leftovers`.
+
+Success is `201`:
+
+```json
+{
+  "issue": {"id": "T4-123", "title": "Fix login bug"},
+  "event": {"id": "abc123", "title": "Fix login bug", "start": "2030-01-07T15:00:00Z", "end": "2030-01-07T15:30:00Z"},
+  "summary": {"id": "scheduled-issue-T4-123-abc123.md", "markdown": "# Fix login bug\n…"}
+}
+```
+
+If storage definitely fails (for example, Dropbox denies permission), the service deletes the event, then the issue, and returns `502`:
+
+```json
+{
+  "error": {
+    "code": "provider_error",
+    "message": "Summary storage failed.",
+    "retryable": false,
+    "step": "summary",
+    "leftovers": []
+  }
+}
+```
+
+## Decisions with the largest effect
+
+### 1. Depend only on the shared contracts; choose each implementation by a setting
+
+- **Constraint:** we must use another team's implementation for two verticals, and swapping teams must need no code change.
+- **Approach:** the endpoint depends only on contract types (`IssueProvider`, `CalendarService`, `SummaryStore` over `DocumentStorage`). A dependency factory reads a setting and returns the implementation. Both other-team verticals import the other team's package and run it in our process against our own provider account:
+  - **Issue tracker:** Team 4's package against our Trello list (PR #52). This follows Tyler's November 15 clarification of the TA's expectation, and replaced an earlier HTTP adapter that could not pass `fresh=True` through Team 4's cached API.
+  - **Storage:** Team 3's package against our Dropbox account (PR #55). It replaced an earlier HTTP adapter for Team 3's hosted service after Hari answered in the course help channel that a package dependency is required.
+- **Alternative:** call each team's hosted service over HTTP. It keeps provider credentials with the other team, but the course does not count it as using their implementation, and Team 4's cached reads broke `fresh=True`.
+- **Tradeoff:** we own the Trello and Dropbox credentials and inherit each package's behavior: Team 4's fixed timeout, and Team 3's `.env` loading on import, which we turn off. A swap now means a different package plus a setting that selects it, not just a URL. Both storage packages declare the shared contract with slightly different Git URLs, so `pyproject.toml` unifies `cloud-storage-api` with one narrow `override-dependencies` entry, and Team 1's exact Dropbox SDK pin (`12.1.0`) applies to both.
+- **Revisit when:** either storage team tags a release, or changes the shared contract or its SDK pin; then recheck the override and the certainty rules below.
+
+### 2. Never retry a write; undo only after a definite failure; report what may remain
+
+- **Constraint:** the Calendar and issue-tracker contracts both report an uncertain write as a non-retryable `provider_error` and forbid retrying it; we apply the same rule to storage. No vertical gives us an idempotency key we have verified.
+- **Approach:** each write runs once. If a later step *definitely* did nothing, earlier writes are deleted newest first (a `not_found` during cleanup counts as removed). If a write's outcome is *uncertain*, nothing is deleted. The error lists every resource that may still exist (`leftovers`, each `created` or `uncertain`). `retryable` is true only when the failed step allows a retry **and** nothing from this attempt remains.
+- **Storage certainty (PR #55):** a storage failure counts as definite only for a typed rejection (name conflict, permission, invalid input or operation, size, not found) or a connection that could not be opened (connect timeout or new-connection failure, read from the exception's type chain, never its message). Anything else, and any failure after the upload was acknowledged, is uncertain. These rules depend on Team 3's pinned commit and must be rechecked when it or the Dropbox SDK changes. Team 1's package uses the shared contract's generic, more conservative classification, so Team 3's exception-chain rules never classify a Team 1 failure.
+- **Alternative:** retry with idempotency keys (Team 4's package has tagged-creation helpers we leave disabled), or a saga that records state and finishes later.
+- **Tradeoff:** an uncertain failure needs a person to reconcile, guided by `leftovers`. In return, the workflow never automatically retries an uncertain write and never claims unfinished work succeeded. Resubmitting the whole request can still create another issue and event (see the retry case below).
+- **Revisit when:** all three implementations offer idempotency we can verify across restarts.
+
+### 3. One title for issue and event; the summary uses provider-confirmed values
+
+- **Constraint:** the summary must link the real records, and the two contracts limit titles differently.
+- **Approach:** validate the title against both contracts before any write, then render the summary only from values the providers returned.
+- **Alternative:** separate issue and event titles, or render from the request.
+- **Tradeoff:** a slightly stricter title rule. In return, the summary cannot disagree with the providers.
+- **Revisit when:** the Milestone 2 product needs different titles.
+
+### Boundaries and rules that must hold
+
+- Input is validated once, in step 1, before any write. Contract-level validation inside adapters is a second guard, not the main one.
+- Implementations are built in `app/workflow_dependencies.py` from settings. Trello and storage settings and the Calendar selector are checked during dependency resolution, so a missing one fails with `503` before any write. Google authorization has two cases. In the deployed (hosted) service, startup reads `CALENDAR_TOKEN_FILE` and checks its fields and scopes, so a missing or malformed credential file stops the service from starting, before any issue can be created. A revoked refresh token passes those local checks and is rejected by Google only at `step: event`, after the issue exists; the issue is then deleted, or listed in `leftovers` if cleanup fails. Ordinary access-token expiry is refreshed in memory automatically.
+- Remote error messages are never forwarded. Messages are fixed text and logs are sanitized (HW1 Level 5 rules).
+- Even when a dependency fails: no write is retried, no uncertain write is undone, and `retryable` is never true while anything from the attempt may remain.
+
+### Operations we need beyond the shared contracts
+
+| Need | Calendar | Issue tracker | Storage |
+| --- | --- | --- | --- |
+| Create | `create` | `create_issue` | `save_summary` (our `SummaryStore` protocol) |
+| Delete, for compensation | `delete` | `delete_issue` | not needed: storage is the last step |
+| Find, to reconcile an uncertain write | by ID only | by ID only (`get_issue(fresh=True)` reads Trello directly) | the error gives the known path in the summary leftover's `path` (its `id` stays `null`); `SummaryStore` exposes only `save_summary`, so reconciliation is manual today |
+| Verify a write | not done | not done | every summary is downloaded and compared byte for byte before success (PR #55) |
+
+### Mismatches with other teams' implementations
+
+| Date found | Team | Mismatch | Effect | Reported |
+| --- | --- | --- | --- | --- |
+| 2026-11-12 | Team 4 | The contract's `get_issue(fresh=True)` could not be expressed over Team 4's HTTP API, whose reads were cached for 30 s | Resolved on 2026-11-15 by importing Team 4's package, which has no cache | Not needed after the switch |
+
+## What could go wrong
+
+| Failure | Trigger | State left behind | Caller sees | Recovery | Test |
+| --- | --- | --- | --- | --- | --- |
+| Invalid input | Blank title, `end` before `start` (`422`), or malformed or empty JSON (`400`) | nothing | `422` or `400`, `step: validate`, `retryable: false`. Checked before any provider setting, so this holds even with Trello unconfigured (PR #59) | fix the request | `tests/test_workflow.py` |
+| Trello token rejected | Expired or revoked key or token (Trello `401`/`403`, which Team 4's package reports as `ACCESS_DENIED`) | nothing | `403`, `step: issue`, `retryable: false` | replace the token in Secret Manager | controlled fake |
+| Trello fails | Outage, rate limit, list removed, or another definite rejection | nothing | `502`, `step: issue`, `retryable: false` | retry later, or fix the list | controlled fake |
+| Issue response lost | Timeout after send | issue may exist | `502`, `step: issue`, leftover issue `uncertain`, `retryable: false` | check Trello by title before retrying | controlled fake |
+| Google credential file unusable | Deployed service: `CALENDAR_TOKEN_FILE` missing, malformed, or without the required scopes | nothing (the service does not start) | no response; the revision fails to start | fix the secret, then redeploy | `tests/test_hosted_runtime.py` |
+| Google token revoked | Refresh token revoked or expired; Google rejects it at the event step (ordinary access-token expiry is refreshed automatically) | issue deleted by compensation, or listed in `leftovers` if cleanup fails | `503` `provider_unavailable`, `step: event`, `retryable: false` | run `scripts/google_calendar_auth.py`, update the secret | HW2 Level 5 auth-failure test, plus workflow fake |
+| Event response lost | Timeout after Google receives the insert | issue exists, event may exist | `502`, `step: event`, leftovers issue `created`, event `uncertain`, `retryable: false` | find the event by title and time in Google Calendar; delete both by hand or keep both. Two events with the same title and time cannot be told apart, because the shared Calendar contract has no field for a request ID (open question 7) | controlled fake |
+| Storage rejects the summary | Team 3's package reports a definite rejection (name conflict, permission, invalid input or operation, size, not found), or the connection to Dropbox could not be opened | event then issue deleted | `502`, `step: summary`, `leftovers: []`, `retryable: false` | fix the cause, then send a new request | controlled: injected Dropbox SDK failures through Team 3's real error translation (PR #55) |
+| Storage misconfigured | Unknown `STORAGE_IMPLEMENTATION`, missing or invalid `STORAGE_ROOT_PATH` or Dropbox credentials, or `PYTHON_DOTENV_DISABLED` not `1` | nothing (checked before the issue is created) | `503`, `step: summary`, `leftovers: []` | fix configuration | `tests/test_storage_package.py`, `tests/test_workflow.py` (PR #55) |
+| Storage response lost or unverified | Read timeout, lost reply, unrecognized error, any failure after the upload was acknowledged, or downloaded bytes differ | issue and event exist, summary may exist | `502`, `step: summary`, leftovers issue+event `created`, summary `uncertain` with its `path`, `retryable: false` | look for the file at that path in Team 5's Dropbox; finish or delete by hand | controlled, as above |
+| Compensation fails | Delete call fails after a definite failure | records that could not be deleted | original error, with those records in `leftovers` | delete by hand using the IDs | controlled fake |
+| Service stops mid-request | Instance restart or request timeout between steps | earlier writes, with no record on our side | connection error, no body | find records by title in each provider; accepted risk for one test account | none; documented limit |
+| Missing or wrong bearer token | Caller omits the token, or sends a wrong one (deployed service) | nothing | `401` in the shared three-field shape (`code`, `message`, `retryable`), without `step` or `leftovers`, because authentication runs before the workflow | send the right token | `tests/test_hosted_runtime.py` (not workflow-specific) |
+| Same request sent twice | Client resends after a timeout | two issues and two events | two successful results | delete the duplicate by hand; accepted risk until idempotency (open question 3) | none; documented limit |
+| Issue tracker or Calendar not configured | Missing `TRELLO_*` setting, or `CALENDAR_IMPLEMENTATION` not `google` | nothing | `503` before any write, `step: issue` or `step: event`, `leftovers: []` | fix configuration | dependency test |
+
+**The handout's retry case** (event created, summary save fails, caller retries): after a *definite* storage failure, the event and issue are deleted and `leftovers` is empty, so a retry cannot duplicate anything; `retryable` is still false, because PR #55's store reports every definite storage failure as non-retryable (a name conflict, for example, would fail again). After an *uncertain* storage failure, both records stay, `retryable` is false, and the caller gets their IDs and the summary's path. The caller should not resend the request: a new request creates a new issue and event, so the service cannot recognize it as a retry. A safe automatic retry needs the caller to send an idempotency key that the service stores with the IDs, plus a storage read to check for the summary; both are open question 3.
+
+**Error shape:** every error from the endpoint carries `step` and `leftovers`, including request validation (`400`/`422`, `step: validate`) and the configuration `503`s. Niriti fixed this in PR #53 (`70f9286`, 2026-11-17) after Jim's review; the full suite passes at that commit (808 passed, 58 skipped). Two exceptions remain. Authentication failures keep the shared three-field `401`, as documented in the failure table. Juno's review of #53 found that provider settings were checked before request validation, so with Trello unconfigured, invalid input returned `503` `step: issue`. Niriti fixed this in PR #59 (merged 2026-11-18): the request is validated before any provider is built, with 24 regression tests through the normal route wiring.
+
+## Verification plan
+
+| Check | Kind | Evidence |
+| --- | --- | --- |
+| Step order, Markdown, compensation, error mapping | Controlled: fakes for all three contracts | `tests/test_workflow.py` in CI on the submitted commit |
+| Each adapter against its contract | Controlled | `tests/` for PRs #52, #54, #55 and #57; #52 and #55 also have live probe records (Trello; Team 3's and Team 1's packages against Team 5's Dropbox). Full suite on the merged branch: 972 passed, 58 skipped (PR #55) |
+| Full workflow, run locally | Real providers, test account | done 2026-11-16 at `e2616dd` (PR #55, [WORKFLOW.md](docs/WORKFLOW.md#local-real-provider-workflow-evidence)): `201`, then a fresh issue read, a Calendar read, exact summary bytes, and cleanup confirmed absent. Read by our own scripts; nobody has yet checked the records in the provider web pages |
+| Full workflow through the **deployed** endpoint | Real providers, test account | response body; the issue seen in Trello, the event in Google Calendar, the file in Team 5's Dropbox, each checked directly, not through our API. **Done 2026-11-19:** Team 3 at `f201764` (Juno, Deploy [44583149056](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44583149056)), then Team 1 and Team 3 at `e44a105` (Deploy [44602278015](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44602278015), [44603372843](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44603372843)): `201`, card, event and summary found, summary SHA-256 matching the response ([evidence](docs/HW3_HOSTED_DEPLOYMENT.md#hosted-evidence-2026-11-19)). Checked by API reads with our own credentials; nobody viewed them in the provider web pages |
+| Swap storage from Team 3 to Team 1 | Real, configuration only | the deployment diff shows only a setting change; the same workflow run with the file found in Team 1 storage. Local run done 2026-11-17 at `bf66e7f` ([evidence](docs/HW3_STORAGE_TEAM1_INTEGRATION.md#step-6-local-configuration-only-swap-evidence)): only `STORAGE_IMPLEMENTATION` changed, and both runs returned `201` with issue, event and exact summary bytes read back, then cleanup confirmed. Those runs predate #59. **Deployed swap done 2026-11-19:** revisions `00010-ccc` (Team 1) and `00011-jdz` (Team 3) share image `sha256:d8ca8a72…` and differ only in `STORAGE_IMPLEMENTATION`; both runs returned `201` with the summary found under that package |
+| Controlled failure | The handout's case (event created, summary save fails) against real Trello and Google: a definite storage failure caused by configuration. The selector accepts only `team3_dropbox` and `team1_dropbox`, so the failure must come from a storage setting, not a third implementation. Niriti owns this run | the caller receives the documented error with `step: summary`, and compensation is confirmed in the providers: the issue and event are gone from Trello and Google. **Done 2026-11-19** on `demo`, not a separate `verify` deployment, following [HW3_HOSTED_DEPLOYMENT.md section 6](docs/HW3_HOSTED_DEPLOYMENT.md#6-controlled-storage-failure): `STORAGE_ROOT_PATH` pointed at a Dropbox file (Deploy [44603958321](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44603958321)); response `502`, `step: summary`, `leftovers: []`; no card, event or summary found; setting restored (Deploy [44604506844](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44604506844)) and the file deleted |
+| Cleanup | Real | all test records deleted, confirmed by direct provider reads. **Done:** every hosted run has a `_CLEANUP.json` with `all_absent: true` ([evidence](docs/HW3_HOSTED_DEPLOYMENT.md#hosted-evidence-2026-11-19)) |
+
+Success means observable provider records plus the documented API result, never our own logs alone. Each record is checked directly against its provider (Trello, Google Calendar, and Team 5's Dropbox folder) with our own credentials, not through our API or the other teams' packages.
+
+## Open questions
+
+1. ~~Does calling Team 3's hosted storage service count as using their implementation?~~ Resolved 2026-11-16: Hari said in the course help channel that a package dependency is required, so PR #55 imports Team 3's package.
+2. ~~How does storage swap to Team 1?~~ Answered 2026-11-17 by Kristie in PR #55: Team 1 supplied a namespaced package (`784be97`), and `STORAGE_IMPLEMENTATION` selects it. Deployed swap done 2026-11-19 (see Verification plan).
+3. Should callers send an idempotency key, and should the storage adapter read before writing, so a retry after an uncertain write becomes safe?
+4. Does the controlled failure need to run on the deployed service, or is a local run with a failing implementation enough? (ask staff) We ran it on the deployed `demo` service on 2026-11-19, so this no longer blocks submission.
+5. Who runs the deployment through the HW2 pipeline, and which settings and secrets does the workflow add (`TRELLO_*`, `STORAGE_ROOT_PATH`, `DROPBOX_*`, `PYTHON_DOTENV_DISABLED`; the Terraform service does not wire them yet)? (Member 1 owns deployment per PR #52 and #55) Answered: Juno and Niriti deployed through the HW2 pipeline; PR #60 wires `TRELLO_*`, `DROPBOX_*` (Secret Manager, pinned versions), `STORAGE_IMPLEMENTATION`, `STORAGE_ROOT_PATH` and `PYTHON_DOTENV_DISABLED` into Cloud Run.
+6. ~~How does the deployed service keep the Google token fresh?~~ Answered 2026-11-17 by Jim for the implementation: the workflow uses `get_calendar_service`, so the hosted behavior applies (startup checks, then in-memory refresh that never writes back to the mounted secret). Confirmed on the deployed service 2026-11-19: hosted runs created and deleted Calendar events with the mounted token.
+7. Should each event carry a request ID so an operator can find it after an uncertain write? The shared Calendar contract has only `title`, `start` and `end`. Options: add the issue ID to the event title (changes decision 3), or propose an optional field in `calendar-contract` that the Google adapter stores as a private extended property (needs Teams 2 and 7). Raised by Team 4; not planned for Milestone 1. (Member 2)
+
+## How to call it
+
+Deployed endpoint (`demo`, commit `e44a105`):
 
 ```text
-HTTP caller
-  -> FastAPI route + shared request-model validation
-  -> injected CalendarService (GoogleCalendarService)
-  -> operation-specific Google adapter
-  -> authenticated account's primary Google Calendar
-  -> shared Event, or adapter error translated to CalendarError
-  -> HTTP response + one sanitized request outcome log
+POST https://team5-calendar-demo-dnuukwp5ga-uc.a.run.app/workflows/scheduled-issues
 ```
 
-`app/calendar_service.py` implements `CalendarService` structurally by composing
-the existing four adapters, rather than duplicating their SDK code:
-
-| Shared method | Team 5 adapter |
-| --- | --- |
-| `create(CreateEvent) -> Event` | `GoogleEventCreator.create_event` |
-| `get(event_id) -> Event` | `GoogleEventReader.get_event` |
-| `replace(event_id, ReplaceEvent) -> Event` | `GoogleEventUpdater.update_event` |
-| `delete(event_id) -> None` | `GoogleEventDeleter.delete_event` |
-
-`get_calendar_service` in `app/calendar_service_dependencies.py` receives the
-existing operation factories as FastAPI subdependencies and constructs the
-composition object. POST, event GET, PUT, and DELETE receive the shared protocol.
-PATCH delegates to `replace`. Tests can substitute the complete service or an
-operation subdependency. This composition has one concrete responsibility:
-exposing the common methods and translating existing adapter failures.
-
-Adapters create and close Google clients per operation using context management.
-They translate Google fields and validate returned data before constructing the
-shared Event. SDK outcomes become operation-specific errors inside adapters;
-`GoogleCalendarService` converts those errors to `CalendarError`. The HTTP
-handler selects the public response and supplies safe error context to the
-request middleware, which emits one outcome log at request completion.
-Programming errors propagate rather than being presented as known provider errors.
-
-Before requests, a developer runs `scripts/google_calendar_auth.py`. Routes never
-launch browser authorization. Local credential loading and refresh remain in
-`app/google_auth.py` and the existing shared write-authorization helper. Both
-setup scopes are retained. Calendar metadata keeps its existing separate reader
-and dependency injection.
-
-### Successful replacement
-
-FastAPI validates a `ReplaceEvent` containing all of `title/start/end` and rejects
-unknown fields before a provider operation. The route calls `service.replace`.
-`GoogleEventUpdater` reads the event to detect missing/cancelled state, then
-patches `summary`, `start`, and `end`. It checks the returned ID and converts
-Google's result to Event. The route returns 200 with that same ID. The patch
-preserves unrelated Google fields, including description.
-
-### Expected failure
-
-If the patch is sent but its response is lost, the updater raises
-`EventUpdateUnconfirmedError`. The service converts it to `CalendarError` with
-`PROVIDER_ERROR` and `retryable=False`; the HTTP handler returns 502 and logs one
-sanitized entry. Neither layer retries the uncertain write. The response does
-not establish whether Google changed the event.
-
-## API, data model, and compatibility
-
-The linked memo and versioned Python/HTTP contracts define the shared agreement.
-This section records Team 5's migration choices rather than duplicating that
-agreement. This revision corrects the inherited `v0.1.0` source pin to the
-published `v0.1.0-rc.1` tag, updates lock metadata and current references, and
-keeps the shared commit unchanged. The correction was integrated through #40;
-historical output retains its original labels with the clarification below.
-Both names have referred to commit `1c1cad7`; the current published tag is the
-reproducible reference. The distribution's internal version remains `0.1.0`.
-
-| Operation | Success | Adoption behavior |
-| --- | --- | --- |
-| POST `/events` | 201 + Event | `CreateEvent`; Google assigns the opaque ID |
-| GET `/events/{event_id}` | 200 + Event | Shared response fields; empty title allowed for untitled provider events |
-| PUT `/events/{event_id}` | 200 + Event | `ReplaceEvent`; same ID, complete replacement of shared editable fields |
-| DELETE `/events/{event_id}` | 204, no body | Missing or repeated deletion returns 404 |
-| PATCH `/events/{event_id}` (extension) | 200 + Event | Same shared fields and full-field replacement path as PUT |
-
-Requests and Event responses use string `start` and `end`. Legacy
-`start_time/end_time` inputs are rejected with 422, including when canonical
-fields are also supplied. Unknown fields are rejected. There are no temporary
-aliases. Existing clients, tests, tutorial examples, and scripts must migrate
-together. Calendar metadata retains `id/title/time_zone`.
-
-POST, PUT, and PATCH require non-null string `title/start/end`. The shared models
-check RFC 3339 timestamps, explicit offsets, and `end > start` by instant. Team 5
-passes timestamp strings without deliberately truncating fractions; provider
-precision and equivalent output offsets can differ. Whole-second timestamps are
-the portable consumer choice. Accepted memo rule 14 requires ordering validation
-after truncation if an implementation truncates. Team 2's October 28 acceptance
-resolved the old approval question.
-
-Write titles must be nonblank after trimming. The package preserves submitted
-text, while Team 5 trims before writing to Google. Reads of untitled provider
-events return an empty title. No new application title-length maximum is added.
-
-IDs identify events in the configured primary calendar, not globally across
-accounts. The shared model treats them as opaque. Team 5 retains HTTP ID
-validation of 1-1024 letters, digits, underscores, or hyphens. This
-restriction is a Team 5 HTTP policy, not a shared-model rule. Controlled
-tests verify boundary lengths, unchanged forwarding, and recurring-instance
-IDs. IDs are not parsed to infer recurrence; provider metadata determines shape.
-
-Illustrative expected request/response, not an observed event:
-
-```http
-PUT /events/example-provider-id
-Content-Type: application/json
-
-{"title":"Design review","start":"2026-11-04T15:00:00Z","end":"2026-11-04T15:30:00Z"}
-```
-
-```http
-HTTP/1.1 200 OK
-Content-Type: application/json
-
-{"id":"example-provider-id","title":"Design review","start":"2026-11-04T15:00:00Z","end":"2026-11-04T15:30:00Z"}
-```
-
-The shared representation omits description, location, attendees, recurrence,
-and other Google fields without requiring those fields to be deleted. All-day
-and unsupported provider shapes remain outside the timed-event model.
-GET retains 422 `invalid_input` for all-day events and can read the timed
-representation of a recurring series or instance. PUT/PATCH reject all-day
-events and recurring-series parents with 400 `invalid_input`, `retryable=false`,
-before any patch. Individual timed recurring instances can be replaced;
-`recurringEventId`, `originalStartTime`, description, and the parent are retained
-by the controlled patch checks. Malformed provider time structures return 502.
-DELETE keeps its existing behavior; these guards concern replacement only.
-This local policy does not add operations or fields to the shared interface.
-Google identifies series and instances through
-[recurrence metadata](https://developers.google.com/workspace/calendar/api/guides/recurringevents);
-Team 5 tests the behavior offline and does not claim new live recurrence evidence.
-[Observed verification][adoption-evidence] records actual sanitized results and
-reproduction steps for the adopted shared commit.
-
-## Alternatives and tradeoffs
-
-**Reuse Google's patch operation for common-field replacement.** Requiring every
-shared editable field at the HTTP boundary supplies full common-model
-replacement while retaining non-shared Google state. Reusing the updater avoids
-a second SDK/authentication path. Controlled tests inspect its payload, and the
-live workflow independently checks that description survives replacement.
-
-Google's full update operation is the alternative. It would require copying
-unrelated fields or accepting their removal, conflicting with Team 5's
-preservation choice. Revisit patching if the common contract requires replacing
-provider extensions or provider evidence contradicts preservation. There is no
-atomic read/write or concurrent-edit guarantee.
-
-**Use shared models directly and compose existing adapters.** Separate local
-models would reduce initial edits but introduce ongoing conversions and risk
-validation drift. Direct adoption changes more callers now, while a small
-composition object retains operation ownership and existing provider tests.
-Revisit this choice if a required extension cannot be represented without
-breaking the shared boundary.
-
-**Reject legacy field names.** Aliases or versioned compatibility routes would
-reduce immediate client disruption but add ambiguous mixed-name cases and more
-validation paths. A direct rename makes unknown-field rejection predictable;
-its cost is a documented client migration. Revisit compatibility support only
-with a concrete consumer requirement and cross-team review.
-
-## Failures and operational concerns
-
-Request construction can raise Pydantic `ValidationError` before a service call.
-FastAPI request validation renders invalid client input in the common envelope;
-manually constructed models need equivalent handling at their HTTP boundary.
-Known operation failures instead cross the service boundary as `CalendarError`.
-
-| Outcome | HTTP/code | Retry advice |
-| --- | --- | --- |
-| Malformed or empty JSON | 400 `invalid_input` | False; correct input |
-| Invalid valid-JSON input or HTTP ID | 422 `invalid_input` | False |
-| All-day or series-parent replacement | 400 `invalid_input` | False; event unchanged |
-| All-day GET | Existing 422 `invalid_input` | False |
-| Missing/cancelled/deleted event | 404 `not_found` | False |
-| Confirmed permission denial | 403 `access_denied` | False |
-| Missing/unusable OAuth or rejected authorization | 503 `provider_unavailable` | False; repair setup |
-| Temporary pre-write failure or explicit rate-limit rejection | 503 `provider_unavailable` | True; wait before caller retry |
-| Invalid provider response or uncertain POST/PUT | 502 `provider_error` | False for uncertain writes |
-| Unconfirmed DELETE | 502 `provider_error` | True; a completed deletion is subsequently 404 |
-
-A PUT existence-read failure occurs before a write and can safely be classified
-as temporary unavailability. A transport failure after sending POST/PUT preserves
-write uncertainty. Automatic uncertain writes remain disabled. No meaningful
-retry delay is currently known; do not invent `Retry-After`. Supply it if a
-meaningful wait becomes available.
-
-The common error envelope is `{"error":{"code":"...","message":"...","retryable":false}}`.
-The service supplies safe messages, a Boolean provider-involvement flag, and
-a controlled reason for unsupported shapes. The HTTP handler uses that reason
-to select 400 without changing other `INVALID_INPUT` mappings.
-`app/errors.py` supplies sanitized failure context to the request middleware,
-which logs the operation, code, status, and that flag once; it does not
-expose raw exception messages, request bodies, titles, tokens, or authorization
-headers. Credential files stay outside Git and evidence. Hosted secret injection,
-refresh-token persistence, and write permissions are described below.
-
-PUT's local work is proportional to the encoded field sizes. Its normal provider
-path performs one existence read and one patch, with possible credential refresh.
-It does not scan the calendar; network timing does not establish Google's
-internal complexity. Tests check that failures do not cause extra writes.
-
-Every live run owns its created data and records cleanup results. The workflow
-script keeps an obtained ID and cleans up in `finally`, attempting its remaining
-checks after failures. If creation is uncertain without an ID, inspect the
-calendar using the printed run marker before another POST. The shared suite's
-cleanup gaps are mitigated by the local fixture overrides described below.
-
-### Milestone 3 deployment
-
-Juno owns the Cloud Run deployment, billing checks, and teardown. Deploy one
-service in `us-central1`, with zero minimum instances, a maximum
-of one instance, and one concurrent request per instance. The workload is
-occasional classroom demonstrations. The first request after idle may be slow.
-Level 3 uses always-allocated CPU so background telemetry can run after a
-response. This uses instance-based billing while an instance exists; do not
-carry forward the earlier request-billing free-tier assumption. The project
-requires billing, and compute, telemetry ingestion, and registry storage can
-incur charges. Juno owns billing review. Keep classroom traffic bounded and check
-billing while the service remains available for grading. The deployment runbook
-records February 28, 2027 as the target teardown date; coordinate teardown with
-the grading requirement rather than removing the service before grades are released.
-
-| Responsibility | Implementation |
-| --- | --- |
-| Infrastructure | Terraform with a protected, versioned Cloud Storage state bucket and a separate state prefix for each environment |
-| Build | Non-root Python 3.14 container with dependencies installed from `uv.lock`; record the source commit and deploy by Artifact Registry digest |
-| Secrets | Mount pinned Secret Manager versions for Google OAuth and the demo bearer key. Terraform records references only |
-| Authorization | The Google refresh token survives instance replacement in Secret Manager. All hosted Google adapters share in-memory credentials. Rotate a durable refresh token by adding a secret version and deploying that version |
-| Access | Cloud Run serves HTTPS. The application authenticates requests before routing, with only the health and readiness endpoints exempt |
-| Health | `/ready` confirms hosted startup checks passed and gates startup. `/health` checks process health. The live workflow checks provider connectivity separately |
-| Handoff | Level 2 automates deployments using immutable image digests and verified release manifests. Rollback restores application code and configuration. Google Calendar writes need separate cleanup |
-
-A hosted service does not require a persistent disk. Google Calendar remains
-the authoritative store for events. The deployed application loads the durable
-OAuth grant at startup without contacting Google, then refreshes access tokens in
-memory when needed. Google outages therefore surface as operation failures without
-making Cloud Run restart the process. Check the OAuth consent status before the
-deployment. External apps in Testing can issue refresh tokens that expire after
-seven days.
-
-See [the deployment runbook](docs/DEPLOYMENT.md) for bootstrap, plan/apply,
-verification, and teardown. Kristie independently reproduced a disposable
-deployment at `244148d`, verified the real Google workflow and a no-change plan,
-and destroyed all seven verification resources without affecting demo. Her
-[PR #46 review](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/46)
-records the walkthrough; its reported conformance/additional checks were 16
-passed and 14 skipped, not complete deployed conformance coverage.
-
-### Level 2: release pipeline and recovery
-
-Kristie's `deploy.yml` reuses Checks before deploying an immutable image digest.
-An administrator bootstraps environment-scoped OIDC permissions in `infra/ci`;
-CI cannot administer its own IAM or bootstrap state. The checked Terraform plan
-permits only an update/no-op of the existing service. Deployment and recovery
-share environment concurrency and state locking.
-
-The ready revision and traffic must match, then deployed HTTP operations,
-independent Google read-back, and cleanup must pass before a verified release
-artifact is published. Manual recovery validates a successful trusted artifact,
-restores its original Terraform configuration, image, and secret versions without
-rebuilding, and repeats the same checks. It does not undo Calendar writes.
-
-See [the deployment runbook](docs/DEPLOYMENT.md#level-2-automated-deployment-and-recovery)
-for setup and recovery. **Verify deployment, failure detection, and recovery are
-verified**, including real Google smoke, cleanup, and a no-change Terraform plan.
-The merged PR #48 revision `ed6ab9e` subsequently passed the
-[demo Deploy run, attempt 2](https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42409430131/attempts/2),
-including ready revision/traffic, real Google smoke, cleanup and verified-release
-artifact publication. The later [Level 3 merge deployment][level3-deploy] at
-`8ad2e64958fe05e17b8712dacd49a87e2a06bde7` also passed controlled conformance,
-ready revision/traffic checks, real Google smoke/cleanup, and verified-release
-artifact publication. Results belong to those commits, not every later head.
-
-After #50 merged, [Deploy run 43100667215][final-deploy] successfully deployed
-`191b006c1bed59796f36321eb6f905d4768ba85d` on November 11. Application checks,
-controlled shared conformance, all three infrastructure checks, deployed Google
-smoke/cleanup, and verified-release publication passed. This confirms the
-merged Level 4 integration revision; a later documentation or release commit
-needs its own matching CI and deployment record before submission.
-
-### Level 3: request observability
-
-Jim's `RequestTelemetryMiddleware` wraps caller access, validation, and route
-execution. It records fixed-label request/error counters and duration histograms,
-then emits one sanitized outcome log. Existing error handlers supply categories
-and provider context without duplicating that log. The common metric operation
-names are `create`, `get`, `replace`, and `delete`, matching the shared Python
-interface; PATCH and calendar metadata remain separate extensions.
-
-The lifespan owns an isolated OpenTelemetry tracing SDK provider. Each request
-has one SERVER span and explicit Google execute/credential-refresh calls have
-CLIENT child spans. PUT/PATCH separates its pre-read from its write. Logs and
-responses reaching the middleware carry the SDK trace ID; logs retain a separate
-request UUID as well. Resources contain the service name and sanitized release.
-Incoming trace/baggage headers, raw URLs, event data, exception text, and
-tracebacks are not exported. Tracing failure does not change the API result or
-repeat provider work.
-
-An explicit project setting attaches official OTLP/HTTP exporters to the
-app-owned SDK providers. Cloud Run's runtime identity authenticates to Google's
-Telemetry API; Calendar credentials are never used for export. Traces queue at
-most 512 spans, export batches of 64, and have a 256 KiB payload limit and
-three-second export timeout. Metrics aggregate in the SDK and export every
-30 seconds in batches of at most 256 points with the same payload/timeout limit.
-Worker failures drop observations without changing or retrying API work.
-No global SDK provider is installed. Shutdown attempts a final export.
-
-Request-entry saturation measures active common-operation requests divided by
-the configured instance concurrency of one; the histogram preserves brief work
-that a periodic gauge could miss. It is not a time-weighted utilization or
-queue measurement. Cloud Run memory relative to its 512 MiB limit supplies
-additional instance-wide context. `infra/observability` provisions a dashboard
-with all four signals for each common operation, release/environment legends,
-and log/trace investigation links. It owns separate administrator state; the
-release pipeline cannot change its IAM. Level 4 adds SLOs and alerts in that
-administrator-managed Terraform root.
-
-See [the observability guide](docs/OBSERVABILITY.md) for setup, interpretation,
-export limits, independent verification, and the handoff to Level 4. Deployed
-evidence is separate from controlled SDK tests.
-The [walkthrough and Level 4 handoff](docs/OBSERVABILITY_HANDOFF.md) records
-Ka Pui’s completed independent interpretation and approval in PR #49, with
-optional documentation clarifications. The reviewed Level 3 merge was deployed
-by [run 42535452049][level3-deploy]. Historical success, invalid-input, and
-provider-failure traces still identify their original verify revisions, not the
-later merge. The handoff defines the metric names/units and query boundaries
-used by Level 4.
-
-### Level 4: reliability objectives and actionable alerts
-
-Ka Pui's `infra/observability/slo.tf` defines environment-specific Cloud
-Monitoring services and two request-based SLOs over `create`, `get`, `replace`,
-and `delete`. Both use a rolling 28-day window and aggregate releases within
-one environment, so a deployment does not reset the budget. Extensions and
-health/readiness traffic are excluded.
-
-Availability targets 99%: all common-operation requests are eligible, and only
-service/provider failures are bad. Correct caller rejections remain eligible
-without consuming budget. Latency targets 95% of successful common-operation
-requests finishing within one second. Success-only latency prevents fast
-rejections from hiding slow successful work; one second is an existing histogram
-bucket boundary. The initial observed create took 538 ms, including 516 ms in
-Google insert. These server-side measurements cannot count requests that never
-reach the middleware, and a semantically wrong 2xx can still appear successful.
-Conformance and independent provider read-back remain necessary.
-
-Each SLO has an alert policy with OR-combined burn-rate conditions: more than
-14.4 times budget consumption over one hour, or more than six times over six
-hours sustained for five minutes. Notification channels are configured
-separately for demo and verify. Alerts identify the environment and objective
-and link to the dashboard and runbook. No data is not treated as proof of health.
-Uncertain POST/PUT requests remain non-retryable regardless of alert status.
-
-[SLO.md](docs/SLO.md) contains the eligible/good definitions, calculations,
-traffic-based budget examples, runbook, and error-budget policy. Feature merges
-freeze below 25% remaining budget; exhaustion calls for rollback and an incident
-note. Provider failures consume budget rather than being excluded after a failure.
-
-On November 11, provider failures were injected only in disposable verify.
-The availability alert opened at 15:35:25 EST, delivered email with dashboard
-and runbook links, and closed at 15:38:20 after recovery. The
-[verification record](docs/SLO.md#alert-test-2026-11-11) links the incident and
-notification screenshot. Demo's notification channel was applied separately.
-This is required Level 4 verification; no extra-credit game day is claimed.
-
-## Testing and verification
-
-| Guarantee | Check and what it establishes |
-| --- | --- |
-| Shared validation and migration | `test_shared_model_migration.py` and HTTP validation tests: required/unknown/legacy fields, malformed JSON, ordering, and no provider operation on rejection |
-| Shared interface and DI | `test_calendar_service.py` and `test_shared_calendar_http.py`: composition, service substitution, statuses/errors, and restored overrides |
-| Local ID and event-shape policy | `test_event_shape_policy.py`: no writes for all-day/series replacement, timed instance preservation, existing GET policy, HTTP ID boundaries |
-| Google translation and write phases | Adapter tests and `test_shared_provider_failures.py`: controlled SDK outcomes, unchanged replacement ID, before/after-write classification, no retry |
-| Sanitized request observations | `test_observability.py` and existing HTTP log assertions: counters, histograms, one outcome entry, correlation, bounded labels, privacy, and fail-open recording |
-| Request and provider traces | `test_tracing.py`: normal HTTP/adapter wiring with fake Google, real SDK span export, parentage, error/retry semantics, request isolation, and privacy; not deployed evidence |
-| Same vertical suite | #44's `test_shared_conformance.py`: tagged `CalendarServiceConformance` against Team 5's implementation |
-| Real persistence and extension preservation | Workflow script and recorded live conformance: actual Google reads/writes, description preservation, cleanup |
-| Deployment and rollback guards | `test_deploy_release.py` and `test_rollback_release.py`: immutable references, service-only plans, ready revision/traffic, trusted artifact provenance, and original configuration inputs |
-| Smoke failure/cleanup behavior | `test_verify_put_live.py`: controlled remote HTTP transport, readiness before writes, faulty PUT detection, cleanup, and no uncertain-create retry; not live pipeline evidence |
-| Cloud telemetry export | `test_cloud_telemetry.py`: controlled real SDK serialization, bounded export, privacy, and failure isolation; not cloud delivery evidence |
-| SLO and alert configuration | `infra/observability/tests/slo.tftest.hcl`: mocked plan assertions for goals, failure filters, success-only latency, burn conditions, and dashboard/runbook links; CI runs these alongside dashboard tests |
-
-In #44, the offline `service` fixture constructs `GoogleCalendarService` using
-real adapters backed by the isolated fake Google client. `failing_service`
-receives `ProviderFailure` and builds the real composition object with adapters
-raising controlled Team 5 errors. The suite therefore checks shared error
-translation; Google-to-adapter classification is covered separately by offline
-provider tests. Failure hooks remain in tests, not the production protocol.
-
-Adoption #43 and conformance #44 are integrated into `hw2/milestone-2`.
-Run the shared suite offline with:
+**Bearer token.** Every request needs `Authorization: Bearer <token>`. The token lives in Secret Manager (`team5-calendar-demo-bearer`) and is not published. Graders and reviewers contact the team privately and receive it out of band; never paste it into issues, chat or evidence.
 
 ```sh
-uv run pytest tests/test_shared_conformance.py -v -k 'not Live'
+curl -sS -X POST "https://team5-calendar-demo-dnuukwp5ga-uc.a.run.app/workflows/scheduled-issues" \
+  -H "Authorization: Bearer $(cat bearer.txt)" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "grader-check-<unique>", "start": "2027-01-18T15:00:00Z", "end": "2027-01-18T15:30:00Z"}'
 ```
 
-An explicit live run uses real Google adapters for success/not-found behavior:
+Success is `201` with the Trello issue ID, the Calendar event ID and its confirmed times, and the Dropbox summary ID. A failure carries `error.code`, `error.step` and `error.leftovers`.
 
-```sh
-CALENDAR_LIVE_CONFORMANCE=1 uv run pytest tests/test_shared_conformance.py -v -k Live
+**Deleting what a run creates.** Each call creates a Trello card on the team's test list, a Google Calendar event, and `/ospsd-team5-hw3/scheduled-issue-<issue id>-<event id>.md` in Team 5's Dropbox app folder. The team deletes them for graders: send the response IDs. Team members use the helper, which deletes only that run's records and confirms they are gone (see [HW3_HOSTED_DEPLOYMENT.md](docs/HW3_HOSTED_DEPLOYMENT.md#5-team-3-run-then-team-1-run)):
+
+```powershell
+uv run python -m scripts.verify_workflow_hosted cleanup --record <run record> --output <cleanup record>
 ```
 
-Its failure groups still use controlled adapters, and invalid-input cases test
-request models. They do not induce real Google failures. This distinction also
-applies to the recorded 24-test live run. Passing Python conformance alone does
-not prove HTTP serialization, statuses, malformed-JSON handling, or deployment.
+## Review record
 
-The consumer workflow remains POST, GET, PUT, GET, DELETE, GET expecting 404,
-then repeated DELETE expecting 404. Only base URL and setup vary between
-services. Compare instants rather than timestamp strings. An ignored start
-update must be caught with a replacement start representing a different instant;
-the tagged suite currently has a gap here, so retain Team 5's separate
-replacement checks.
+The handout requires review within the team and by another team before submission, with questions and responses recorded here.
 
-Team 5 overrides the tagged suite's cleanup fixtures locally in
-`tests/conformance_support.py`. Missing-event IDs are registered before the
-initial delete, and teardown attempts every unique tracked ID before reporting
-sanitized aggregate failures. HTTP creation also records an ID before validating
-the rest of the response, so malformed responses with known IDs can be cleaned
-up. Uncertain writes without an ID are not retried and require Calendar
-inspection. Offline regressions exercise setup-deletion failure, multiple cleanup
-failures, malformed create responses, and ignored start updates.
-
-The test-only `HttpCalendarService` bridge runs the inherited shared suite through
-deployed HTTPS when `CALENDAR_DEPLOYED_CONFORMANCE=1`. It uses the same URL and
-private bearer-file inputs as the existing smoke script. Fast CI runs an
-equivalent HTTP suite on fake Google, with live flags explicitly disabled.
-Provider-failure cases still use controlled adapters; they do not inject failures
-into demo. HTTP validation extensions check unknown, missing, and legacy fields
-plus malformed/empty JSON. See [deployed conformance evidence](docs/DEPLOYED_CONFORMANCE_VERIFICATION.md)
-for the tested server revision, source fingerprint, reproduction, and cleanup.
-
-### Observed evidence and limits
-
-- [Local PUT evidence][put-evidence] from #41 uses HW1 field names and establishes
-  local PUT before adoption; it is not shared-package evidence.
-- [Adoption evidence][adoption-evidence] records Jim's November 4 real Google
-  workflow at clean service commit `327e8bc`, using shared commit `1c1cad7`.
-  POST/GET/PUT/GET, independent Google checks, description preservation, and
-  DELETE/404 checks passed. Requests use TestClient in-process HTTP through
-  normal dependencies; the run does not establish a Uvicorn listener, restart,
-  or deployment. Its original tag label requires clarification to the currently
-  published `v0.1.0-rc.1` without rewriting historical observations.
-- [Conformance evidence][conformance-evidence] records Ka Pui's November 4 run
-  at adoption base `aa11f9c` plus the conformance test content committed in #44:
-  24 passed, exit 0, followed by a Google search reporting no remaining test
-  events. It identifies controlled failure cases separately from real Google.
-- Independent review of `aa11f9c` passed 433 offline tests; review of #44 at
-  `86fd81e` passed 457 with 24 live tests skipped, plus lint, formatting, and
-  strict typing. These counts belong to those revisions, not every later head.
-  Adoption head `6d1611f` also has [passing CI][adoption-ci] and was merged via
-  #43 at `b088ad9`. The earlier live run remains tied to `327e8bc`; it is not
-  relabeled as a new run at the merge commit.
-
-The local policy revision passed 475 offline tests, Ruff lint/format, strict
-mypy, verification-script typing, and whitespace checks on Python 3.14.2.
-These checks cover the ID/event-shape guards; no new live Google run was made.
-Record the committed revision and matching CI before treating this as final
-submission evidence.
-
-Before final integration, repeat the README checks at the selected commit:
-
-```sh
-uv sync --frozen
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv run mypy scripts/verify_put_live.py
-uv run pytest -v
-git diff --check
-```
-
-Match CI and recorded evidence to the submitted revisions. Initial installation
-needs network access; fast controlled tests require neither network nor Google
-credentials. Historical HW1 results cannot substitute for HW2 checks.
-
-## Ownership, coordination, and checkpoints
-
-| Owner | Output | Dependency and checkpoint |
-| --- | --- | --- |
-| Juno Lee | This design and initial shared-interface contribution | Consolidate #42 into #40, resolve feedback, obtain reviews before November 4 submission |
-| Niriti Pahadi | Complete-design review and verification support | Review the consolidated revision and record concerns/outcomes; help reproduce adoption as needed |
-| Kristie Lee | Shared-contract and contract-facing coordination | Record accepted revision, cross-team review, and release references before submission |
-| Jim Lo | #43 adoption merged; migration, models/errors, examples | Review #40's tag-reference correction and unchanged shared commit before integration |
-| Ka Pui Cheung | #41 PUT and #44 conformance merged; real verification recorded | Juno's local cleanup overrides and deployed HTTP checks resolve the inherited concerns; repeat final tag verification after publication inputs are selected |
-| Juno Lee | Level 1 Cloud Run runtime, Terraform, billing, and teardown | Independent provisioning, no-change plan, and teardown recorded in #46; maintain billing and grading availability |
-| Kristie Lee | Level 2 CI, deployment, and recovery | Verify failure/recovery exercise completed; merged Level 4 revision deployment and Google smoke/cleanup passed in run 43100667215 |
-| Jim Lo | Level 3 metrics, logs, traces, and dashboard | Independent walkthrough in #49; reviewed merge deployment at `8ad2e64` passed |
-| Ka Pui Cheung | Level 4 SLIs/SLOs, error-budget policy, and alerts | #50 merged; verify alert delivery/resolution and demo notification setup recorded in `docs/SLO.md` |
-
-Milestone 3 uses `hw2/milestone-3`. Level 2 work on
-`hw2/milestone-3-level-2` targets that branch; the combined milestone PR targets
-`main` after review and verification.
-
-If a common contract change is incompatible, Kristie coordinates Teams 2, 5,
-and 7 and their consumers before publication. Explain changed requests/outcomes,
-update memo, package, tests, and service migration together, and obtain affected
-team review. Publish a new tag rather than moving an existing published tag.
-
-## Review record and unresolved decisions
-
-| Concern | Disposition / next step | Owner / checkpoint |
-| --- | --- | --- |
-| Stale progress and missing local PUT | Incorporated Niriti's #42 corrections and #41 evidence; shared release and merged #43/#44 recorded | Juno; this revision |
-| Concrete CalendarService/error boundary | Documented #43's composition, DI, and adapter-to-CalendarError translation | Jim/Ka Pui; confirm during implementation/design review |
-| Old names and PATCH behavior | Documented #43's rejection of legacy names and full-field PATCH with `start/end` | Jim; review with affected callers before integration |
-| Shared tag pin | Corrected source/lock/current references to `v0.1.0-rc.1` in this revision; shared commit unchanged, historical output retained with clarification | Juno implements; Jim reviews before #40 integration |
-| Shared-suite failure hooks | Implemented in released suite; documented #44's two fixtures and scope | Ka Pui; verify the combined submission revision |
-| Replacement-start and live cleanup gaps | Local conformance extension detects a changed start instant; fixture overrides track missing-event IDs and attempt all cleanup; offline failure regressions added | Juno; implementation and deployed results in `docs/DEPLOYED_CONFORMANCE_VERIFICATION.md` |
-| HTTP IDs and unsupported event shapes | Local policy implemented and checked in `tests/test_event_shape_policy.py`: ID forwarding/rejection, no unsupported writes, instance metadata preserved | Juno implements; Jim/Ka Pui review with the consolidated design before final acceptance |
-| Hosting and credential persistence | Cloud Run, Terraform, and durable Secret Manager credentials replace the original Render proposal; #46 records independent provisioning and teardown | Juno; maintain billing, runtime credentials, and grader availability |
-| Final complete-design and contract-facing reviews | Completion confirmed by the team through Juno on November 11; #42 remains the linked design-review history | Team; preserve review links with the submission where available |
-
-Niriti's #42 provides review revisions; that historical PR alone does not approve
-this later revision. Juno confirmed completion of both required design reviews
-on behalf of the team on November 11; this records that confirmation rather than
-claiming a new GitHub approval or inventing an outside review URL.
-Kristie's feedback supplied in team coordination requested fresh progress notes,
-concrete architecture/error conversion, compatibility policy, suite execution,
-and final revision/evidence links. This document now incorporates the known code
-and evidence for those items. Kristie's coordination feedback is separate from
-the outside-team review confirmed by the team above.
-
-## Submission and change record
-
-Before submission, record the final reviewed design commit, package tag and
-commit, integrated service revision, matching CI, implementation PRs, provider
-evidence, reviewer outcomes, and owned remaining-work issues. Verify staff can
-access every artifact and submit the team/vertical/member details required by
-the assignment. A reviewed plan and a successful provider run are separate
-requirements.
-
-- November 2: initial design proposal against the inspected HW1 baseline.
-- November 3: added shared links, claimed owners, interface proposal, validation
-  boundaries, and conformance strategy; resolved stale rule 14 approval note.
-- November 3: Niriti's #42 recorded local PUT/#41 evidence and began the complete
-  design review; those revisions are incorporated in this document.
-- November 4: consolidated #42 into #40's document, linked the released contract,
-  described #43/#44 implementation choices and observed evidence, and replaced
-  stale progress notes with current review dependencies. Adoption merged via
-  #43 at `b088ad9`; #44 subsequently merged at `671b63a`. Final reviews and
-  hosting decisions remain pending. The source-pin correction is supplied in the subsequent revision below.
-- November 4: Juno took deployment-proposal ownership. Added local pre-write
-  shape guards and controlled policy checks; preserved the shared interface and
-  existing GET/ID behavior. Runtime policy changes still require teammate review.
-- November 4: proposed a Render/Docker/Blueprint deployment with token
-  persistence, access controls, health checks, rollout/rollback, estimated budget,
-  and teardown; team approval and actual provisioning remain pending. Corrected
-  the shared source tag to `v0.1.0-rc.1` without changing its locked commit and
-  clarified historical verification labels.
-- November 4: recorded #44 as merged at `671b63a`, removed stale retargeting
-  instructions, and retained historical test/live-run revisions. Integration
-  does not establish that the inherited cleanup concerns are resolved.
-- November 5: selected Cloud Run and Terraform for Level 1. Added the container,
-  hosted runtime, infrastructure configuration, and deployment runbook. Live
-  provisioning and independent verification remain separate evidence.
-- November 6: added Level 2 CI, OIDC bootstrap, immutable deployment, smoke
-  gating, and manual recovery. Local checks passed.
-- November 7: verified pipeline deployment, controlled failure detection, and
-  recovery in verify, including real Google smoke/cleanup and a no-change plan.
-- November 8: #49 merged and its `8ad2e64` deployment passed controlled
-  conformance and the real Google workflow/cleanup. Historical Level 3 request
-  evidence and independent interpretation retain their original revision scope.
-- November 11: #50 merged at `191b006`; added Level 4 design, alert verification,
-  demo notification setup, measurement limits, and current deployment evidence.
-  Deploy run 43100667215 passed merged-revision checks, Google smoke/cleanup,
-  and verified-release publication.
-  The team confirmed the complete-design and contract-facing reviews. Local
-  conformance fixture fixes and deployed HTTP checks address the inherited
-  cleanup and replacement-start concerns. Release publication and grader access
-  remain submission follow-ups.
-- Codex assisted with drafting, repository inspection, and review checks.
-  Students must understand, verify, and own their submitted work.
-
-[memo]: https://docs.google.com/document/d/1bVv6tLLtfGKt75HH1OPBTuJ3d1kkMdkEgzz9ef3UcOI/edit
-[shared-tag]: https://github.com/Airbus-A330/OSPSD-Calendar/tree/v0.1.0-rc.1
-[python-contract]: https://github.com/Airbus-A330/OSPSD-Calendar/blob/1c1cad7a0732ddb242a05400d8833d94e4422424/docs/PYTHON_INTERFACE.md
-[http-contract]: https://github.com/Airbus-A330/OSPSD-Calendar/blob/1c1cad7a0732ddb242a05400d8833d94e4422424/docs/HTTP_CONTRACT.md
-[design-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/40
-[design-review]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/42
-[put-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/41
-[adoption-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/43
-[conformance-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/44
-[deployment-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/46
-[pipeline-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/48
-[observability-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/49
-[slo-pr]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/pull/50
-[level3-deploy]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/42535452049
-[final-deploy]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/43100667215
-[put-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/e52d656/docs/PUT_LIVE_VERIFICATION.md
-[adoption-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/aa11f9ccbd75dd66fd280aa22a06186a29a47564/docs/SHARED_CONTRACT_VERIFICATION.md
-[conformance-evidence]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/blob/86fd81e250543610d7a51bbe7197a95236b5b08b/docs/SHARED_CONTRACT_VERIFICATION.md
-
-[adoption-ci]: https://github.com/juno-junhyuk-lee/OSPSD-Team-5/actions/runs/41897518692
+| Date | Reviewer | Question or comment | Response or change |
+| --- | --- | --- | --- |
+| 2026-11-14 | Jim (Team 5) | `422` and `503` errors lack `step` and `leftovers` (PR #53) | Fixed by Niriti in PR #53 (`70f9286`, 2026-11-17): validation returns `step: validate`, configuration errors name their step, all with `leftovers: []` |
+| 2026-11-15 | Ka Pui (Team 5) | A refused connection to storage was reported as uncertain, so the issue and event were kept although nothing was written (PR #55) | Implemented in PR #55 (merged 2026-11-18): a connect timeout or new-connection failure, read from the exception's type chain, now counts as definite and triggers cleanup; other connection errors stay uncertain |
+| 2026-11-16 | Juno (Team 5) | A rejected Trello token returns `403` (`ACCESS_DENIED` from Team 4's package), not `502`/`503`; separate it from configuration and outage failures | Split into "Trello token rejected" (`403`) and "Trello fails" (`502`); missing configuration stays `503`. Checked against Team 4's `provider.py` and `_issue_failure` in PR #53 |
+| 2026-11-16 | Juno (Team 5) | Use #57's stable Calendar contract and package details | Calendar now cites `calendar-contract` `v0.1.0` and the `team5-calendar` package (PR #57) |
+| 2026-11-16 | Juno (Team 5) | Update the storage architecture once its approach is settled | Storage now imports Team 3's package (Hari's clarification). Diagram, settings, credentials, failure rules, verification and open questions updated from Kristie's handoff in PR #55 |
+| 2026-11-16 | Kristie (Team 5) | Seven storage changes from #55's handoff (`docs/HW3_STORAGE_REVIEW_HANDOFF.md`): package path and pins, Dropbox settings, Hari's answer, failure certainty, local evidence, lazy Google authorization | All seven made in this revision. #53's validation and configuration error shape stays open (Jim's row) |
+| 2026-11-17 | Jim (Team 5) | Separate a missing or malformed hosted credential file (service does not start) from a revoked refresh token (rejected at the event step); replace "never creates duplicates" with "never automatically retries an uncertain write"; answered open question 6 | Both changes made: the dependency-resolution rule and the failure table now list the two Google cases, and decision 2 uses the new wording. Open question 6 marked answered; confirmed on the deployed service 2026-11-19 |
+| 2026-11-17 | Juno (Team 5) | With Trello unconfigured, invalid input returns `503` `step: issue` instead of `422`/`400` `step: validate`, because provider settings are checked first; document the shared `401` separately (PR #53) | Recorded under "Error shape" and in the failure table (new `401` row). Fixed by Niriti in PR #59 (merged 2026-11-18): validation runs before provider setup, with 24 regression tests through the normal route wiring |
+| 2026-11-17 | Turki (Team 4) | Use the latest version of Team 4's package | We pin `team-4-trello-impl` at `team-4-issue-tracker-trello-v1.0.0` (`c88ce2f`); it is still their latest package tag, and the package folder is unchanged on their `main` since then |
+| 2026-11-17 | Turki (Team 4) | Keep the Trello and Dropbox credentials in Secret Manager and pass them through Cloud Run's secret integration, not as Terraform variables, so they never reach Terraform state or logs | Adopted: the credentials section now commits to the HW2 pattern (Terraform creates the secret without a value; the value is added with `gcloud`). Wired in PR #60 and deployed 2026-11-19 |
+| 2026-11-17 | Turki (Team 4) | Finding an uncertain event by title and time is ambiguous when events share both; attach a request ID to the event | Recorded as a limitation in "Event response lost" and as open question 7: the shared Calendar contract has no field for it, so the fix needs a title change or a contract change |
+| 2026-11-17 | Turki (Team 4) | Verify compensation against real providers, especially an event created and then a failed summary save | Run on the deployed service 2026-11-19 as the "Controlled failure" check: `502` `step: summary`, `leftovers: []`, and the issue and event confirmed gone from Trello and Google |
