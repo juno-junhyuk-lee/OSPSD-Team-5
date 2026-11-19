@@ -9,3 +9,7 @@ output "secret_ids" {
 output "service_url" {
   value = one(google_cloud_run_v2_service.calendar[*].uri)
 }
+
+output "storage_implementation" {
+  value = var.integration == null ? null : var.integration.storage_implementation
+}

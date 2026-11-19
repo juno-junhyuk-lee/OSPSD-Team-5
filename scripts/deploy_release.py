@@ -7,7 +7,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-TRUSTED_BRANCHES = {"hw2/milestone-3-level-2", "hw2/milestone-3", "main"}
+TRUSTED_BRANCHES = {
+    "hw2/milestone-3-level-2",
+    "hw2/milestone-3",
+    "hw3/milestone-1",
+    "main",
+}
 
 
 @dataclass(frozen=True)
@@ -29,13 +34,128 @@ class Release:
             raise ValueError("Secret versions must be positive integers")
 
 
+STORAGE_IMPLEMENTATIONS = {"team3_dropbox", "team1_dropbox"}
+# Release manifest key = container env var; secret ID uses hyphens.
+INTEGRATION_SECRETS = {
+    "trello_api_key": "TRELLO_API_KEY",
+    "trello_token": "TRELLO_TOKEN",
+    "dropbox_app_key": "DROPBOX_APP_KEY",
+    "dropbox_app_secret": "DROPBOX_APP_SECRET",
+    "dropbox_refresh_token": "DROPBOX_REFRESH_TOKEN",
+}
+
+
+@dataclass(frozen=True)
+class Integration:
+    """Non-secret HW3 workflow settings and pinned credential versions."""
+
+    storage_implementation: str
+    storage_root_path: str
+    trello_list_id: str
+    secret_versions: dict[str, int]
+
+    def __post_init__(self) -> None:
+        if self.storage_implementation not in STORAGE_IMPLEMENTATIONS:
+            raise ValueError("Unsupported storage implementation")
+        root = self.storage_root_path
+        if not re.fullmatch(r"/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*", root) or any(
+            part in {".", ".."} for part in root[1:].split("/")
+        ):
+            raise ValueError("An absolute storage root path is required")
+        if not re.fullmatch(r"[0-9a-f]{24}", self.trello_list_id):
+            raise ValueError("A 24-character Trello list ID is required")
+        if (
+            not isinstance(self.secret_versions, dict)
+            or set(self.secret_versions) != set(INTEGRATION_SECRETS)
+            or any(
+                type(version) is not int or version < 1
+                for version in self.secret_versions.values()
+            )
+        ):
+            raise ValueError("Integration secret versions must be positive integers")
+
+    def settings(self) -> dict[str, str]:
+        return {
+            "ISSUE_TRACKER_IMPLEMENTATION": "team4_trello",
+            "TRELLO_LIST_ID": self.trello_list_id,
+            "STORAGE_IMPLEMENTATION": self.storage_implementation,
+            "STORAGE_ROOT_PATH": self.storage_root_path,
+            "PYTHON_DOTENV_DISABLED": "1",
+        }
+
+
+WORKFLOW_ENV_NAMES = {
+    "ISSUE_TRACKER_IMPLEMENTATION",
+    "TRELLO_LIST_ID",
+    "STORAGE_IMPLEMENTATION",
+    "STORAGE_ROOT_PATH",
+    "PYTHON_DOTENV_DISABLED",
+    *INTEGRATION_SECRETS.values(),
+}
+
+
 def read_release(path: Path) -> Release:
     document = json.loads(path.read_text(encoding="utf-8"))
     return Release(**document["release"])
 
 
+def read_integration(path: Path) -> Integration | None:
+    """Releases recorded before HW3 have no integration block."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    value = document.get("integration")
+    return None if value is None else Integration(**value)
+
+
+def release_document(
+    release: Release, integration: Integration | None
+) -> dict[str, Any]:
+    document: dict[str, Any] = {"release": asdict(release)}
+    if integration is not None:
+        document["integration"] = asdict(integration)
+    return document
+
+
+def _secret_reference(entry: dict[str, Any], shape: str) -> tuple[Any, Any] | None:
+    """Read (secret, version) from a Terraform plan or Cloud Run v1 env entry."""
+    if shape == "plan":
+        sources = entry.get("value_source") or []
+        refs = sources[0].get("secret_key_ref") if sources else None
+        return (refs[0].get("secret"), refs[0].get("version")) if refs else None
+    ref = (entry.get("valueFrom") or {}).get("secretKeyRef")
+    return (ref.get("name"), ref.get("key")) if ref else None
+
+
+def check_integration_env(
+    entries: list[dict[str, Any]],
+    integration: Integration | None,
+    name: str,
+    shape: str,
+) -> None:
+    """Match workflow settings and pinned secret references for one container."""
+    settings = {entry["name"]: entry for entry in entries}
+    if integration is None:
+        if WORKFLOW_ENV_NAMES & set(settings):
+            raise ValueError("Unexpected workflow settings for this release")
+        return
+    for key, value in integration.settings().items():
+        if settings.get(key, {}).get("value") != value:
+            raise ValueError("The service workflow settings do not match the release")
+    for secret, variable in INTEGRATION_SECRETS.items():
+        entry = settings.get(variable, {})
+        expected = (
+            f"{name}-{secret.replace('_', '-')}",
+            str(integration.secret_versions[secret]),
+        )
+        if entry.get("value") or _secret_reference(entry, shape) != expected:
+            raise ValueError("The service secret references do not match the release")
+
+
 def check_plan(
-    plan: dict[str, Any], release: Release, project: str, environment: str
+    plan: dict[str, Any],
+    release: Release,
+    project: str,
+    environment: str,
+    integration: Integration | None = None,
 ) -> None:
     if environment not in {"demo", "verify"}:
         raise ValueError("Unsupported deployment environment")
@@ -80,10 +200,15 @@ def check_plan(
             version
         ):
             raise ValueError("The service secret references do not match the release")
+    check_integration_env(containers[0]["env"], integration, name, "plan")
 
 
 def check_service(
-    service: dict[str, Any], release: Release, project: str, environment: str
+    service: dict[str, Any],
+    release: Release,
+    project: str,
+    environment: str,
+    integration: Integration | None = None,
 ) -> str:
     """Check Cloud Run v1 describe output before trusting a smoke result."""
     if environment not in {"demo", "verify"}:
@@ -105,6 +230,7 @@ def check_service(
     settings = {entry["name"]: entry.get("value") for entry in containers[0]["env"]}
     if settings.get("CALENDAR_RELEASE") != release.commit:
         raise ValueError("The running release must match the selected commit")
+    check_integration_env(containers[0]["env"], integration, name, "service")
     traffic = status["traffic"]
     if sum(route.get("percent", 0) for route in traffic) != 100 or any(
         route.get("percent", 0) > 0 and route.get("revisionName") != revision
@@ -160,9 +286,13 @@ def select_rollback_artifact(
 
 def prepare_rollback(
     document: dict[str, Any], selection: dict[str, Any], project: str, environment: str
-) -> tuple[Release, str]:
+) -> tuple[Release, Integration | None, str]:
     """Restore release inputs and configuration source without trusting artifact code."""
     release = Release(**document["release"])
+    integration_value = document.get("integration")
+    integration = (
+        None if integration_value is None else Integration(**integration_value)
+    )
     name = f"team5-calendar-{environment}"
     if (
         environment not in {"demo", "verify"}
@@ -198,7 +328,7 @@ def prepare_rollback(
             raise ValueError("A rollback artifact must record its source run")
     else:
         raise ValueError("Unknown source release operation")
-    return release, configuration_commit
+    return release, integration, configuration_commit
 
 
 def main() -> int:
@@ -210,6 +340,7 @@ def main() -> int:
     prepare.add_argument("--oauth-version", type=int, required=True)
     prepare.add_argument("--bearer-version", type=int, required=True)
     prepare.add_argument("--output", type=Path, required=True)
+    prepare.add_argument("--integration", type=Path)
     check = commands.add_parser("check-plan")
     check.add_argument("--plan", type=Path, required=True)
     check.add_argument("--release", type=Path, required=True)
@@ -238,8 +369,15 @@ def main() -> int:
             release = Release(
                 args.commit, args.digest, args.oauth_version, args.bearer_version
             )
+            integration = (
+                None
+                if args.integration is None
+                else Integration(
+                    **json.loads(args.integration.read_text(encoding="utf-8"))
+                )
+            )
             args.output.write_text(
-                json.dumps({"release": asdict(release)}, indent=2) + "\n",
+                json.dumps(release_document(release, integration), indent=2) + "\n",
                 encoding="utf-8",
             )
         elif args.command == "check-plan":
@@ -248,6 +386,7 @@ def main() -> int:
                 read_release(args.release),
                 args.project,
                 args.environment,
+                read_integration(args.release),
             )
         elif args.command == "check-service":
             print(
@@ -256,6 +395,7 @@ def main() -> int:
                     read_release(args.release),
                     args.project,
                     args.environment,
+                    read_integration(args.release),
                 )
             )
         elif args.command == "select-rollback":
@@ -267,14 +407,14 @@ def main() -> int:
             )
             args.output.write_text(json.dumps(selection) + "\n", encoding="utf-8")
         else:
-            release, configuration_commit = prepare_rollback(
+            release, integration, configuration_commit = prepare_rollback(
                 json.loads(args.artifact.read_text(encoding="utf-8")),
                 json.loads(args.selection.read_text(encoding="utf-8")),
                 args.project,
                 args.environment,
             )
             args.output.write_text(
-                json.dumps({"release": asdict(release)}, indent=2) + "\n",
+                json.dumps(release_document(release, integration), indent=2) + "\n",
                 encoding="utf-8",
             )
             print(configuration_commit)

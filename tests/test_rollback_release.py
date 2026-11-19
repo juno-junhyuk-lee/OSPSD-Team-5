@@ -161,10 +161,11 @@ def test_restores_original_digest_secret_versions_and_configuration(
     verified_release: dict[str, Any],
     selection: dict[str, Any],
 ) -> None:
-    release, configuration = prepare_rollback(
+    release, integration, configuration = prepare_rollback(
         verified_release, selection, "ospsd-team5", "verify"
     )
     assert release == Release(COMMIT, DIGEST, 2, 3)
+    assert integration is None
     assert configuration == COMMIT
 
 
@@ -224,11 +225,12 @@ def test_can_restore_a_release_verified_by_an_earlier_rollback(
         operation="rollback", rollback_source_run_id=41, configuration_commit="c" * 40
     )
     verified_release["release"]["commit"] = "d" * 40
-    release, configuration = prepare_rollback(
+    release, integration, configuration = prepare_rollback(
         verified_release, selection, "ospsd-team5", "verify"
     )
     assert release.commit == "d" * 40
     assert release.digest == DIGEST
+    assert integration is None
     assert configuration == "c" * 40
     verified_release["rollback_source_run_id"] = None
     with pytest.raises(ValueError):

@@ -59,6 +59,23 @@ run "verify_access_is_scoped" {
     ])
     error_message = "CI must not administer secrets or access other environments."
   }
+
+  assert {
+    condition = (
+      length(google_secret_manager_secret_iam_member.smoke) == 9 &&
+      alltrue([
+        for grant in google_secret_manager_secret_iam_member.smoke :
+        grant.role == "roles/secretmanager.viewer"
+        if !contains(["team5-calendar-verify-oauth", "team5-calendar-verify-bearer"], grant.secret_id)
+      ])
+    )
+    error_message = "CI may plan against workflow secrets but must not read their values."
+  }
+
+  assert {
+    condition     = contains(output.trusted_refs, "refs/heads/hw3/milestone-1")
+    error_message = "The HW3 integration branch must be able to deploy."
+  }
 }
 
 run "demo_uses_distinct_environment" {
