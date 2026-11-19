@@ -1,0 +1,34 @@
+{
+  "kind": "hw3_hosted_workflow_run",
+  "operator_checkout_commit": "e44a10517a28424e7da73a45bb83191c74767172",
+  "deploy_run_id": 44603958321,
+  "deployed_storage_implementation": "team3_dropbox",
+  "expect": "storage_failure",
+  "service_host": "team5-calendar-demo-dnuukwp5ga-uc.a.run.app",
+  "marker": "ffc9036afc2240a481265fcdf5fae5be",
+  "request": {
+    "title": "team5-hw3-hosted-ffc9036afc2240a481265fcdf5fae5be",
+    "start": "2027-01-18T15:00:00Z",
+    "end": "2027-01-18T15:30:00Z"
+  },
+  "started_at": "2026-11-19T20:01:54+00:00",
+  "health_status": 200,
+  "response": {
+    "status": 502,
+    "error": {
+      "code": "provider_error",
+      "retryable": false,
+      "step": "summary",
+      "leftovers": []
+    }
+  },
+  "finished_at": "2026-11-19T20:01:58+00:00",
+  "inspection_before_cleanup": {
+    "at": "2026-11-19T20:01:59+00:00",
+    "trello_cards": [],
+    "calendar_events": [],
+    "summaries": []
+  },
+  "expectation_met": true,
+  "cleanup": "not performed; run the cleanup command after inspection"
+}

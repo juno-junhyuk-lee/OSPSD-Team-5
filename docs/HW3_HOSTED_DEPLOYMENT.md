@@ -180,4 +180,55 @@ workflow compensates. Configuration only, no code change:
 
 Offline: Python release checks, Terraform plan tests with a mocked provider
 (`infra/tests/integration.tftest.hcl`), and helper tests with fake providers.
-Foundations, secrets, deployment and live runs are still pending.
+
+### Hosted evidence (2026-11-19)
+
+Service: `https://team5-calendar-demo-dnuukwp5ga-uc.a.run.app`
+(`POST /workflows/scheduled-issues`), environment `demo`. Foundations, secrets
+and the first Team 3 run were done by Juno; the runs below were done by Niriti
+with Claude Code assistance, using the same pinned secret versions as the
+service. Each record's inspection reads Trello, Google Calendar and Dropbox
+directly with the operator's credentials (not through our endpoint); the
+Dropbox read uses the storage package selected for that run.
+
+| Run | Commit / image | Deploy run | Result | Record | Cleanup |
+| --- | --- | --- | --- | --- | --- |
+| Team 3 (Juno) | `f201764` / `sha256:3d536559…` | [44583149056](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44583149056) | `201`; card, event and summary confirmed | Juno's `HW3_HOSTED_WORKFLOW_team3_20261119-130334.json` (to be added) | all absent (Juno's `_CLEANUP.json`) |
+| Team 1 | `e44a105` / `sha256:d8ca8a72…` | [44602278015](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44602278015) | `201`; card, event, summary present with matching SHA-256 | [record](evidence/HW3_HOSTED_WORKFLOW_team1_20261119-115503.json) | [all absent](evidence/HW3_HOSTED_WORKFLOW_team1_20261119-115503_CLEANUP.json) |
+| Team 3 (same image) | `e44a105` / `sha256:d8ca8a72…` | [44603372843](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44603372843) | `201`; card, event, summary present with matching SHA-256 | [record](evidence/HW3_HOSTED_WORKFLOW_team3_20261119-115812.json) | [all absent](evidence/HW3_HOSTED_WORKFLOW_team3_20261119-115812_CLEANUP.json) |
+| Controlled storage failure (Team 3) | `e44a105` / `sha256:d8ca8a72…` | [44603958321](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44603958321) | `502`, `code: provider_error`, `step: summary`, `leftovers: []`; inspection found no card, event or summary | [record](evidence/HW3_HOSTED_STORAGE_FAILURE_20261119-120143.json) | [all absent](evidence/HW3_HOSTED_STORAGE_FAILURE_20261119-120143_CLEANUP.json) |
+
+**Configuration-only swap.** Deploy 44603372843 changed only the
+`STORAGE_IMPLEMENTATION` environment variable and reused the pushed image.
+`gcloud run revisions describe` on `team5-calendar-demo-00010-ccc` (Team 1)
+and `team5-calendar-demo-00011-jdz` (Team 3) shows the same image digest
+`sha256:d8ca8a721d3b9f3cfa92bc10de8fb8301ecde1f7945ee5efc567533ad89944fc`
+and exactly one environment difference:
+`STORAGE_IMPLEMENTATION team1_dropbox -> team3_dropbox`. Juno's Team 3 run
+used the earlier `f201764` image; PR #61 (repository move fix) created
+`e44a105`, so both swap runs were repeated on that one image.
+
+**Controlled failure.** Followed section 6 on `demo`: uploaded the file
+`/ospsd-team5-hw3-failure-target`, deployed with that `STORAGE_ROOT_PATH`
+(revision `00012-jmw`), ran with `--expect storage_failure`, then restored
+`STORAGE_ROOT_PATH=/ospsd-team5-hw3` (Deploy
+[44604506844](https://github.com/OSPSD-Team-5/OSPSD-Team-5/actions/runs/44604506844),
+revision `00013-5jf`, same image) and deleted the target file. The
+app folder afterwards holds only the empty `ospsd-team5-hw3` folder. The
+package classified the path conflict as a definite failure, so the workflow
+deleted the event and then the issue before answering.
+
+**Discarded attempt.** `HW3_HOSTED_WORKFLOW_team1_20261119-115349.json` is kept
+for completeness but is not evidence of Dropbox inspection: Git Bash rewrote the
+operator's `STORAGE_ROOT_PATH` into a Windows path, so its pre-cleanup summary
+check looked in the wrong place (`present: false`). The service itself returned
+`201`. Its cleanup ran with the corrected root, found the summary with a
+matching hash, deleted all three resources and confirmed absence. The Team 1
+run above was repeated with the fix. Operators on Windows Git Bash should set
+`MSYS2_ENV_CONV_EXCL='*'` before running the helper.
+
+Not done: nobody viewed these records in the Trello, Google Calendar or Dropbox
+web pages; checks are API reads by the helper.
+
+Current state: `STORAGE_IMPLEMENTATION=team3_dropbox`,
+`STORAGE_ROOT_PATH=/ospsd-team5-hw3`, revision `team5-calendar-demo-00013-5jf`.

@@ -1,0 +1,21 @@
+{
+  "kind": "hw3_hosted_workflow_cleanup",
+  "run_record": "HW3_HOSTED_STORAGE_FAILURE_20261119-120143.json",
+  "marker": "ffc9036afc2240a481265fcdf5fae5be",
+  "operator_checkout_commit": "e44a10517a28424e7da73a45bb83191c74767172",
+  "started_at": "2026-11-19T20:02:18+00:00",
+  "before": {
+    "at": "2026-11-19T20:02:18+00:00",
+    "trello_cards": [],
+    "calendar_events": [],
+    "summaries": []
+  },
+  "actions": [],
+  "after": {
+    "at": "2026-11-19T20:02:18+00:00",
+    "trello_cards": [],
+    "calendar_events": [],
+    "summaries": []
+  },
+  "all_absent": true
+}

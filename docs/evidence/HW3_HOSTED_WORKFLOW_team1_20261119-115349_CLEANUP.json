@@ -1,0 +1,58 @@
+{
+  "kind": "hw3_hosted_workflow_cleanup",
+  "run_record": "HW3_HOSTED_WORKFLOW_team1_20261119-115349.json",
+  "marker": "1692c54f954446fcbf2e19bff43a59f9",
+  "operator_checkout_commit": "e44a10517a28424e7da73a45bb83191c74767172",
+  "started_at": "2026-11-19T19:54:53+00:00",
+  "before": {
+    "at": "2026-11-19T19:54:53+00:00",
+    "trello_cards": [
+      {
+        "id": "6aff53db8f96b4934ce19311",
+        "closed": false
+      }
+    ],
+    "calendar_events": [
+      {
+        "id": "6lekoqq5tdu0ir5qidtmdadnhs"
+      }
+    ],
+    "summaries": [
+      {
+        "path": "/ospsd-team5-hw3/scheduled-issue-6aff53db8f96b4934ce19311-6lekoqq5tdu0ir5qidtmdadnhs.md",
+        "present": true,
+        "matches_response": true
+      }
+    ]
+  },
+  "actions": [
+    {
+      "kind": "summary",
+      "id": "/ospsd-team5-hw3/scheduled-issue-6aff53db8f96b4934ce19311-6lekoqq5tdu0ir5qidtmdadnhs.md",
+      "deleted": true
+    },
+    {
+      "kind": "event",
+      "id": "6lekoqq5tdu0ir5qidtmdadnhs",
+      "deleted": true
+    },
+    {
+      "kind": "issue",
+      "id": "6aff53db8f96b4934ce19311",
+      "deleted": true
+    }
+  ],
+  "after": {
+    "at": "2026-11-19T19:54:55+00:00",
+    "trello_cards": [],
+    "calendar_events": [],
+    "summaries": [
+      {
+        "path": "/ospsd-team5-hw3/scheduled-issue-6aff53db8f96b4934ce19311-6lekoqq5tdu0ir5qidtmdadnhs.md",
+        "present": false,
+        "matches_response": false
+      }
+    ]
+  },
+  "all_absent": true
+}
