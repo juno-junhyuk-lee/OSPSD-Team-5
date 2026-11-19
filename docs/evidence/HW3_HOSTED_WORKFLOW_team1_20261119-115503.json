@@ -1,0 +1,49 @@
+{
+  "kind": "hw3_hosted_workflow_run",
+  "operator_checkout_commit": "e44a10517a28424e7da73a45bb83191c74767172",
+  "deploy_run_id": 44602278015,
+  "deployed_storage_implementation": "team1_dropbox",
+  "expect": "created",
+  "service_host": "team5-calendar-demo-dnuukwp5ga-uc.a.run.app",
+  "marker": "f00a65a1b1d245ec85d3545ac001ca40",
+  "request": {
+    "title": "team5-hw3-hosted-f00a65a1b1d245ec85d3545ac001ca40",
+    "start": "2027-01-18T15:00:00Z",
+    "end": "2027-01-18T15:30:00Z"
+  },
+  "started_at": "2026-11-19T19:55:13+00:00",
+  "health_status": 200,
+  "response": {
+    "status": 201,
+    "issue_id": "6aff5422c84d8fa5e052ecc6",
+    "event_id": "qd2betat1qkat5hput0jkn3amc",
+    "event_start": "2027-01-18T10:00:00-05:00",
+    "event_end": "2027-01-18T10:30:00-05:00",
+    "summary_id": "id:ceeRv-cWOxkAAAAAAAAAEw",
+    "summary_sha256": "aba967f03678b4722314a174a2b4b074c0278f929a13336705befa680112bdde"
+  },
+  "finished_at": "2026-11-19T19:55:16+00:00",
+  "inspection_before_cleanup": {
+    "at": "2026-11-19T19:55:18+00:00",
+    "trello_cards": [
+      {
+        "id": "6aff5422c84d8fa5e052ecc6",
+        "closed": false
+      }
+    ],
+    "calendar_events": [
+      {
+        "id": "qd2betat1qkat5hput0jkn3amc"
+      }
+    ],
+    "summaries": [
+      {
+        "path": "/ospsd-team5-hw3/scheduled-issue-6aff5422c84d8fa5e052ecc6-qd2betat1qkat5hput0jkn3amc.md",
+        "present": true,
+        "matches_response": true
+      }
+    ]
+  },
+  "expectation_met": true,
+  "cleanup": "not performed; run the cleanup command after inspection"
+}
