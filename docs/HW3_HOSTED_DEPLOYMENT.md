@@ -39,6 +39,24 @@ file is mounted. Secret values never enter Terraform state or the manifest.
    CI gets no access to those secret values. Apply this after step 1 below has
    created the secrets, or the IAM bindings fail on missing secrets.
 
+### After the move to the `OSPSD-Team-5` organization
+
+On 2026-11-19 the repository moved from `juno-junhyuk-lee/OSPSD-Team-5` to
+`OSPSD-Team-5/OSPSD-Team-5`. The Deploy job guard and the `infra/ci` default now
+name the new repository, but the existing Workload Identity provider still
+trusts the old owner, so Google login fails until a project administrator
+re-applies `infra/ci` for `demo`. Use the same commands as
+[DEPLOYMENT.md](DEPLOYMENT.md) (Bootstrap CI) with:
+
+```sh
+export TF_VAR_github_repository_id=1372508104 # unchanged by the move
+export TF_VAR_github_owner_id=358853205       # was 66204402 (personal account)
+```
+
+The plan should update only the WIF provider attribute condition and the
+deployer `workloadIdentityUser` member. The OIDC subject becomes
+`repo:OSPSD-Team-5@358853205/OSPSD-Team-5@1372508104:environment:calendar-demo`.
+
 ## 1. Administrator: apply the new foundations (once per environment)
 
 CI refuses foundation changes, so a deployer with project access applies them.
