@@ -33,7 +33,7 @@ jobs:
     if: >-
       (vars.CALENDAR_DEPLOY_ENABLED == 'true' ||
         (github.event_name == 'workflow_dispatch' && inputs.rollback_run_id != '')) &&
-      github.repository == 'juno-junhyuk-lee/OSPSD-Team-5' &&
+      github.repository == 'OSPSD-Team-5/OSPSD-Team-5' &&
       contains(fromJSON('["refs/heads/hw2/milestone-3-level-2","refs/heads/hw2/milestone-3","refs/heads/hw3/milestone-1","refs/heads/main"]'), github.ref)
     runs-on: ubuntu-latest
     timeout-minutes: 30

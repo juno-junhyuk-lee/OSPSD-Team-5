@@ -20,7 +20,7 @@ variable "environment" {
 
 variable "github_repository" {
   type        = string
-  default     = "juno-junhyuk-lee/OSPSD-Team-5"
+  default     = "OSPSD-Team-5/OSPSD-Team-5"
   description = "Exact, case-sensitive GitHub owner/repository used in the OIDC subject."
 
   validation {

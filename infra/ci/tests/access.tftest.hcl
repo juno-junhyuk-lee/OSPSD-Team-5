@@ -21,9 +21,9 @@ run "verify_access_is_scoped" {
 
   assert {
     condition = (
-      local.github_subject == "repo:juno-junhyuk-lee@987654321/OSPSD-Team-5@123456789:environment:calendar-verify" &&
-      endswith(google_service_account_iam_member.github.member, "/subject/repo:juno-junhyuk-lee@987654321/OSPSD-Team-5@123456789:environment:calendar-verify") &&
-      strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.sub == \"repo:juno-junhyuk-lee@987654321/OSPSD-Team-5@123456789:environment:calendar-verify\"")
+      local.github_subject == "repo:OSPSD-Team-5@987654321/OSPSD-Team-5@123456789:environment:calendar-verify" &&
+      endswith(google_service_account_iam_member.github.member, "/subject/repo:OSPSD-Team-5@987654321/OSPSD-Team-5@123456789:environment:calendar-verify") &&
+      strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.sub == \"repo:OSPSD-Team-5@987654321/OSPSD-Team-5@123456789:environment:calendar-verify\"")
     )
     error_message = "Both WIF trust and its IAM binding must match GitHub's immutable environment subject."
   }
@@ -86,7 +86,7 @@ run "demo_uses_distinct_environment" {
   }
 
   assert {
-    condition     = local.github_subject == "repo:juno-junhyuk-lee@987654321/OSPSD-Team-5@123456789:environment:calendar-demo" && google_service_account.deployer.account_id == "team5-calendar-demo-ci"
+    condition     = local.github_subject == "repo:OSPSD-Team-5@987654321/OSPSD-Team-5@123456789:environment:calendar-demo" && google_service_account.deployer.account_id == "team5-calendar-demo-ci"
     error_message = "Demo must have its own GitHub Environment and deployer."
   }
 }
